@@ -83,11 +83,11 @@ let _lastActiveCard = null; // кэш для активной карточки
 const _cardElements = new Map(); // кэш: track.path → HTMLElement
 
 // ===== ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ =====
+const _escapeDiv = document.createElement('div');
 function escapeHtml(str) {
   if (!str) return '';
-  const d = document.createElement('div');
-  d.textContent = str;
-  return d.innerHTML;
+  _escapeDiv.textContent = str;
+  return _escapeDiv.innerHTML;
 }
 
 // Для data-атрибутов — не нужно HTML-экранирование, только кавычки
@@ -103,8 +103,8 @@ function getFileTypeText(ext) {
 function formatTime(sec) {
   if (!sec || isNaN(sec)) return '0:00';
   const m = Math.floor(sec / 60);
-  const s = Math.floor(sec % 60).toString().padStart(2, '0');
-  return `${m}:${s}`;
+  const s = Math.floor(sec % 60);
+  return `${m}:${s < 10 ? '0' : ''}${s}`;
 }
 
 function formatDate(ts) {
@@ -1034,41 +1034,36 @@ function renderPlaylist(page) {
   updatePlaylistInfo(displayTracks);
   updateSelectionBar(displayTracks);
 
-  // Оптимизированный рендеринг большими батчами
+  // Рендерим ВСЁ сразу одним батчем для максимальной скорости
   const isSelecting = selectedTracks.size > 0;
-  const BATCH = 30;
-  let batchIdx = 0;
-
-  function renderNextBatch() {
-    const end = Math.min(batchIdx + BATCH, pageTracks.length);
-    const fragment = document.createDocumentFragment();
-    
-    for (let i = batchIdx; i < end; i++) {
-      const track = pageTracks[i];
-      const realIndex = getTrackIndex(track.path);
-      if (realIndex === -1) continue;
-      fragment.appendChild(buildTrackCard(track, realIndex, isSelecting));
-    }
-    
-    playlistGrid.appendChild(fragment);
-    batchIdx = end;
-    
-    if (batchIdx < pageTracks.length) {
-      requestAnimationFrame(renderNextBatch);
-    } else {
-      // Пагинация
-      if (totalPages > 1) {
-        const paginationEl = document.createElement('div');
-        paginationEl.className = 'pagination';
-        paginationEl.innerHTML = buildPaginationHTML(totalPages, _currentPage);
-        playlistGrid.appendChild(paginationEl);
-      }
-      // Загружаем метаданные только после полной отрисовки
-      requestAnimationFrame(() => loadMetadataForPageIfNeeded(pageTracks));
-    }
+  const fragment = document.createDocumentFragment();
+  
+  // Предварительно вычисляем индексы для всех треков на странице
+  const trackIndices = new Map();
+  pageTracks.forEach(track => {
+    const idx = getTrackIndex(track.path);
+    if (idx !== -1) trackIndices.set(track.path, idx);
+  });
+  
+  for (let i = 0; i < pageTracks.length; i++) {
+    const track = pageTracks[i];
+    const realIndex = trackIndices.get(track.path);
+    if (realIndex === undefined) continue;
+    fragment.appendChild(buildTrackCard(track, realIndex, isSelecting));
   }
   
-  renderNextBatch();
+  playlistGrid.appendChild(fragment);
+  
+  // Пагинация
+  if (totalPages > 1) {
+    const paginationEl = document.createElement('div');
+    paginationEl.className = 'pagination';
+    paginationEl.innerHTML = buildPaginationHTML(totalPages, _currentPage);
+    playlistGrid.appendChild(paginationEl);
+  }
+  
+  // Загружаем метаданные в фоне
+  requestAnimationFrame(() => loadMetadataForPageIfNeeded(pageTracks));
 }
 
 function buildPaginationHTML(totalPages, currentPage) {
@@ -1142,31 +1137,19 @@ function buildTrackCard(track, realIndex, isSelecting) {
   }
 
   const duration = track.duration ? formatTime(track.duration) : '--:--';
-  const fileType = getFileTypeText(track.ext);
   const iconClass = isActive && isPlaying ? 'pause' : 'play';
+  
+  // Упрощённая генерация HTML
+  let artHTML;
+  if (isSelected) {
+    artHTML = '<div class="select-check"><i class="fa-solid fa-check"></i></div>';
+  } else if (track.cover) {
+    artHTML = `<img src="${track.cover}" style="width:100%;height:100%;object-fit:cover;border-radius:10px;"><div class="play-overlay"><i class="fa-solid fa-${iconClass}"></i></div>`;
+  } else {
+    artHTML = `<i class="fa-solid fa-music"></i><div class="play-overlay"><i class="fa-solid fa-${iconClass}"></i></div>`;
+  }
 
-  const artContent = isSelected
-    ? `<div class="select-check"><i class="fa-solid fa-check"></i></div>`
-    : track.cover
-      ? `<img src="${track.cover}" style="width:100%;height:100%;object-fit:cover;border-radius:10px;"><div class="play-overlay"><i class="fa-solid fa-${iconClass}"></i></div>`
-      : `<i class="fa-solid fa-music"></i><div class="play-overlay"><i class="fa-solid fa-${iconClass}"></i></div>`;
-
-  card.innerHTML = `
-    <div class="track-card-art">
-      ${artContent}
-    </div>
-    <div class="track-card-info">
-      <div class="track-card-title">${escapeHtml(track.name)}</div>
-      <div class="track-card-meta">
-        <span class="track-card-type"><i class="fa-regular fa-file-audio"></i> <span>${track.artist ? escapeHtml(track.artist) : fileType}</span></span>
-        <span class="track-card-duration"><i class="fa-regular fa-clock"></i> ${duration}</span>
-        ${track.liked ? '<span class="track-liked-badge"><i class="fa-solid fa-heart"></i></span>' : ''}
-      </div>
-    </div>
-    <div class="track-card-menu">
-      <button class="track-menu-btn" data-index="${realIndex}"><i class="fa-solid fa-ellipsis"></i></button>
-    </div>
-  `;
+  card.innerHTML = `<div class="track-card-art">${artHTML}</div><div class="track-card-info"><div class="track-card-title">${escapeHtml(track.name)}</div><div class="track-card-meta"><span class="track-card-type"><i class="fa-regular fa-file-audio"></i> <span>${track.artist ? escapeHtml(track.artist) : track.ext + '-файл'}</span></span><span class="track-card-duration"><i class="fa-regular fa-clock"></i> ${duration}</span>${track.liked ? '<span class="track-liked-badge"><i class="fa-solid fa-heart"></i></span>' : ''}</div></div><div class="track-card-menu"><button class="track-menu-btn" data-index="${realIndex}"><i class="fa-solid fa-ellipsis"></i></button></div>`;
 
   // Сохраняем в кэш
   _cardElements.set(track.path, card);
