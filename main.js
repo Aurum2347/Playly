@@ -18,6 +18,12 @@ protocol.registerSchemesAsPrivileged([
 let mainWindow;
 let splashWindow;
 const DATA_PATH = path.join(app.getPath('userData'), 'topmusic-data.json');
+const COVERS_DIR = path.join(app.getPath('userData'), 'covers');
+
+// Создаём папку для обложек при старте
+async function ensureCoversDir() {
+  try { await fs.mkdir(COVERS_DIR, { recursive: true }); } catch {}
+}
 
 function createSplashWindow() {
   splashWindow = new BrowserWindow({
@@ -79,6 +85,7 @@ function createWindow() {
 }
 
 app.whenReady().then(() => {
+  ensureCoversDir();
   createSplashWindow();
   // Кастомный протокол для стриминга локальных аудиофайлов
   protocol.handle('localfile', async (request) => {
@@ -255,6 +262,104 @@ ipcMain.handle('load-data', async () => {
   } catch {
     return null;
   }
+});
+
+// ===== ХРАНИЛИЩЕ ОБЛОЖЕК =====
+// Сохранить обложку на диск, вернуть coverId (имя файла без расширения)
+ipcMain.handle('save-cover', async (_, coverId, base64Data) => {
+  try {
+    await ensureCoversDir();
+    // base64Data = "data:image/jpeg;base64,/9j/..."
+    const matches = base64Data.match(/^data:([^;]+);base64,(.+)$/);
+    if (!matches) return null;
+    const ext = matches[1].split('/')[1]?.replace('jpeg', 'jpg') || 'jpg';
+    const buffer = Buffer.from(matches[2], 'base64');
+    const filePath = path.join(COVERS_DIR, `${coverId}.${ext}`);
+    await fs.writeFile(filePath, buffer);
+    return `${coverId}.${ext}`;
+  } catch (e) {
+    console.error('Save cover error:', e);
+    return null;
+  }
+});
+
+// Загрузить обложку с диска, вернуть base64 data URL
+ipcMain.handle('load-cover', async (_, coverId) => {
+  try {
+    // coverId может быть "abc123.jpg" или просто "abc123"
+    const name = coverId.includes('.') ? coverId : null;
+    if (name) {
+      const filePath = path.join(COVERS_DIR, name);
+      const buffer = await fs.readFile(filePath);
+      const ext = path.extname(name).slice(1).replace('jpg', 'jpeg');
+      return `data:image/${ext};base64,${buffer.toString('base64')}`;
+    }
+    // Ищем файл с любым расширением
+    const files = await fs.readdir(COVERS_DIR);
+    const found = files.find(f => f.startsWith(coverId + '.'));
+    if (!found) return null;
+    const filePath = path.join(COVERS_DIR, found);
+    const buffer = await fs.readFile(filePath);
+    const ext = path.extname(found).slice(1).replace('jpg', 'jpeg');
+    return `data:image/${ext};base64,${buffer.toString('base64')}`;
+  } catch {
+    return null;
+  }
+});
+
+// Загрузить несколько обложек батчем — возвращает Map { coverId -> dataUrl }
+ipcMain.handle('load-covers-batch', async (_, coverIds) => {
+  const result = {};
+  await Promise.all(coverIds.map(async (coverId) => {
+    try {
+      const name = coverId.includes('.') ? coverId : null;
+      let filePath;
+      if (name) {
+        filePath = path.join(COVERS_DIR, name);
+      } else {
+        const files = await fs.readdir(COVERS_DIR);
+        const found = files.find(f => f.startsWith(coverId + '.'));
+        if (!found) return;
+        filePath = path.join(COVERS_DIR, found);
+      }
+      const buffer = await fs.readFile(filePath);
+      const ext = path.extname(filePath).slice(1).replace('jpg', 'jpeg');
+      result[coverId] = `data:image/${ext};base64,${buffer.toString('base64')}`;
+    } catch {}
+  }));
+  return result;
+});
+
+// Удалить обложку
+ipcMain.handle('delete-cover', async (_, coverId) => {
+  try {
+    const files = await fs.readdir(COVERS_DIR);
+    const found = files.find(f => f.startsWith(coverId.replace(/\.[^.]+$/, '') + '.') || f === coverId);
+    if (found) await fs.unlink(path.join(COVERS_DIR, found));
+    return true;
+  } catch { return false; }
+});
+
+// Мигрировать старые base64 обложки из JSON в файлы
+// Вызывается один раз при старте если в треках ещё есть поле cover
+ipcMain.handle('migrate-covers', async (_, tracks) => {
+  await ensureCoversDir();
+  const result = {}; // path -> coverId
+  await Promise.all(tracks.map(async (track) => {
+    if (!track.cover || !track.cover.startsWith('data:')) return;
+    // coverId = md5-подобный хэш пути трека (просто base36 от числа)
+    const coverId = Math.abs(track.path.split('').reduce((h, c) => (Math.imul(31, h) + c.charCodeAt(0)) | 0, 0)).toString(36);
+    try {
+      const matches = track.cover.match(/^data:([^;]+);base64,(.+)$/);
+      if (!matches) return;
+      const ext = matches[1].split('/')[1]?.replace('jpeg', 'jpg') || 'jpg';
+      const buffer = Buffer.from(matches[2], 'base64');
+      const fileName = `${coverId}.${ext}`;
+      await fs.writeFile(path.join(COVERS_DIR, fileName), buffer);
+      result[track.path] = fileName;
+    } catch {}
+  }));
+  return result;
 });
 
 // Получить длительность аудиофайла (парсинг заголовков без чтения всего файла)

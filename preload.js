@@ -22,4 +22,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
   loadData: () => ipcRenderer.invoke('load-data'),
   getAudioMetadata: (filePath) => ipcRenderer.invoke('get-audio-metadata', filePath),
   getAudioDuration: (filePath) => ipcRenderer.invoke('get-audio-duration', filePath),
+  // Хранилище обложек
+  saveCover: (coverId, base64Data) => ipcRenderer.invoke('save-cover', coverId, base64Data),
+  loadCover: (coverId) => ipcRenderer.invoke('load-cover', coverId),
+  loadCoversBatch: (coverIds) => ipcRenderer.invoke('load-covers-batch', coverIds),
+  deleteCover: (coverId) => ipcRenderer.invoke('delete-cover', coverId),
+  migrateCovers: (tracks) => ipcRenderer.invoke('migrate-covers', tracks),
 });

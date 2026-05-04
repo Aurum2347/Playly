@@ -155,6 +155,38 @@ function showToast(message, type = 'success') {
   }, 2500);
 }
 
+// ===== ЛЕНИВАЯ ЗАГРУЗКА ОБЛОЖЕК =====
+let _coverObserver = null;
+
+function initCoverObserver() {
+  if (_coverObserver) return;
+  _coverObserver = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (!entry.isIntersecting) return;
+      const img = entry.target;
+      const coverData = img.dataset.coverData;
+      if (coverData) {
+        // Плавное появление
+        img.style.opacity = '0';
+        img.style.transition = 'opacity 0.3s ease';
+        img.src = coverData;
+        img.onload = () => {
+          img.style.opacity = '1';
+          delete img.dataset.coverData;
+        };
+        img.onerror = () => {
+          img.style.opacity = '1';
+          delete img.dataset.coverData;
+        };
+      }
+      _coverObserver.unobserve(img);
+    });
+  }, {
+    rootMargin: '200px 0px',
+    threshold: 0
+  });
+}
+
 // ===== КЭШ ИНДЕКСОВ (path → index) для O(1) поиска =====
 let _trackIndexCache = new Map();
 
@@ -173,6 +205,7 @@ async function init() {
     appVersionEl.textContent = window.appConfig.version;
   }
   audio.volume = lastVolume;
+  initCoverObserver();
   updateVolumeUI();
   
   await loadData();
@@ -187,11 +220,9 @@ async function init() {
   loadUIPreferences();
   initGraph();
 
-  // Откладываем тяжёлые фоновые задачи — не блокируем первый рендер
-  // checkMissingFiles запускаем через 4с после старта
+  // Откладываем тяжёлые фоновые задачи
   setTimeout(() => checkMissingFiles(), 4000);
 
-  // Метаданные и длительности — через requestIdleCallback чтобы не мешать UI
   const scheduleIdle = window.requestIdleCallback
     ? (fn) => requestIdleCallback(fn, { timeout: 3000 })
     : (fn) => setTimeout(fn, 500);
@@ -865,10 +896,11 @@ function addDemoTracks() {
   renderAll();
 }
 
-// ===== РЕНДЕРИНГ ПЛЕЙЛИСТА (пагинация по 60 треков) =====
+// ===== РЕНДЕРИНГ ПЛЕЙЛИСТА (оптимизированный) =====
 const PAGE_SIZE = 60;
-let _currentDisplayTracks = []; // кэш отсортированного списка
-let _currentPage = 0;           // текущая страница (0-based)
+let _currentDisplayTracks = [];
+let _currentPage = 0;
+let _lastSortKey = '';
 
 function renderPlaylist(page) {
   if (!playlistGrid) return;
@@ -900,20 +932,23 @@ function renderPlaylist(page) {
     return;
   }
 
-  // Сортировка
-  switch(currentSortType) {
-    case 'name-az': displayTracks.sort((a, b) => a.name.localeCompare(b.name, 'ru')); break;
-    case 'name-za': displayTracks.sort((a, b) => b.name.localeCompare(a.name, 'ru')); break;
-    case 'date-new-old': displayTracks.sort((a, b) => b.dateAdded - a.dateAdded); break;
-    case 'date-old-new': displayTracks.sort((a, b) => a.dateAdded - b.dateAdded); break;
-    case 'artist-az': displayTracks.sort((a, b) => (a.artist||'').localeCompare(b.artist||'', 'ru')); break;
-    case 'artist-za': displayTracks.sort((a, b) => (b.artist||'').localeCompare(a.artist||'', 'ru')); break;
+  // Кэшированная сортировка
+  const sortKey = `${currentSortType}-${currentCategory}-${searchQuery}`;
+  if (_lastSortKey !== sortKey) {
+    switch(currentSortType) {
+      case 'name-az': displayTracks.sort((a, b) => a.name.localeCompare(b.name, 'ru')); break;
+      case 'name-za': displayTracks.sort((a, b) => b.name.localeCompare(a.name, 'ru')); break;
+      case 'date-new-old': displayTracks.sort((a, b) => b.dateAdded - a.dateAdded); break;
+      case 'date-old-new': displayTracks.sort((a, b) => a.dateAdded - b.dateAdded); break;
+      case 'artist-az': displayTracks.sort((a, b) => (a.artist||'').localeCompare(b.artist||'', 'ru')); break;
+      case 'artist-za': displayTracks.sort((a, b) => (b.artist||'').localeCompare(a.artist||'', 'ru')); break;
+    }
+    _lastSortKey = sortKey;
   }
 
   _currentDisplayTracks = displayTracks;
 
   const totalPages = Math.ceil(displayTracks.length / PAGE_SIZE);
-  // Клампируем страницу
   if (_currentPage >= totalPages) _currentPage = totalPages - 1;
   if (_currentPage < 0) _currentPage = 0;
 
@@ -925,37 +960,42 @@ function renderPlaylist(page) {
   updatePlaylistInfo(displayTracks);
   updateSelectionBar(displayTracks);
 
-  // Рендерим батчами по 30 карточек через rAF чтобы не блокировать UI
+  // Простой рендеринг маленькими батчами
   const isSelecting = selectedTracks.size > 0;
-  const BATCH = 30;
+  const BATCH = 10; // Уменьшил батч для плавности
   let batchIdx = 0;
 
   function renderNextBatch() {
     const end = Math.min(batchIdx + BATCH, pageTracks.length);
     const fragment = document.createDocumentFragment();
+    
     for (let i = batchIdx; i < end; i++) {
       const track = pageTracks[i];
-      const realIndex = getTrackIndex(track.path); // O(1) вместо O(n)
+      const realIndex = getTrackIndex(track.path);
       if (realIndex === -1) continue;
       fragment.appendChild(buildTrackCard(track, realIndex, isSelecting));
     }
+    
     playlistGrid.appendChild(fragment);
     batchIdx = end;
+    
     if (batchIdx < pageTracks.length) {
-      requestAnimationFrame(renderNextBatch);
+      // Увеличил задержку для плавности
+      setTimeout(renderNextBatch, 8);
     } else {
-      // Пагинация добавляется после всех карточек
+      // Пагинация
       if (totalPages > 1) {
         const paginationEl = document.createElement('div');
         paginationEl.className = 'pagination';
         paginationEl.innerHTML = buildPaginationHTML(totalPages, _currentPage);
         playlistGrid.appendChild(paginationEl);
       }
-      // Загружаем метаданные только для треков без данных (старые сохранения)
       loadMetadataForPageIfNeeded(pageTracks);
     }
   }
-  requestAnimationFrame(renderNextBatch);
+  
+  // Начинаем рендеринг через небольшую задержку
+  setTimeout(renderNextBatch, 1);
 }
 
 function buildPaginationHTML(totalPages, currentPage) {
@@ -1011,13 +1051,12 @@ function buildTrackCard(track, realIndex, isSelecting) {
   card.dataset.index = realIndex;
   card.dataset.path = track.path;
   
-  // Применяем кастомный цвет карточки
+  // Кастомный цвет карточки
   if (track.cardColor && !isSelected) {
     const hex = track.cardColor;
     const r = parseInt(hex.slice(1,3),16), g = parseInt(hex.slice(3,5),16), b = parseInt(hex.slice(5,7),16);
     card.style.background = `rgba(${r},${g},${b},0.12)`;
     card.style.borderColor = `rgba(${r},${g},${b},0.35)`;
-    card.style.setProperty('--card-accent', hex);
   }
 
   const duration = track.duration ? formatTime(track.duration) : '--:--';
@@ -1027,7 +1066,7 @@ function buildTrackCard(track, realIndex, isSelecting) {
   const artContent = isSelected
     ? `<div class="select-check"><i class="fa-solid fa-check"></i></div>`
     : track.cover
-      ? `<img src="${track.cover}" style="width:100%;height:100%;object-fit:cover;border-radius:10px;" loading="lazy"><div class="play-overlay"><i class="fa-solid fa-${iconClass}"></i></div>`
+      ? `<img class="lazy-cover" style="width:100%;height:100%;object-fit:cover;border-radius:10px;"><div class="play-overlay"><i class="fa-solid fa-${iconClass}"></i></div>`
       : `<i class="fa-solid fa-music"></i><div class="play-overlay"><i class="fa-solid fa-${iconClass}"></i></div>`;
 
   card.innerHTML = `
@@ -1073,6 +1112,15 @@ function buildTrackCard(track, realIndex, isSelecting) {
     contextTrackIndex = realIndex;
     showContextMenu(e, card);
   });
+
+  // Ленивая загрузка обложки
+  if (track.cover && !isSelected && _coverObserver) {
+    const lazyImg = card.querySelector('img.lazy-cover');
+    if (lazyImg) {
+      lazyImg.dataset.coverData = track.cover;
+      _coverObserver.observe(lazyImg);
+    }
+  }
 
   return card;
 }
@@ -1151,7 +1199,17 @@ function toggleTrackSelection(trackPath) {
         const isActive = realIndex === currentIndex;
         const iconClass = isActive && isPlaying ? 'pause' : 'play';
         if (track?.cover) {
-          artEl.innerHTML = `<img src="${track.cover}" style="width:100%;height:100%;object-fit:cover;border-radius:10px;"><div class="play-overlay"><i class="fa-solid fa-${iconClass}"></i></div>`;
+          const img = document.createElement('img');
+          img.style.cssText = 'width:100%;height:100%;object-fit:cover;border-radius:10px;';
+          img.className = 'lazy-cover';
+          img.dataset.coverData = track.cover;
+          const overlay = document.createElement('div');
+          overlay.className = 'play-overlay';
+          overlay.innerHTML = `<i class="fa-solid fa-${iconClass}"></i>`;
+          artEl.innerHTML = '';
+          artEl.appendChild(img);
+          artEl.appendChild(overlay);
+          if (_coverObserver) _coverObserver.observe(img);
         } else {
           artEl.innerHTML = `<i class="fa-solid fa-music"></i><div class="play-overlay"><i class="fa-solid fa-${iconClass}"></i></div>`;
         }
@@ -1346,7 +1404,7 @@ function renderRecent() {
     
     card.innerHTML = `
       <div class="song-card-art">
-        ${track.cover ? `<img src="${track.cover}" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;border-radius:8px;">` : '<i class="fa-solid fa-music"></i>'}
+        ${track.cover ? `<img class="lazy-cover" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;border-radius:8px;">` : '<i class="fa-solid fa-music"></i>'}
         <div class="play-overlay"><i class="fa-solid fa-${isCurrentAndPlaying ? 'pause' : 'play'}"></i></div>
       </div>
       <div class="song-card-title">${escapeHtml(track.name)}</div>
@@ -1354,7 +1412,6 @@ function renderRecent() {
     `;
     card.onclick = () => {
       if (idx === currentIndex) {
-        // Тот же трек — toggle play/pause
         togglePlay();
       } else {
         currentIndex = idx;
@@ -1368,6 +1425,14 @@ function renderRecent() {
       showContextMenu(e, card);
     });
     recentCards.appendChild(card);
+    // Регистрируем ленивую загрузку обложки
+    if (track.cover && _coverObserver) {
+      const lazyImg = card.querySelector('img.lazy-cover');
+      if (lazyImg) {
+        lazyImg.dataset.coverData = track.cover;
+        _coverObserver.observe(lazyImg);
+      }
+    }
   });
 }
 
@@ -1497,46 +1562,63 @@ async function loadMetadataForTrack(track) {
       if (meta.artist && meta.artist.trim()) { track.artist = meta.artist.trim(); changed = true; }
       if (meta.album) track.album = meta.album;
       if (meta.cover && meta.cover.length > 50) { track.cover = meta.cover; changed = true; }
+
       if (changed) {
-        // Обновляем только player-bar и recent — карточки плейлиста обновятся при следующем рендере страницы
         requestAnimationFrame(() => {
           // Обновляем player-bar если это текущий трек
           if (tracks[currentIndex]?.path === track.path) {
             trackNameEl.textContent = track.name;
             trackArtistEl.textContent = track.artist || getFileTypeText(track.ext);
-            const playerArt = document.querySelector('.player-track-art');
-            if (playerArt && track.cover) {
-              let img = playerArt.querySelector('img');
-              if (!img) { img = document.createElement('img'); playerArt.insertBefore(img, playerArt.firstChild); }
-              img.src = track.cover;
+            if (track.cover) {
+              const playerArt = document.querySelector('.player-track-art');
+              if (playerArt) {
+                let img = playerArt.querySelector('img');
+                if (!img) { img = document.createElement('img'); playerArt.insertBefore(img, playerArt.firstChild); }
+                img.src = track.cover;
+              }
             }
             updateNowPlayingCard();
           }
           // Обновляем недавние
           const recentCard = recentCards?.querySelector(`[data-path="${CSS.escape(track.path)}"]`);
-          if (recentCard) {
-            if (track.cover) {
-              const artEl = recentCard.querySelector('.song-card-art');
-              if (artEl) {
-                let img = artEl.querySelector('img');
-                if (!img) {
-                  img = document.createElement('img');
-                  img.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;object-fit:cover;border-radius:8px;';
-                  artEl.insertBefore(img, artEl.firstChild);
-                }
-                img.src = track.cover;
+          if (recentCard && track.cover) {
+            const artEl = recentCard.querySelector('.song-card-art');
+            if (artEl) {
+              let img = artEl.querySelector('img');
+              if (!img) {
+                img = document.createElement('img');
+                img.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;object-fit:cover;border-radius:8px;';
+                artEl.insertBefore(img, artEl.firstChild);
               }
+              img.src = track.cover;
             }
             const artistEl = recentCard.querySelector('.song-card-artist');
             if (artistEl) artistEl.textContent = track.artist || getFileTypeText(track.ext);
           }
-          // Обновляем карточку в плейлисте только текстовые поля (без обложки — она вставится при рендере)
+          // Обновляем карточку в плейлисте
           const card = playlistGrid?.querySelector(`[data-path="${CSS.escape(track.path)}"]`);
           if (card) {
             const titleEl = card.querySelector('.track-card-title');
             if (titleEl) titleEl.textContent = track.name;
             const typeEl = card.querySelector('.track-card-type span');
             if (typeEl) typeEl.textContent = track.artist || getFileTypeText(track.ext);
+            // Обновляем обложку если она появилась
+            if (track.cover) {
+              const artEl = card.querySelector('.track-card-art');
+              if (artEl && !artEl.querySelector('img')) {
+                const realIndex = getTrackIndex(track.path);
+                const isActive = realIndex === currentIndex;
+                const iconClass = isActive && isPlaying ? 'pause' : 'play';
+                const img = document.createElement('img');
+                img.style.cssText = 'width:100%;height:100%;object-fit:cover;border-radius:10px;';
+                img.className = 'lazy-cover';
+                img.dataset.coverData = track.cover;
+                const musicIcon = artEl.querySelector('i.fa-music');
+                if (musicIcon) musicIcon.remove();
+                artEl.insertBefore(img, artEl.firstChild);
+                if (_coverObserver) _coverObserver.observe(img);
+              }
+            }
           }
         });
         saveDataDebounced();
@@ -2293,13 +2375,10 @@ async function loadData() {
       tracks.forEach(t => {
         if (!t.categories) t.categories = ['all-songs'];
         else if (!t.categories.includes('all-songs')) t.categories.push('all-songs');
-        // Сбрасываем _metaLoaded из JSON (он больше не сохраняется, но мог остаться в старых данных)
         delete t._metaLoaded;
-        // Обложка валидна только если начинается с data:
-        if (t.cover && !t.cover.startsWith('data:')) {
-          t.cover = null; // битая обложка — сбрасываем
-        }
-        // Треки с обложкой И исполнителем считаем уже загруженными
+        // Валидация обложек
+        if (t.cover && !t.cover.startsWith('data:')) t.cover = null;
+        // Треки с обложкой И исполнителем считаем загруженными
         if (t.cover && t.artist) t._metaLoaded = true;
       });
     }
