@@ -1,0 +1,22 @@
+{
+  "name": "playly",
+  "version": "1.0.0",
+  "description": "Playly - аудиоплеер",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "dist": "node build.js"
+  },
+  "author": "Aurum2347",
+  "license": "MIT",
+  "devDependencies": {
+    "electron": "^28.0.0",
+    "electron-builder": "^25.1.8",
+    "electron-packager": "^17.1.2",
+    "asar": "^3.2.0"
+  },
+  "dependencies": {
+    "jsmediatags": "^3.9.7"
+  },
+  "type": "commonjs"
+}
