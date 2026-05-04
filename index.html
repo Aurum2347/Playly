@@ -1,0 +1,1828 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Playly</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; user-select: none; -webkit-user-select: none; outline: none !important; }
+        input, textarea { user-select: text; -webkit-user-select: text; }
+        
+        :root {
+            --bg-color: #0a0a0a;
+            --sidebar-bg: #0c0c0c;
+        }
+        
+        html, body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: #0a0a0a;
+            color: #ffffff;
+            height: 100vh;
+            width: 100vw;
+            overflow: hidden;
+            display: flex;
+            font-size: var(--font-base);
+        }
+
+        /* Полоса для перетаскивания окна — только верхние 40px */
+        .drag-region {
+            position: fixed; top: 0; left: 0; right: 0; height: 40px;
+            -webkit-app-region: drag;
+            z-index: 9998;
+        }
+
+        .window-controls {
+            position: absolute; top: 0; right: 0; display: flex;
+            height: 40px; z-index: 10000;
+            backdrop-filter: none !important;
+            -webkit-backdrop-filter: none !important;
+            background: transparent !important;
+            -webkit-app-region: no-drag;
+        }
+        .window-btn {
+            width: 46px; height: 40px; display: flex; align-items: center;
+            justify-content: center; background: transparent; border: none;
+            color: #aaa; font-size: 14px; cursor: default;
+            transition: background 0.15s, color 0.15s;
+        }
+        .window-btn:hover { background: rgba(255,255,255,0.08); color: #fff; }
+        .window-btn.close:hover { background: #e81123; color: #fff; }
+
+        ::-webkit-scrollbar { width: 5px; height: 5px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.12); border-radius: 10px; }
+        ::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.22); }
+
+        .sidebar {
+            width: 260px; min-width: 260px; background: #0c0c0c;
+            border-right: 1px solid rgba(255,255,255,0.06); display: flex; flex-direction: column;
+            height: 100vh; position: relative; z-index: 100;
+            flex-shrink: 0;
+        }
+        .sidebar-logo { 
+            padding: 0 20px 22px;
+            padding-top: 40px;
+            border-bottom: 1px solid rgba(255,255,255,0.06);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            height: 96px;
+            flex-shrink: 0;
+        }
+        .sidebar-logo svg {
+            width: 28px;
+            height: 28px;
+            flex-shrink: 0;
+        }
+        .sidebar-logo h1 {
+            font-size: 18px; font-weight: 700; letter-spacing: -0.3px;
+            background: linear-gradient(135deg, #ffffff 0%, #666 100%);
+            -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin: 0;
+        }
+        .sidebar-logo h1 span { -webkit-text-fill-color: #ffffff; }
+        .sidebar-nav { padding: 12px 10px; flex: 1; overflow-y: auto; min-height: 0; }
+        .nav-item {
+            display: flex; align-items: center; gap: 12px; padding: 10px 14px;
+            border-radius: 10px; cursor: pointer; transition: all 0.15s ease;
+            margin-bottom: 1px; font-size: 13px; font-weight: 500; color: #666; position: relative;
+        }
+        .nav-item:hover { background: rgba(255,255,255,0.05); color: #bbb; }
+        .nav-item.active { background: rgba(255,255,255,0.07); color: #fff; }
+        .nav-item.active::before {
+            content: ''; position: absolute; left: 0; top: 50%; transform: translateY(-50%);
+            width: 2px; height: 16px; background: #fff; border-radius: 2px;
+        }
+        .nav-item i { font-size: 15px; width: 18px; text-align: center; opacity: 0.8; }
+        .nav-label {
+            padding: 16px 14px 6px; font-size: 10px; font-weight: 600;
+            text-transform: uppercase; letter-spacing: 1.2px; color: #333;
+            cursor: default; user-select: none;
+        }
+        .nav-divider {
+            height: 1px; background: rgba(255,255,255,0.06);
+            margin: 0 10px 4px; border-radius: 1px;
+        }
+        .add-btn {
+            margin: 10px; padding: 11px; background: rgba(255,255,255,0.05);
+            border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; color: #888;
+            font-size: 12px; font-weight: 500; cursor: pointer; display: flex;
+            align-items: center; justify-content: center; gap: 7px; transition: all 0.2s ease;
+            font-family: 'Inter', sans-serif;
+        }
+        .add-btn:hover {
+            background: rgba(255,255,255,0.09);
+            border-color: rgba(255,255,255,0.14); color: #ccc;
+        }
+        .custom-category { position: relative; }
+        .custom-category .delete-cat {
+            position: absolute; right: 10px; top: 50%; transform: translateY(-50%);
+            opacity: 0; transition: opacity 0.15s; background: none; border: none;
+            color: #444; cursor: pointer; font-size: 11px; padding: 3px; border-radius: 4px;
+        }
+        .custom-category:hover .delete-cat { opacity: 1; }
+        .custom-category .delete-cat:hover { color: #fff; background: rgba(255,255,255,0.08); }
+
+        .main-content {
+            flex: 1; display: flex; flex-direction: column; height: 100vh;
+            overflow: hidden; position: relative; padding-top: 40px;
+            background: var(--bg-color, #0a0a0a); min-width: 0; width: 0;
+        }
+
+        .top-bar {
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 0 28px; height: 56px; border-bottom: 1px solid rgba(255,255,255,0.06);
+            background: rgba(10,10,10,0.98); backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px); flex-shrink: 0;
+            position: relative; z-index: 50; min-width: 0; width: 100%;
+        }
+        .top-bar-title {
+            font-size: 15px; font-weight: 600; letter-spacing: -0.2px;
+            overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+            display: flex; align-items: center; gap: 8px; color: #fff;
+        }
+        .top-bar-title svg { width: 18px; height: 18px; flex-shrink: 0; opacity: 0.7; }
+
+        .top-bar-actions {
+            display: flex; align-items: center; gap: 8px; flex-shrink: 0;
+        }
+
+        .sort-container { position: relative; z-index: 1000; flex-shrink: 0; }
+        .sort-container.hidden { opacity: 0; pointer-events: none; position: absolute; }
+        .sort-btn {
+            display: flex; align-items: center; gap: 6px; padding: 6px 12px;
+            background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.08);
+            border-radius: 8px; color: #777; font-size: 12px; font-weight: 500;
+            cursor: pointer; transition: all 0.15s; font-family: 'Inter', sans-serif;
+        }
+        .sort-btn:hover { background: rgba(255,255,255,0.08); color: #ccc; border-color: rgba(255,255,255,0.12); }
+        .sort-dropdown {
+            position: absolute; top: calc(100% + 6px); right: 0;
+            background: #141414; border: 1px solid rgba(255,255,255,0.1); border-radius: 12px;
+            padding: 6px; min-width: 220px;
+            box-shadow: 0 16px 48px rgba(0,0,0,0.7);
+            opacity: 0; visibility: hidden; transform: translateY(-6px);
+            transition: all 0.2s ease; z-index: 10000 !important;
+        }
+        .sort-dropdown.open { opacity: 1; visibility: visible; transform: translateY(0); }
+        .sort-group { margin-bottom: 2px; }
+        .sort-group:last-child { margin-bottom: 0; }
+        .sort-group-title {
+            font-size: 9px; font-weight: 600; text-transform: uppercase;
+            letter-spacing: 1px; color: #444; padding: 6px 10px 3px;
+        }
+        .sort-option {
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 8px 10px; border-radius: 7px; cursor: pointer;
+            font-size: 12px; color: #888; transition: all 0.12s;
+        }
+        .sort-option:hover { background: rgba(255,255,255,0.06); color: #ddd; }
+        .sort-option.active { background: rgba(255,255,255,0.07); color: #fff; }
+        .sort-option .check-icon { opacity: 0; font-size: 11px; color: #fff; }
+        .sort-option.active .check-icon { opacity: 1; }
+
+        .settings-top-btn {
+            display: flex; align-items: center; gap: 5px;
+            padding: 6px 12px; background: rgba(255,255,255,0.05);
+            border: 1px solid rgba(255,255,255,0.08); border-radius: 8px;
+            color: #777; font-size: 12px; cursor: pointer; transition: all 0.15s;
+            font-family: 'Inter', sans-serif;
+        }
+        .settings-top-btn:hover { background: rgba(255,255,255,0.08); color: #ccc; }
+        .settings-top-btn.hidden { display: none; }
+
+        .home-wrapper {
+            flex: 1; min-height: 0; overflow-y: auto; display: flex;
+            flex-direction: column; padding-bottom: 88px;
+        }
+        .home-wrapper:not(.active) { display: none; }
+        .home-section {
+            padding: 20px 20px 0;
+            display: flex; flex-direction: column; min-width: 0; width: 100%;
+            cursor: default; gap: 16px; flex-shrink: 0;
+        }
+        .home-section:not(.active) { display: none; }
+
+        .playlist-view {
+            flex: 1; min-height: 0; padding: 20px 20px; padding-bottom: 88px;
+            display: none; flex-direction: column; overflow-y: scroll;
+            min-width: 0; width: 100%; cursor: default;
+            scrollbar-width: auto;
+            scrollbar-color: rgba(255,255,255,0.2) transparent;
+        }
+        .playlist-view::-webkit-scrollbar { width: 8px; }
+        .playlist-view::-webkit-scrollbar-track { background: rgba(255,255,255,0.03); border-radius: 4px; }
+        .playlist-view::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.18); border-radius: 4px; }
+        .playlist-view::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.32); }
+        .playlist-view.active { display: flex; }
+        .playlist-header {
+            display: flex; align-items: center; justify-content: space-between;
+            margin-bottom: 16px; flex-shrink: 0;
+        }
+        .add-track-btn {
+            display: flex; align-items: center; gap: 5px;
+            padding: 7px 14px; background: rgba(255,255,255,0.05);
+            border: 1px solid rgba(255,255,255,0.08); border-radius: 8px;
+            color: #777; font-size: 12px; cursor: pointer; transition: all 0.15s;
+        }
+        .add-track-btn:hover { background: rgba(255,255,255,0.08); color: #ccc; }
+        .add-folder-btn {
+            display: flex; align-items: center; gap: 5px;
+            padding: 7px 14px; background: rgba(255,255,255,0.05);
+            border: 1px solid rgba(255,255,255,0.08); border-radius: 8px;
+            color: #777; font-size: 12px; cursor: pointer; transition: all 0.15s;
+            margin-left: 6px;
+        }
+        .add-folder-btn:hover { background: rgba(255,255,255,0.08); color: #ccc; }
+
+        .playlist-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+            gap: 8px;
+            width: 100%;
+        }
+        
+        .track-card {
+            background: rgba(255,255,255,0.03);
+            border: 1px solid rgba(255,255,255,0.05);
+            border-radius: 12px;
+            padding: 12px 14px;
+            cursor: pointer;
+            transition: background 0.15s, border-color 0.15s, transform 0.15s;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            position: relative;
+        }
+        .track-card:hover {
+            background: rgba(255,255,255,0.06);
+            border-color: rgba(255,255,255,0.09);
+            transform: translateY(-1px);
+        }
+        .track-card.active-track {
+            background: rgba(255,255,255,0.07);
+            border-color: rgba(255,255,255,0.14);
+        }
+        .track-card.selected {
+            background: rgba(255,255,255,0.08) !important;
+            border-color: rgba(255,255,255,0.25) !important;
+        }
+        
+        .track-card-art {
+            width: 44px; height: 44px;
+            background: rgba(255,255,255,0.05);
+            border-radius: 8px;
+            display: flex; align-items: center; justify-content: center;
+            flex-shrink: 0; position: relative; overflow: hidden;
+        }
+        .track-card-art i { font-size: 16px; color: #333; }
+        .track-card-art img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; border-radius: 8px; }
+        .track-card-art .play-overlay {
+            position: absolute; inset: 0;
+            background: rgba(0,0,0,0.6);
+            border-radius: 8px;
+            display: flex; align-items: center; justify-content: center;
+            opacity: 0; transition: opacity 0.15s;
+        }
+        .track-card:hover .play-overlay,
+        .track-card.active-track .play-overlay { opacity: 1; }
+        .track-card-art .play-overlay i { color: #fff; font-size: 14px; }
+        
+        .track-card-info {
+            flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px;
+        }
+        .track-card-title {
+            font-size: 13px; font-weight: 500; color: #ddd;
+            white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+        }
+        .track-card-meta {
+            display: flex; align-items: center; gap: 10px;
+            font-size: 11px; color: #444; min-width: 0;
+        }
+        .track-card-type {
+            display: flex; align-items: center; gap: 3px;
+            min-width: 0; overflow: hidden;
+        }
+        .track-card-type span {
+            white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+        }
+        .track-card-duration { display: flex; align-items: center; gap: 3px; flex-shrink: 0; }
+        
+        .track-card-menu { position: relative; }
+        .track-menu-btn {
+            background: none; border: none; color: #444; cursor: pointer;
+            padding: 6px; border-radius: 6px; font-size: 13px;
+            transition: all 0.12s; display: flex; align-items: center; justify-content: center;
+        }
+        .track-menu-btn:hover { background: rgba(255,255,255,0.08); color: #ccc; }
+        
+        .playlist-empty {
+            text-align: center; padding: 60px 20px; color: #333;
+            font-size: 13px; width: 100%;
+            /* Центрирование по всей странице с учётом сайдбара */
+            position: fixed;
+            top: 50%;
+            left: calc(260px + (100vw - 260px) / 2);
+            transform: translate(-50%, -50%);
+            pointer-events: none;
+            z-index: 1;
+        }
+        .playlist-empty i { font-size: 28px; margin-bottom: 10px; display: block; opacity: 0.3; }
+
+        /* Пагинация */
+        .pagination {
+            grid-column: 1 / -1;
+            display: flex; align-items: center; justify-content: center;
+            gap: 4px; padding: 20px 0 8px; flex-wrap: wrap;
+        }
+        .page-btn {
+            min-width: 32px; height: 32px; padding: 0 8px;
+            background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.07);
+            border-radius: 8px; color: #555; font-size: 12px; font-weight: 500;
+            cursor: pointer; transition: all 0.15s; font-family: 'Inter', sans-serif;
+            display: flex; align-items: center; justify-content: center;
+        }
+        .page-btn:hover { background: rgba(255,255,255,0.08); color: #ccc; border-color: rgba(255,255,255,0.12); }
+        .page-btn.active { background: rgba(255,255,255,0.12); color: #fff; border-color: rgba(255,255,255,0.2); }
+        .page-btn.dots { cursor: default; background: none; border-color: transparent; color: #333; }
+        .page-btn.dots:hover { background: none; color: #333; }
+
+        .recent-section {
+            padding: 16px 20px 14px 20px;
+            display: flex; flex-direction: column; flex-shrink: 0; min-width: 0; width: 100%;
+        }
+        .recent-section.hidden { display: none; }
+        /* Обёртка с fade-эффектом по краям */
+        .recent-cards-wrapper {
+            position: relative;
+            min-width: 0;
+        }
+        .recent-cards-wrapper::before,
+        .recent-cards-wrapper::after {
+            content: '';
+            position: absolute;
+            top: 0; bottom: 14px;
+            width: 48px;
+            z-index: 2;
+            pointer-events: none;
+            transition: opacity 0.2s;
+        }
+        .recent-cards-wrapper::before {
+            left: 0;
+            background: linear-gradient(to right, var(--bg-color, #0a0a0a) 0%, transparent 100%);
+        }
+        .recent-cards-wrapper::after {
+            right: 0;
+            background: linear-gradient(to left, var(--bg-color, #0a0a0a) 0%, transparent 100%);
+        }
+        .recent-cards-wrapper:has(.recent-cards.empty)::before,
+        .recent-cards-wrapper:has(.recent-cards.empty)::after { opacity: 0; }
+        .recent-cards {
+            display: flex; gap: 10px; overflow-x: auto; padding-bottom: 14px;
+            flex-shrink: 0; min-height: 200px;
+            scrollbar-width: thin;
+            scrollbar-color: rgba(255,255,255,0.18) transparent;
+        }
+        .recent-cards::-webkit-scrollbar { height: 8px; }
+        .recent-cards::-webkit-scrollbar-track { background: transparent; margin: 0 4px; }
+        .recent-cards::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.14); border-radius: 10px; }
+        .recent-cards::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.26); }
+        .recent-cards.empty {
+            align-items: center; justify-content: center;
+            background: rgba(255,255,255,0.015); border-radius: 12px;
+            border: 1px dashed rgba(255,255,255,0.06);
+        }
+        .recent-cards.empty .empty-message {
+            text-align: center; color: #333; font-size: 12px; padding: 30px 20px; width: 100%;
+        }
+        .recent-cards.empty .empty-message i {
+            font-size: 24px; margin-bottom: 8px; display: block; opacity: 0.3;
+        }
+        .song-card {
+            min-width: 160px; width: 160px;
+            background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.05);
+            border-radius: 12px; padding: 12px; cursor: pointer; transition: all 0.2s ease;
+            position: relative; overflow: hidden; flex-shrink: 0; display: flex; flex-direction: column;
+        }
+        .song-card:hover {
+            background: rgba(255,255,255,0.06); border-color: rgba(255,255,255,0.09);
+            transform: translateY(-2px);
+        }
+        .song-card-art {
+            width: 100%; aspect-ratio: 1/1;
+            background: rgba(255,255,255,0.04);
+            border-radius: 8px; margin-bottom: 10px; display: flex; align-items: center;
+            justify-content: center; position: relative; overflow: hidden;
+        }
+        .song-card-art .play-overlay {
+            position: absolute; inset: 0; background: rgba(0,0,0,0.55); display: flex;
+            align-items: center; justify-content: center; opacity: 0; transition: opacity 0.15s; border-radius: 8px;
+        }
+        .song-card:hover .play-overlay { opacity: 1; }
+        .song-card.playing .play-overlay { opacity: 1; }
+        .play-overlay i { font-size: 22px; color: #fff; }
+        .song-card-art i.fa-music { font-size: 24px; color: #2a2a2a; }
+        .song-card-art img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; border-radius: 8px; }
+        .song-card-title {
+            font-size: 12px; font-weight: 500; margin-bottom: 2px; white-space: nowrap;
+            overflow: hidden; text-overflow: ellipsis; color: #ccc;
+        }
+        .song-card-artist {
+            font-size: 11px; color: #444; white-space: nowrap; overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .settings-view {
+            flex: 1; min-height: 0; padding: 20px; padding-bottom: 88px;
+            display: none; flex-direction: column; overflow-y: scroll;
+            min-width: 0; width: 100%; cursor: default;
+        }
+        .settings-view.active { display: flex; }
+        .settings-group { margin-bottom: 28px; }
+        .settings-group h3 {
+            font-size: 13px; font-weight: 600; margin-bottom: 12px; color: #888;
+            display: flex; align-items: center; gap: 8px;
+            text-transform: uppercase; letter-spacing: 0.8px;
+        }
+        .setting-row {
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 12px 0; border-bottom: 1px solid rgba(255,255,255,0.04);
+        }
+        .setting-label { font-size: 13px; color: #bbb; }
+        .setting-desc { font-size: 11px; color: #444; margin-top: 2px; }
+        .toggle-switch {
+            width: 40px; height: 22px; background: rgba(255,255,255,0.08); border-radius: 11px;
+            cursor: pointer; position: relative; transition: background 0.2s; flex-shrink: 0;
+        }
+        .toggle-switch.on { background: rgba(255,255,255,0.85); }
+        .toggle-switch::after {
+            content: ''; position: absolute; width: 16px; height: 16px; background: #555;
+            border-radius: 50%; top: 3px; left: 3px; transition: all 0.2s ease;
+        }
+        .toggle-switch.on::after { left: 21px; background: #111; }
+        .about-info {
+            background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.05);
+            border-radius: 10px; padding: 16px; margin-top: 10px;
+        }
+        .about-info p { font-size: 13px; line-height: 1.6; color: #555; }
+        .about-info strong { color: #888; }
+
+        .about-tg-wrap {
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 12px 0; border-top: 1px solid rgba(255,255,255,0.04); margin-top: 4px;
+        }
+        .about-tg-label {
+            font-size: 12px; color: #444;
+        }
+        .about-tg-btn {
+            display: inline-flex; align-items: center; gap: 7px;
+            padding: 7px 14px;
+            background: rgba(255,255,255,0.05);
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 9px;
+            color: #888; font-size: 12px; font-weight: 500;
+            text-decoration: none; cursor: pointer;
+            transition: background 0.15s, color 0.15s, border-color 0.15s;
+            font-family: 'Inter', sans-serif;
+        }
+        .about-tg-btn svg { width: 14px; height: 14px; flex-shrink: 0; }
+        .about-tg-btn:hover {
+            background: rgba(255,255,255,0.1);
+            border-color: rgba(255,255,255,0.2);
+            color: #ddd;
+        }
+
+        /* === СИНХРОНИЗАЦИЯ В НАСТРОЙКАХ === */
+        .sync-section { margin-top: 20px; padding-top: 20px; border-top: 1px solid rgba(255,255,255,0.05); }
+        .sync-section h4 { font-size: 12px; font-weight: 600; color: #666; margin-bottom: 6px; display: flex; align-items: center; gap: 6px; text-transform: uppercase; letter-spacing: 0.8px; }
+        .sync-section p { font-size: 11px; color: #333; margin-bottom: 12px; line-height: 1.5; }
+        .sync-folder-btn {
+            width: 100%; padding: 10px 14px; background: rgba(255,255,255,0.04);
+            border: 1px solid rgba(255,255,255,0.07); border-radius: 9px; color: #666;
+            font-size: 12px; cursor: pointer; transition: all 0.15s;
+            display: flex; align-items: center; justify-content: center; gap: 6px;
+            font-family: 'Inter', sans-serif;
+        }
+        .sync-folder-btn:hover { background: rgba(255,255,255,0.07); color: #aaa; }
+        .sync-list { margin-top: 12px; display: flex; flex-direction: column; gap: 6px; }
+        .sync-item {
+            display: flex; align-items: center; gap: 10px; padding: 10px;
+            background: rgba(255,255,255,0.02); border-radius: 8px;
+        }
+        .sync-item-icon {
+            width: 28px; height: 28px; background: rgba(255,255,255,0.04);
+            border-radius: 6px; display: flex; align-items: center; justify-content: center;
+            color: #444; font-size: 12px; flex-shrink: 0;
+        }
+        .sync-item-info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+        .sync-item-name { font-size: 12px; font-weight: 500; color: #888; }
+        .sync-item-path { font-size: 10px; color: #333; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .sync-item-count { font-size: 10px; color: #333; background: rgba(255,255,255,0.04); padding: 3px 7px; border-radius: 5px; }
+        .sync-categories { margin-top: 12px; }
+        .sync-categories-title { font-size: 10px; color: #333; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.8px; }
+        .category-toggle {
+            display: flex; align-items: center; gap: 7px; padding: 7px 10px;
+            background: rgba(255,255,255,0.02); border-radius: 7px; margin-bottom: 4px;
+            cursor: pointer; transition: background 0.12s;
+        }
+        .category-toggle:hover { background: rgba(255,255,255,0.04); }
+        .category-toggle input { cursor: pointer; }
+        .category-toggle span { font-size: 12px; color: #666; }
+        .category-toggle.default { opacity: 0.5; cursor: not-allowed; }
+        .category-toggle input[type="checkbox"] { display: none; }
+        .category-toggle .cb-box {
+            width: 16px; height: 16px; border: 1.5px solid rgba(255,255,255,0.15);
+            border-radius: 4px; display: inline-flex; align-items: center;
+            justify-content: center; flex-shrink: 0; transition: all 0.12s;
+        }
+        .category-toggle input:checked ~ .cb-box { background: rgba(255,255,255,0.7); border-color: rgba(255,255,255,0.7); }
+        .category-toggle input:checked ~ .cb-box::after {
+            content: ''; display: block; width: 4px; height: 7px;
+            border: 1.5px solid #111; border-top: none; border-left: none;
+            transform: rotate(45deg) translate(-1px, -1px);
+        }
+
+        .player-bar {
+            position: fixed; bottom: 0; left: 260px; right: 0;
+            width: calc(100% - 260px); height: 72px;
+            background: rgba(10,10,10,0.97); border-top: 1px solid rgba(255,255,255,0.06);
+            display: flex; align-items: center; padding: 0 20px; gap: 16px;
+            z-index: 200; min-width: 0; justify-content: space-between;
+            backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+        }
+        @media (max-width: 900px) {
+            .player-bar { left: 0; width: 100%; }
+        }
+
+        .player-progress-container {
+            position: absolute; top: 0; left: 0; right: 0; height: 4px;
+            cursor: pointer; z-index: 30;
+        }
+        .player-progress-container:hover { height: 6px; top: -1px; }
+        .player-progress-bg {
+            position: absolute; top: 0; left: 0; right: 0; height: 100%;
+            background: rgba(255,255,255,0.08);
+        }
+        .player-progress-fill {
+            height: 100%; background: rgba(255,255,255,0.7); width: 0%; border-radius: 0;
+            position: relative; transition: width 0.1s linear;
+        }
+        .player-progress-fill::after {
+            content: ''; position: absolute; right: -5px; top: 50%;
+            transform: translateY(-50%) scale(0);
+            width: 12px; height: 12px; background: #fff; border-radius: 50%;
+            transition: transform 0.12s ease;
+        }
+        .player-progress-container:hover .player-progress-fill::after {
+            transform: translateY(-50%) scale(1);
+        }
+        .player-progress-container:hover .player-progress-fill {
+            background: #fff;
+        }
+
+        .player-track-info {
+            display: flex; align-items: center; gap: 12px;
+            min-width: 0; flex: 0 0 auto; width: clamp(200px, 25%, 320px);
+        }
+        .player-track-art {
+            width: 42px; height: 42px;
+            background: rgba(255,255,255,0.06);
+            border-radius: 8px; display: flex; align-items: center;
+            justify-content: center; flex-shrink: 0; overflow: hidden; position: relative;
+        }
+        .player-track-art i { font-size: 15px; color: #444; }
+        .player-track-art img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; border-radius: 8px; }
+        .player-track-details { overflow: hidden; min-width: 0; flex: 1; position: relative; }
+        /* Fade по краям для бегущей строки */
+        .player-track-details::before,
+        .player-track-details::after {
+            content: ''; position: absolute; top: 0; bottom: 0; width: 20px;
+            z-index: 1; pointer-events: none; opacity: 0; transition: opacity 0.3s;
+        }
+        .player-track-details::before { left: 0; background: linear-gradient(to right, rgba(10,10,10,0.97) 0%, transparent 100%); }
+        .player-track-details::after { right: 0; background: linear-gradient(to left, rgba(10,10,10,0.97) 0%, transparent 100%); }
+        .player-track-details.marquee-active::before,
+        .player-track-details.marquee-active::after { opacity: 1; }
+        .player-track-name {
+            font-size: 12px; font-weight: 600; white-space: nowrap;
+            color: #fff; display: block;
+        }
+        .player-track-artist {
+            font-size: 11px; color: #555; white-space: nowrap;
+            margin-top: 1px; display: block;
+        }
+
+        .player-controls {
+            display: flex; align-items: center; gap: 4px; flex: 1; justify-content: center;
+        }
+        .ctrl-btn {
+            background: none; border: none; color: #555; cursor: pointer;
+            font-size: 14px; padding: 8px; border-radius: 8px;
+            transition: all 0.15s; display: flex; align-items: center;
+            justify-content: center; flex-shrink: 0; position: relative;
+        }
+        .ctrl-btn:hover { color: #fff; background: rgba(255,255,255,0.06); }
+        .ctrl-btn.active { color: #fff; }
+        /* Бейдж "1" для повтора одного трека */
+        .repeat-one-badge {
+            position: absolute; top: 2px; right: 2px;
+            font-size: 8px; font-weight: 800; color: #fff;
+            line-height: 1; pointer-events: none;
+        }
+        .play-btn {
+            width: 38px; height: 38px; background: #fff; border: none;
+            border-radius: 50%; color: #000; font-size: 14px; cursor: pointer;
+            display: flex; align-items: center; justify-content: center;
+            transition: all 0.15s; flex-shrink: 0; margin: 0 4px;
+        }
+        .play-btn:hover { transform: scale(1.06); box-shadow: 0 0 16px rgba(255,255,255,0.2); }
+        .play-btn:active { transform: scale(0.96); }
+
+        .player-time {
+            font-size: 10px; color: #444; font-variant-numeric: tabular-nums;
+            min-width: 80px; text-align: center; flex-shrink: 0;
+        }
+
+        .player-volume {
+            display: flex; align-items: center; gap: 8px;
+            min-width: 110px; justify-content: flex-end; flex-shrink: 0;
+        }
+        .volume-icon {
+            color: #555; font-size: 13px; cursor: pointer;
+            transition: color 0.15s; flex-shrink: 0;
+        }
+        .volume-icon:hover { color: #ccc; }
+        .volume-slider-container {
+            width: 110px; height: 4px; background: rgba(255,255,255,0.08);
+            border-radius: 2px; cursor: pointer; position: relative; flex-shrink: 0;
+            padding: 8px 0; box-sizing: content-box; margin: -8px 0;
+        }
+        .volume-slider-track {
+            position: absolute; top: 50%; left: 0; right: 0; height: 4px;
+            transform: translateY(-50%); border-radius: 2px;
+            background: rgba(255,255,255,0.08); overflow: hidden; pointer-events: none;
+        }
+        .volume-slider-fill {
+            height: 100%; width: 70%; background: rgba(255,255,255,0.5);
+            border-radius: 2px; position: relative; transition: background 0.15s;
+            pointer-events: none;
+        }
+        .volume-slider-container:hover .volume-slider-fill { background: #fff; }
+        .volume-slider-container.dragging .volume-slider-fill { background: #fff; }
+        .volume-slider-fill::after {
+            content: ''; position: absolute; right: -5px; top: 50%;
+            transform: translateY(-50%); width: 11px; height: 11px;
+            background: #fff; border-radius: 50%; opacity: 0;
+            transition: opacity 0.12s; pointer-events: none;
+        }
+        .volume-slider-container:hover .volume-slider-fill::after { opacity: 1; }
+        .volume-slider-container.dragging .volume-slider-fill::after { opacity: 1; }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(8px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .recent-cards .song-card { animation: fadeIn 0.4s ease forwards; }
+
+        .modal-overlay {
+            position: fixed; inset: 0; background: rgba(0,0,0,0.75);
+            backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+            z-index: 10000; display: flex; align-items: center;
+            justify-content: center; opacity: 0; visibility: hidden;
+            transition: all 0.25s ease;
+        }
+        .modal-overlay.open { opacity: 1; visibility: visible; }
+        .modal-box {
+            background: #111; border: 1px solid rgba(255,255,255,0.08); border-radius: 16px;
+            padding: 24px; width: 400px; max-width: 90vw; max-height: 85vh;
+            box-shadow: 0 32px 80px rgba(0,0,0,0.8);
+            transform: translateY(16px) scale(0.97); transition: all 0.25s ease;
+            display: flex; flex-direction: column; overflow-y: auto;
+        }
+        .modal-overlay.open .modal-box { transform: translateY(0) scale(1); }
+        .modal-header { 
+            display: flex; align-items: center; justify-content: space-between; 
+            margin-bottom: 16px; padding-bottom: 12px;
+            border-bottom: 1px solid rgba(255,255,255,0.06);
+        }
+        .modal-header h3 { font-size: 15px; font-weight: 600; color: #fff; }
+        .modal-close {
+            background: rgba(255,255,255,0.05); border: none; color: #555;
+            width: 28px; height: 28px; border-radius: 7px; cursor: pointer;
+            display: flex; align-items: center; justify-content: center;
+            transition: all 0.15s; font-size: 12px;
+        }
+        .modal-close:hover { background: rgba(255,255,255,0.09); color: #ccc; }
+        .modal-input {
+            width: 100%; padding: 11px 14px; background: rgba(255,255,255,0.04);
+            border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; color: #ddd;
+            font-size: 13px; font-family: 'Inter', sans-serif; outline: none;
+            transition: border-color 0.15s;
+        }
+        .modal-input:focus { border-color: rgba(255,255,255,0.2); background: rgba(255,255,255,0.06); }
+        .modal-input::placeholder { color: #333; }
+        .modal-actions { display: flex; gap: 8px; margin-top: 16px; }
+        .modal-btn {
+            flex: 1; padding: 10px; border-radius: 9px; font-size: 13px;
+            font-weight: 500; cursor: pointer; transition: all 0.15s;
+            font-family: 'Inter', sans-serif; border: none;
+            min-height: 38px; display: inline-flex; align-items: center; justify-content: center;
+        }
+        .modal-btn-cancel { background: rgba(255,255,255,0.05); color: #666; }
+        .modal-btn-cancel:hover { background: rgba(255,255,255,0.08); color: #aaa; }
+        .modal-btn-create { background: rgba(255,255,255,0.9); color: #000; }
+        .modal-btn-create:hover { background: #fff; }
+        .modal-btn-create:disabled { background: rgba(255,255,255,0.08); color: #333; cursor: not-allowed; }
+        
+        .modal-body { margin: 6px 0 12px; flex: 1; min-height: 0; }
+        .modal-text { font-size: 13px; color: #777; line-height: 1.6; word-break: break-word; }
+        .modal-text strong { color: #ccc; }
+        
+        .playlist-list { max-height: 200px; overflow-y: auto; margin: 10px 0; }
+        .playlist-item {
+            display: flex; align-items: center; gap: 8px; padding: 9px 10px;
+            background: rgba(255,255,255,0.02); border-radius: 7px; margin-bottom: 6px;
+            cursor: pointer; transition: background 0.12s;
+        }
+        .playlist-item:hover { background: rgba(255,255,255,0.05); }
+        .playlist-checkbox {
+            width: 16px; height: 16px; border: 1.5px solid #333; border-radius: 4px;
+            display: flex; align-items: center; justify-content: center; cursor: pointer;
+            transition: all 0.12s; flex-shrink: 0;
+        }
+        .playlist-checkbox.checked { background: rgba(255,255,255,0.8); border-color: rgba(255,255,255,0.8); }
+        .playlist-checkbox.checked::after { content: '✓'; color: #000; font-size: 10px; font-weight: bold; }
+        .playlist-name { font-size: 12px; color: #aaa; flex: 1; }
+        .playlist-count { font-size: 10px; color: #444; }
+        
+        .missing-file-icon {
+            font-size: 48px; color: #e81123; margin: 0 auto 16px; display: block;
+        }
+        .missing-file-path {
+            font-size: 12px; color: #888; background: rgba(255,255,255,0.05);
+            padding: 10px 14px; border-radius: 8px; margin: 12px 0;
+            word-break: break-all; font-family: monospace;
+        }
+        .missing-file-actions { display: flex; gap: 10px; margin-top: 20px; }
+        .missing-file-btn {
+            flex: 1; padding: 12px; border-radius: 10px; font-size: 14px;
+            font-weight: 500; cursor: pointer; transition: all 0.2s;
+            font-family: 'Inter', sans-serif; border: none; display: flex;
+            align-items: center; justify-content: center; gap: 8px;
+            min-height: 40px;
+        }
+        .missing-file-btn-copy { background: rgba(255,255,255,0.06); color: #888; }
+        .missing-file-btn-copy:hover { background: rgba(255,255,255,0.1); color: #fff; }
+        .missing-file-btn-ok { background: #fff; color: #000; }
+        .missing-file-btn-ok:hover { background: #e0e0e0; }
+        
+        /* === ДЕТАЛИ ТРЕКА — БЛОКИ + КОПИРОВАНИЕ === */
+        .track-details-block {
+            background: rgba(255,255,255,0.03);
+            border: 1px solid rgba(255,255,255,0.06);
+            border-radius: 12px;
+            padding: 16px;
+            margin-bottom: 12px;
+        }
+        .track-details-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 0;
+            border-bottom: 1px solid rgba(255,255,255,0.04);
+        }
+        .track-details-row:last-child { border-bottom: none; }
+        .track-details-label {
+            font-size: 12px;
+            color: #666;
+        }
+        .track-details-value {
+            font-size: 13px;
+            color: #ccc;
+            font-weight: 500;
+            text-align: right;
+            max-width: 70%;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .track-details-value.mono {
+            font-family: monospace;
+            font-size: 11px;
+            color: #888;
+            word-break: break-all;
+            white-space: normal;
+            text-align: left;
+            max-width: 100%;
+        }
+        .copy-name-btn {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 36px;
+            height: 36px;
+            background: rgba(255,255,255,0.06);
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 8px;
+            color: #aaa;
+            cursor: pointer;
+            transition: all 0.2s;
+            margin-left: auto;
+            align-self: flex-end;
+        }
+        .copy-name-btn:hover {
+            background: rgba(255,255,255,0.1);
+            color: #fff;
+        }
+        .copy-name-btn svg {
+            width: 16px;
+            height: 16px;
+            fill: currentColor;
+        }
+
+        /* === МОДАЛЬНОЕ ОКНО УДАЛЕНИЯ === */
+        .delete-modal-content {
+            text-align: center;
+            padding: 8px 0;
+        }
+        .delete-modal-icon {
+            font-size: 40px;
+            color: #ef4444;
+            margin: 0 auto 16px;
+            display: block;
+        }
+        .delete-modal-text {
+            font-size: 14px;
+            color: #aaa;
+            line-height: 1.6;
+            margin-bottom: 24px;
+        }
+        .delete-modal-text strong {
+            color: #fff;
+        }
+        .delete-modal-actions {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+        }
+        .delete-modal-btn {
+            padding: 12px 24px;
+            border-radius: 10px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-family: 'Inter', sans-serif;
+            border: none;
+            min-height: 40px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .delete-modal-btn-cancel {
+            background: rgba(255,255,255,0.06);
+            color: #888;
+        }
+        .delete-modal-btn-cancel:hover {
+            background: rgba(255,255,255,0.1);
+            color: #ccc;
+        }
+        .delete-modal-btn-confirm {
+            background: #ef4444;
+            color: #fff;
+        }
+        .delete-modal-btn-confirm:hover {
+            background: #dc2626;
+        }
+
+        /* === ПАНЕЛЬ ВЫДЕЛЕНИЯ — БЕЛЫЙ СТИЛЬ === */
+        .selection-bar {
+            display: none;
+            align-items: center;
+            gap: 8px;
+            padding: 7px 12px;
+            background: rgba(255,255,255,0.05);
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 9px;
+            margin-bottom: 10px;
+            font-size: 12px;
+            color: #ccc;
+        }
+        .selection-bar #selectionCount { font-weight: 600; color: #fff; }
+        .delete-selected-btn,
+        .cancel-selection-btn,
+        .select-all-btn,
+        .add-selected-to-playlist-btn {
+            padding: 5px 10px; border: none; border-radius: 6px;
+            font-size: 11px; cursor: pointer; transition: 0.15s;
+            font-family: 'Inter', sans-serif;
+        }
+        .delete-selected-btn { background: rgba(239,68,68,0.15); color: #f87171; }
+        .delete-selected-btn:hover { background: rgba(239,68,68,0.25); }
+        .cancel-selection-btn { background: rgba(255,255,255,0.06); color: #888; }
+        .cancel-selection-btn:hover { background: rgba(255,255,255,0.1); color: #ccc; }
+        .select-all-btn { background: rgba(255,255,255,0.06); color: #888; border: 1px solid rgba(255,255,255,0.1); }
+        .select-all-btn:hover { background: rgba(255,255,255,0.1); color: #ccc; }
+        .add-selected-to-playlist-btn { background: rgba(255,255,255,0.06); color: #888; border: 1px solid rgba(255,255,255,0.1); }
+        .add-selected-to-playlist-btn:hover { background: rgba(255,255,255,0.1); color: #ccc; }
+        
+        .svg-icon { width: 16px; height: 16px; fill: currentColor; }
+
+        /* === ТОСТ-УВЕДОМЛЕНИЯ === */
+        #toastContainer {
+            position: fixed; bottom: 80px; right: 16px; z-index: 99999;
+            display: flex; flex-direction: column-reverse; gap: 6px; pointer-events: none;
+        }
+        .toast {
+            display: flex; align-items: center; gap: 8px; padding: 9px 14px;
+            background: rgba(18,18,18,0.97); border: 1px solid rgba(255,255,255,0.08);
+            border-radius: 10px; color: #ccc; font-size: 12px; font-weight: 500;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.6); opacity: 0;
+            transform: translateY(8px); transition: all 0.25s cubic-bezier(0.34,1.56,0.64,1);
+            pointer-events: auto; min-width: 160px;
+        }
+
+        /* === ПОИСК === */
+        .search-wrapper { position: relative; flex-shrink: 0; }
+        .search-input {
+            width: 180px; padding: 6px 12px 6px 30px;
+            background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.07);
+            border-radius: 8px; color: #ccc; font-size: 12px;
+            font-family: 'Inter', sans-serif; outline: none; transition: all 0.15s;
+        }
+        .search-input:focus {
+            background: rgba(255,255,255,0.06); border-color: rgba(255,255,255,0.14);
+            width: 220px;
+        }
+        .search-input::placeholder { color: #333; }
+        .search-icon {
+            position: absolute; left: 9px; top: 50%; transform: translateY(-50%);
+            color: #333; font-size: 11px; pointer-events: none;
+        }
+
+        /* === УЛУЧШЕННОЕ ВЫДЕЛЕНИЕ ТРЕКА === */
+        .track-card.selected { background: rgba(255,255,255,0.08) !important; border-color: rgba(255,255,255,0.2) !important; }
+        .track-card.selected .track-card-title { color: #fff; }
+        /* Кастомный цвет карточки */
+        .track-card[style*="--card-accent"] .track-card-title { color: var(--card-accent); }
+        .track-card[style*="--card-accent"]:hover { filter: brightness(1.1); }
+        .select-check {
+            width: 44px; height: 44px; background: rgba(255,255,255,0.08);
+            border: 1.5px solid rgba(255,255,255,0.3); border-radius: 8px;
+            display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+        }
+        .select-check i { color: #fff; font-size: 16px; }
+        .track-liked-badge { color: #888; font-size: 10px; display: flex; align-items: center; gap: 2px; }
+        .track-liked-badge i { font-size: 9px; }
+
+        /* === УЛУЧШЕННАЯ СЕКЦИЯ НЕДАВНИХ === */
+        .recent-section-header {
+            display: flex; align-items: center; justify-content: space-between;
+            margin-bottom: 10px; flex-shrink: 0;
+        }
+        .recent-section-header h2 { font-size: 13px; font-weight: 600; color: #666; text-transform: uppercase; letter-spacing: 0.8px; }
+        .recent-section-actions { display: flex; align-items: center; gap: 6px; }
+        .clear-recent-btn {
+            font-size: 11px; color: #333; cursor: pointer; transition: color 0.15s;
+            background: none; border: none; font-family: 'Inter', sans-serif;
+            padding: 3px 7px; border-radius: 5px;
+        }
+        .clear-recent-btn:hover { color: #888; background: rgba(255,255,255,0.04); }
+
+        /* === УЛУЧШЕННЫЕ НАСТРОЙКИ === */
+        .settings-section-icon {
+            width: 26px; height: 26px; background: rgba(255,255,255,0.05);
+            border-radius: 6px; display: flex; align-items: center; justify-content: center;
+            color: #555; font-size: 12px; flex-shrink: 0;
+        }
+        .settings-group h3 { display: flex; align-items: center; gap: 8px; }
+        .settings-reset-btn {
+            margin-top: 12px; padding: 9px 14px;
+            background: rgba(239,68,68,0.06); border: 1px solid rgba(239,68,68,0.15);
+            border-radius: 9px; color: #f87171; font-size: 12px; cursor: pointer;
+            transition: all 0.15s; font-family: 'Inter', sans-serif;
+            display: flex; align-items: center; gap: 6px;
+        }
+        .settings-reset-btn:hover { background: rgba(239,68,68,0.12); border-color: rgba(239,68,68,0.3); }
+        .settings-open-folder-btn {
+            padding: 7px 12px; background: rgba(255,255,255,0.05);
+            border: 1px solid rgba(255,255,255,0.08); border-radius: 8px;
+            color: #777; font-size: 12px; cursor: pointer; transition: all 0.15s;
+            font-family: 'Inter', sans-serif; display: flex; align-items: center; gap: 6px;
+            flex-shrink: 0;
+        }
+        .settings-open-folder-btn:hover { background: rgba(255,255,255,0.09); color: #ccc; }
+        .shortcuts-grid {
+            display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 10px;
+        }
+        .shortcut-item {
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 8px 10px; background: rgba(255,255,255,0.02); border-radius: 7px;
+        }
+        .shortcut-label { font-size: 11px; color: #555; }
+        .shortcut-key {
+            font-size: 10px; color: #666; background: rgba(255,255,255,0.05);
+            border: 1px solid rgba(255,255,255,0.08); border-radius: 4px;
+            padding: 2px 6px; font-family: monospace;
+        }
+        .stats-grid {
+            display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 10px;
+        }
+        .stat-card {
+            background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.05);
+            border-radius: 10px; padding: 12px; text-align: center;
+        }
+        .stat-value { font-size: 20px; font-weight: 700; color: #ddd; }
+        .stat-label { font-size: 10px; color: #444; margin-top: 3px; }
+
+        /* === ЗАГРУЗКА === */
+        .loading-spinner-wrap { display: flex; justify-content: center; margin-bottom: 16px; }
+        .loading-spinner {
+            width: 36px; height: 36px; border: 2px solid rgba(255,255,255,0.08);
+            border-top-color: rgba(255,255,255,0.6); border-radius: 50%;
+            animation: spin 0.7s linear infinite;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .loading-title { font-size: 14px; font-weight: 600; color: #ccc; margin-bottom: 14px; }
+        .loading-progress-bar-wrap {
+            width: 100%; height: 3px; background: rgba(255,255,255,0.06);
+            border-radius: 2px; overflow: hidden; margin-bottom: 8px;
+        }
+        .loading-progress-bar { height: 100%; background: rgba(255,255,255,0.6); border-radius: 2px; width: 0%; transition: width 0.2s ease; }
+        .loading-stats { font-size: 12px; color: #444; margin-bottom: 4px; }
+        .loading-current {
+            font-size: 10px; color: rgba(255,255,255,0.15);
+            white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 280px; margin: 0 auto;
+        }
+        .loading-phrase {
+            font-size: 11px; color: rgba(255,255,255,0.25); margin-top: 14px;
+            min-height: 16px; transition: opacity 0.5s ease;
+            font-style: italic; max-width: 280px; margin-left: auto; margin-right: auto;
+        }
+        .loading-phrase.fade { opacity: 0; }
+        /* Плавное исчезновение модалки */
+        #loadingModal.hiding { opacity: 0; transition: opacity 1s ease; }
+
+        /* === РЕДАКТИРОВАНИЕ ТРЕКА === */
+        .edit-cover-section { display: flex; justify-content: center; margin-bottom: 16px; }
+        .edit-cover-preview {
+            width: 100px; height: 100px; background: rgba(255,255,255,0.03);
+            border-radius: 12px; display: flex; align-items: center; justify-content: center;
+            cursor: pointer; position: relative; overflow: hidden;
+            border: 1px solid rgba(255,255,255,0.07); transition: border-color 0.15s;
+        }
+        .edit-cover-preview:hover { border-color: rgba(255,255,255,0.18); }
+        .edit-cover-preview > i { font-size: 28px; color: #2a2a2a; }
+        .edit-cover-preview img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; border-radius: 12px; }
+        .edit-cover-overlay {
+            position: absolute; inset: 0; background: rgba(0,0,0,0.65);
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            gap: 4px; opacity: 0; transition: opacity 0.15s; border-radius: 12px;
+        }
+        .edit-cover-preview:hover .edit-cover-overlay { opacity: 1; }
+        .edit-cover-overlay i { font-size: 16px; color: #fff; }
+        .edit-cover-overlay span { font-size: 10px; color: #aaa; text-align: center; padding: 0 6px; }
+        .edit-field-group { margin-bottom: 14px; }
+        .edit-label { display: block; font-size: 11px; color: #444; margin-bottom: 6px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.6px; }
+        .edit-speed-row { display: flex; align-items: center; gap: 10px; }
+        .edit-range {
+            flex: 1; -webkit-appearance: none; height: 3px;
+            background: rgba(255,255,255,0.08); border-radius: 2px; outline: none; cursor: pointer;
+        }
+        .edit-range::-webkit-slider-thumb {
+            -webkit-appearance: none; width: 14px; height: 14px;
+            background: rgba(255,255,255,0.8); border-radius: 50%; cursor: pointer; transition: transform 0.12s;
+        }
+        .edit-range::-webkit-slider-thumb:hover { transform: scale(1.2); }
+        .edit-speed-val { font-size: 12px; color: #666; min-width: 40px; text-align: right; font-variant-numeric: tabular-nums; }
+        .eq-grid { display: flex; gap: 6px; align-items: flex-end; height: 90px; padding: 6px 0; overflow: visible; }
+        .eq-band { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 3px; }
+        .eq-band-label { font-size: 8px; color: #333; text-align: center; }
+        .eq-range {
+            -webkit-appearance: none; writing-mode: vertical-lr; direction: rtl;
+            width: 3px; height: 60px; background: rgba(255,255,255,0.07);
+            border-radius: 2px; outline: none; cursor: pointer;
+        }
+        .eq-range::-webkit-slider-thumb {
+            -webkit-appearance: none; width: 12px; height: 12px;
+            background: rgba(255,255,255,0.7); border-radius: 50%; cursor: pointer;
+        }
+        .eq-val { font-size: 8px; color: #333; text-align: center; min-width: 24px; }
+
+        /* === ДЕТАЛИ ТРЕКА === */
+        .track-details-block {
+            background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.05);
+            border-radius: 9px; padding: 12px; margin-bottom: 8px;
+        }
+        .track-details-row {
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 6px 0; border-bottom: 1px solid rgba(255,255,255,0.03);
+        }
+        .track-details-row:last-child { border-bottom: none; }
+        .track-details-label { font-size: 11px; color: #444; }
+        .track-details-value {
+            font-size: 12px; color: #888; font-weight: 500;
+            text-align: right; max-width: 70%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+        }
+        .track-details-value.mono {
+            font-family: monospace; font-size: 10px; color: #555;
+            word-break: break-all; white-space: normal; text-align: left; max-width: 100%;
+        }
+        .copy-name-btn {
+            display: flex; align-items: center; justify-content: center;
+            width: 28px; height: 28px; background: rgba(255,255,255,0.04);
+            border: 1px solid rgba(255,255,255,0.07); border-radius: 6px;
+            color: #444; cursor: pointer; transition: all 0.15s; margin-left: auto; align-self: flex-end;
+        }
+        .copy-name-btn:hover { background: rgba(255,255,255,0.08); color: #aaa; }
+        .copy-name-btn svg { width: 13px; height: 13px; fill: currentColor; }
+
+        /* === МОДАЛЬНОЕ ОКНО УДАЛЕНИЯ === */
+        .delete-modal-content { text-align: center; padding: 6px 0; }
+        .delete-modal-icon { font-size: 32px; color: #f87171; margin: 0 auto 12px; display: block; }
+        .delete-modal-text { font-size: 12px; color: #666; line-height: 1.6; margin-bottom: 18px; }
+        .delete-modal-text strong { color: #aaa; }
+        .delete-modal-actions { display: flex; gap: 8px; justify-content: center; }
+        .delete-modal-btn {
+            padding: 9px 20px; border-radius: 8px; font-size: 12px; font-weight: 500;
+            cursor: pointer; transition: all 0.15s; font-family: 'Inter', sans-serif; border: none;
+            min-height: 36px; display: inline-flex; align-items: center; justify-content: center;
+        }
+        .delete-modal-btn-cancel { background: rgba(255,255,255,0.05); color: #666; }
+        .delete-modal-btn-cancel:hover { background: rgba(255,255,255,0.08); color: #aaa; }
+        .delete-modal-btn-confirm { background: rgba(239,68,68,0.15); color: #f87171; border: 1px solid rgba(239,68,68,0.2); }
+        .delete-modal-btn-confirm:hover { background: rgba(239,68,68,0.25); }
+
+        /* === MISSING FILE === */
+        .missing-file-icon { font-size: 36px; color: #f87171; margin: 0 auto 12px; display: block; }
+        .missing-file-path {
+            font-size: 10px; color: #444; background: rgba(255,255,255,0.03);
+            padding: 8px 12px; border-radius: 7px; margin: 10px 0;
+            word-break: break-all; font-family: monospace;
+        }
+        .missing-file-actions { display: flex; gap: 8px; margin-top: 14px; }
+        .missing-file-btn {
+            flex: 1; padding: 9px; border-radius: 8px; font-size: 12px; font-weight: 500;
+            cursor: pointer; transition: all 0.15s; font-family: 'Inter', sans-serif; border: none;
+            display: flex; align-items: center; justify-content: center; gap: 6px; min-height: 36px;
+        }
+        .missing-file-btn-copy { background: rgba(255,255,255,0.05); color: #666; }
+        .missing-file-btn-copy:hover { background: rgba(255,255,255,0.08); color: #aaa; }
+        .missing-file-btn-ok { background: rgba(255,255,255,0.85); color: #000; }
+        .missing-file-btn-ok:hover { background: #fff; }
+
+        /* === АНИМАЦИИ === */
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+        .recent-cards .song-card { animation: fadeIn 0.3s ease forwards; }
+        .track-card { /* no animation to prevent flicker */ }
+        body.no-animations * { transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; }
+        .svg-icon { width: 14px; height: 14px; fill: currentColor; }
+        .now-playing-card {
+            margin: 0 0 0; background: rgba(255,255,255,0.03);
+            border: 1px solid rgba(255,255,255,0.06); border-radius: 16px;
+            padding: 18px 20px; display: flex; flex-direction: column; gap: 14px;
+            flex-shrink: 0; transition: background 0.3s, border-color 0.3s;
+            position: relative; overflow: hidden;
+        }
+        .now-playing-card.has-track { background: rgba(255,255,255,0.04); border-color: rgba(255,255,255,0.1); }
+        /* Цветной акцент фона карточки */
+        .now-playing-card.has-accent { border-color: var(--np-accent, rgba(255,255,255,0.1)); }
+        .now-playing-card.has-accent::before {
+            content: ''; position: absolute; inset: 0; border-radius: 16px;
+            background: var(--np-accent-bg, transparent); pointer-events: none; z-index: 0;
+        }
+        .now-playing-card > * { position: relative; z-index: 1; }
+
+        /* Верхняя строка: обложка + инфо + eq */
+        .now-playing-top { display: flex; align-items: center; gap: 16px; min-width: 0; }
+
+        .now-playing-card-art {
+            width: 64px; height: 64px; min-width: 48px; max-width: 88px;
+            background: rgba(255,255,255,0.04);
+            border-radius: 10px; flex-shrink: 0; display: flex; align-items: center;
+            justify-content: center; overflow: hidden; position: relative;
+            transition: width 0.3s, height 0.3s;
+        }
+        .now-playing-card-art.has-cover {
+            width: clamp(48px, 72px, 88px);
+            height: clamp(48px, 72px, 88px);
+        }
+        .now-playing-card-art i { font-size: 22px; color: #2a2a2a; }
+        .now-playing-card-art img {
+            position: absolute; inset: 0; width: 100%; height: 100%;
+            object-fit: cover; border-radius: 10px;
+        }
+        .now-playing-card-info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+        .now-playing-label { font-size: 9px; font-weight: 600; text-transform: uppercase; letter-spacing: 1.2px; color: #333; margin-bottom: 2px; }
+        .now-playing-title {
+            font-size: 15px; font-weight: 600; color: #ddd;
+            white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+        }
+        .now-playing-artist {
+            font-size: 12px; color: #555;
+            white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+        }
+        .now-playing-empty { font-size: 13px; color: #2a2a2a; font-style: italic; }
+        .now-playing-eq { display: flex; align-items: flex-end; gap: 2px; height: 20px; flex-shrink: 0; }
+        .now-playing-eq span { width: 2px; background: rgba(255,255,255,0.4); border-radius: 1px; animation: eq-bounce 0.8s ease-in-out infinite alternate; }
+        .now-playing-eq span:nth-child(1) { animation-delay: 0s; }
+        .now-playing-eq span:nth-child(2) { animation-delay: 0.15s; }
+        .now-playing-eq span:nth-child(3) { animation-delay: 0.3s; }
+        .now-playing-eq span:nth-child(4) { animation-delay: 0.1s; }
+        @keyframes eq-bounce { from { height: 3px; } to { height: 16px; } }
+        .now-playing-card:not(.has-track) .now-playing-eq { display: none; }
+        .now-playing-eq.paused span { animation-play-state: paused; }
+
+        /* Прогресс-бар */
+        .now-playing-progress-wrap { display: flex; flex-direction: column; gap: 4px; }
+        .now-playing-progress-bg {
+            width: 100%; height: 3px; background: rgba(255,255,255,0.08);
+            border-radius: 2px; overflow: visible; cursor: pointer; position: relative;
+        }
+        .now-playing-progress-bg:hover { height: 5px; }
+        .now-playing-progress-fill {
+            height: 100%; background: rgba(255,255,255,0.5); border-radius: 2px; width: 0%;
+            transition: width 0.1s linear; position: relative;
+        }
+        .now-playing-progress-bg:hover .now-playing-progress-fill { background: #fff; }
+        .now-playing-progress-fill::after {
+            content: ''; position: absolute; right: -5px; top: 50%;
+            transform: translateY(-50%) scale(0);
+            width: 11px; height: 11px; background: #fff; border-radius: 50%;
+            transition: transform 0.12s;
+        }
+        .now-playing-progress-bg:hover .now-playing-progress-fill::after { transform: translateY(-50%) scale(1); }
+        .now-playing-time-row {
+            display: flex; justify-content: space-between;
+            font-size: 10px; color: #444; font-variant-numeric: tabular-nums;
+        }
+
+        /* Кнопки управления */
+        .now-playing-controls {
+            display: flex; align-items: center; justify-content: center; gap: 6px;
+        }
+        .np-ctrl-btn {
+            background: none; border: none; color: #555; cursor: pointer;
+            font-size: 15px; padding: 8px; border-radius: 8px;
+            transition: all 0.15s; display: flex; align-items: center; justify-content: center;
+        }
+        .np-ctrl-btn:hover { color: #fff; background: rgba(255,255,255,0.07); }
+        .np-ctrl-btn.active { color: #fff; }
+        .np-play-btn {
+            width: 42px; height: 42px; background: #fff; border: none;
+            border-radius: 50%; color: #000; font-size: 16px; cursor: pointer;
+            display: flex; align-items: center; justify-content: center;
+            transition: all 0.15s; flex-shrink: 0;
+        }
+        .np-play-btn:hover { transform: scale(1.07); box-shadow: 0 0 18px rgba(255,255,255,0.2); }
+        .np-play-btn:active { transform: scale(0.95); }
+
+        /* === NOW PLAYING OVERLAY === */
+        .now-playing-art-overlay {
+            position: absolute; inset: 0; background: rgba(0,0,0,0.55);
+            border-radius: 10px; display: flex; align-items: center; justify-content: center;
+            opacity: 0; transition: opacity 0.15s; cursor: pointer; z-index: 2;
+        }
+        .now-playing-card-art:hover .now-playing-art-overlay { opacity: 1; }
+        .now-playing-art-overlay i { color: #fff; font-size: 20px; }
+        .now-playing-date { font-size: 10px; color: #2a2a2a; margin-top: 2px; }
+
+        /* === КАСТОМНЫЕ ЧЕКБОКСЫ === */
+        .category-toggle input[type="checkbox"] { display: none; }
+        .category-toggle .cb-box {
+            width: 18px; height: 18px; border: 2px solid rgba(255,255,255,0.2);
+            border-radius: 5px; display: inline-flex; align-items: center;
+            justify-content: center; flex-shrink: 0; transition: all 0.15s;
+        }
+        .category-toggle input:checked ~ .cb-box { background: #fff; border-color: #fff; }
+        .category-toggle input:checked ~ .cb-box::after {
+            content: ''; display: block; width: 5px; height: 9px;
+            border: 2px solid #000; border-top: none; border-left: none;
+            transform: rotate(45deg) translate(-1px, -1px);
+        }
+
+        /* === АНИМАЦИИ === */
+        @keyframes slideInUp { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes scaleIn { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
+        .track-card { /* animation removed to prevent flicker on re-render */ }
+        body.no-animations .track-card { animation: none; }
+        body.no-animations * { transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; }
+
+        /* === КОНТЕКСТНОЕ МЕНЮ === */
+        .context-menu {
+            position: fixed; background: #111; border: 1px solid rgba(255,255,255,0.08);
+            border-radius: 10px; padding: 5px; min-width: 200px;
+            box-shadow: 0 12px 40px rgba(0,0,0,0.7); z-index: 10001;
+            opacity: 0; visibility: hidden; transform: translateY(-6px) scale(0.97);
+            transition: all 0.15s ease; pointer-events: none;
+        }
+        .context-menu.open {
+            opacity: 1; visibility: visible; transform: translateY(0) scale(1); pointer-events: auto;
+        }
+        .context-item {
+            display: flex; align-items: center; gap: 9px; padding: 8px 10px;
+            border-radius: 7px; cursor: pointer; font-size: 12px; color: #999;
+            transition: background 0.1s;
+        }
+        .context-item:hover { background: rgba(255,255,255,0.06); color: #ddd; }
+        .context-item i { width: 14px; text-align: center; font-size: 11px; color: #555; }
+        .context-item:hover i { color: #999; }
+        .context-item.danger { color: #f87171; }
+        .context-item.danger i { color: #f87171; }
+        .context-item.danger:hover { background: rgba(239,68,68,0.08); }
+        .context-divider { height: 1px; background: rgba(255,255,255,0.06); margin: 3px 0; }
+    </style>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <!-- Полоса для перетаскивания окна -->
+    <div class="drag-region"></div>
+
+    <div class="window-controls">
+        <button class="window-btn" id="minimizeBtn" title="Свернуть">−</button>
+        <button class="window-btn" id="maximizeBtn" title="Развернуть">☐</button>
+        <button class="window-btn close" id="closeBtn" title="Закрыть">✕</button>
+    </div>
+
+    <aside class="sidebar">
+        <div class="sidebar-logo">
+            <!-- ЛОГОТИП: вставь свой SVG код сюда -->
+            <svg viewBox="0 0 422 372" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <rect width="422" height="372" rx="54" fill="#E8E8E8"/>
+                <path d="M387 317C387 330.255 376.255 341 363 341H190C104.396 341 35 271.604 35 186C35 100.396 104.396 31 190 31H363C376.255 31 387 41.7452 387 55V317Z" fill="#111111"/>
+                <path d="M183 106.325C183 90.1596 200.5 80.0559 214.5 88.1386L352.5 167.813C366.5 175.896 366.5 196.104 352.5 204.186L214.5 283.86C200.5 291.943 183 281.84 183 265.674V228.987C182.668 228.995 182.334 229 182 229C158.252 229 139 209.748 139 186C139 162.252 158.252 143 182 143C182.334 143 182.668 143.004 183 143.012V106.325Z" fill="#E8E8E8"/>
+                <path d="M182.5 66.864C182.5 60.864 177.628 55.9527 171.649 56.4554C158.361 57.5728 145.303 60.7379 132.942 65.8576C117.231 72.3656 102.955 81.9045 90.9297 93.9297C78.9045 105.955 69.3656 120.231 62.8576 135.942C56.3496 151.654 53 168.494 53 185.5C53 202.506 56.3496 219.346 62.8576 235.058C69.3656 250.769 78.9045 265.045 90.9297 277.07C102.955 289.096 117.231 298.634 132.943 305.142C145.303 310.262 158.361 313.427 171.649 314.545C177.628 315.047 182.5 310.136 182.5 304.136V304.136C182.5 298.136 177.624 293.329 171.654 292.725C161.222 291.67 150.98 289.096 141.257 285.068C128.182 279.652 116.301 271.714 106.294 261.706C96.2861 251.699 88.3477 239.818 82.9316 226.743C77.5156 213.667 74.728 199.653 74.728 185.5C74.728 171.347 77.5156 157.333 82.9316 144.257C88.3477 131.182 96.2861 119.301 106.294 109.294C116.301 99.2861 128.182 91.3477 141.257 85.9316C150.98 81.9043 161.222 79.3303 171.654 78.2751C177.624 77.6713 182.5 72.864 182.5 66.864V66.864Z" fill="#E8E8E8"/>
+                <path d="M168.406 107.775C166.834 101.908 160.769 98.3656 155.129 100.623C139.768 106.771 126.269 116.956 116.115 130.19C103.719 146.344 97 166.138 97 186.5C97 206.862 103.719 226.656 116.115 242.81C126.269 256.044 139.768 266.229 155.129 272.377C160.769 274.634 166.834 271.092 168.406 265.225V265.225C169.978 259.357 166.445 253.403 160.893 250.939C150.183 246.184 140.77 238.808 133.566 229.42C124.118 217.107 118.997 202.02 118.997 186.5C118.997 170.98 124.118 155.893 133.566 143.58C140.77 134.192 150.183 126.816 160.893 122.061C166.445 119.597 169.978 113.643 168.406 107.775V107.775Z" fill="#E8E8E8"/>
+            </svg>
+            <h1><span>Play</span>ly</h1>
+        </div>
+        <nav class="sidebar-nav">
+            <div class="nav-item active" data-page="home" onclick="switchPage(this)">
+                <i class="fa-solid fa-house"></i><span>Главная</span>
+            </div>
+            <div class="nav-item" data-page="settings" onclick="switchPage(this)">
+                <i class="fa-solid fa-gear"></i><span>Настройки</span>
+            </div>
+            <div class="nav-label">Категории</div>
+            <div class="nav-divider"></div>
+            <div id="categoriesList">
+                <div class="nav-item" data-page="all-songs" onclick="switchPage(this)">
+                    <i class="fa-solid fa-music"></i><span>Все треки</span>
+                </div>
+                <div class="nav-item" data-page="liked" onclick="switchPage(this)">
+                    <i class="fa-solid fa-heart"></i><span>Понравившееся</span>
+                </div>
+            </div>
+        </nav>
+        <button class="add-btn" id="addCategoryBtn">
+            <i class="fa-solid fa-folder-plus"></i><span>Добавить категорию</span>
+        </button>
+    </aside>
+
+    <main class="main-content">
+        <div class="top-bar">
+            <h2 class="top-bar-title" id="pageTitle">
+                <!-- Логотип в заголовке (опционально) -->
+                <svg viewBox="0 0 422 372" fill="none" xmlns="http://www.w3.org/2000/svg" style="width:20px;height:20px">
+                    <rect width="422" height="372" rx="54" fill="#E8E8E8"/>
+                    <path d="M387 317C387 330.255 376.255 341 363 341H190C104.396 341 35 271.604 35 186C35 100.396 104.396 31 190 31H363C376.255 31 387 41.7452 387 55V317Z" fill="#111111"/>
+                    <path d="M183 106.325C183 90.1596 200.5 80.0559 214.5 88.1386L352.5 167.813C366.5 175.896 366.5 196.104 352.5 204.186L214.5 283.86C200.5 291.943 183 281.84 183 265.674V228.987C182.668 228.995 182.334 229 182 229C158.252 229 139 209.748 139 186C139 162.252 158.252 143 182 143C182.334 143 182.668 143.004 183 143.012V106.325Z" fill="#E8E8E8"/>
+                </svg>
+                Главная
+            </h2>
+            <div class="top-bar-actions">
+                <!-- Кнопка "Настройки" (показывается только в категориях) -->
+                <button class="settings-top-btn hidden" id="settingsTopBtn" title="Открыть настройки">
+                    <i class="fa-solid fa-gear"></i>
+                    Настройки
+                </button>
+                
+                <!-- Поиск (показывается только в категориях) -->
+                <div class="search-wrapper sort-container hidden" id="searchContainer">
+                    <i class="fa-solid fa-magnifying-glass search-icon"></i>
+                    <input type="text" class="search-input" id="searchInput" placeholder="Поиск треков...">
+                </div>
+
+                <div class="sort-container hidden" id="sortContainer">
+                    <button class="sort-btn" id="sortBtn">
+                        <i class="fa-solid fa-arrow-down-wide-short"></i><span>Сортировка</span>
+                    </button>
+                    <div class="sort-dropdown" id="sortDropdown">
+                        <div class="sort-group">
+                            <div class="sort-group-title">По названию</div>
+                            <div class="sort-option active" data-sort="name-az"><span>A — Z</span><i class="fa-solid fa-check check-icon"></i></div>
+                            <div class="sort-option" data-sort="name-za"><span>Z — A</span><i class="fa-solid fa-check check-icon"></i></div>
+                        </div>
+                        <div class="sort-group">
+                            <div class="sort-group-title">По дате</div>
+                            <div class="sort-option" data-sort="date-new-old"><span>Сначала новые</span><i class="fa-solid fa-check check-icon"></i></div>
+                            <div class="sort-option" data-sort="date-old-new"><span>Сначала старые</span><i class="fa-solid fa-check check-icon"></i></div>
+                        </div>
+                        <div class="sort-group">
+                            <div class="sort-group-title">По исполнителю</div>
+                            <div class="sort-option" data-sort="artist-az"><span>A — Z</span><i class="fa-solid fa-check check-icon"></i></div>
+                            <div class="sort-option" data-sort="artist-za"><span>Z — A</span><i class="fa-solid fa-check check-icon"></i></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="home-wrapper active" id="homeWrapper">
+        <div class="home-section active" id="graphSection">
+
+            <!-- Карточка текущей песни -->
+            <div class="now-playing-card" id="nowPlayingCard">
+                <div class="now-playing-top">
+                    <div class="now-playing-card-art" id="nowPlayingArt">
+                        <i class="fa-solid fa-music"></i>
+                        <div class="now-playing-art-overlay" onclick="togglePlay()">
+                            <i class="fa-solid fa-pause" id="nowPlayingPlayIcon"></i>
+                        </div>
+                    </div>
+                    <div class="now-playing-card-info">
+                        <div class="now-playing-label">Сейчас играет</div>
+                        <div class="now-playing-title" id="nowPlayingTitle">
+                            <span class="now-playing-empty">Ничего не воспроизводится</span>
+                        </div>
+                        <div class="now-playing-artist" id="nowPlayingArtist"></div>
+                        <div class="now-playing-date" id="nowPlayingDate" style="display:none"></div>
+                    </div>
+                    <div class="now-playing-eq" id="nowPlayingEq">
+                        <span></span><span></span><span></span><span></span>
+                    </div>
+                </div>
+                <!-- Прогресс -->
+                <div class="now-playing-progress-wrap" id="nowPlayingProgressWrap" style="display:none">
+                    <div class="now-playing-progress-bg" id="nowPlayingProgressBg">
+                        <div class="now-playing-progress-fill" id="nowPlayingProgressFill"></div>
+                    </div>
+                    <div class="now-playing-time-row">
+                        <span id="nowPlayingTimeCurrent">0:00</span>
+                        <span id="nowPlayingTimeTotal">0:00</span>
+                    </div>
+                </div>
+                <!-- Кнопки управления -->
+                <div class="now-playing-controls" id="nowPlayingControls" style="display:none">
+                    <button class="np-ctrl-btn" id="npShuffleBtn" title="Перемешать"><i class="fa-solid fa-shuffle"></i></button>
+                    <button class="np-ctrl-btn" id="npPrevBtn" title="Предыдущий"><i class="fa-solid fa-backward-step"></i></button>
+                    <button class="np-play-btn" id="npPlayBtn"><i class="fa-solid fa-play" id="npPlayIcon"></i></button>
+                    <button class="np-ctrl-btn" id="npNextBtn" title="Следующий"><i class="fa-solid fa-forward-step"></i></button>
+                    <button class="np-ctrl-btn" id="npRepeatBtn" title="Повтор"><i class="fa-solid fa-repeat"></i></button>
+                </div>
+            </div>
+        </div><!-- end graphSection -->
+
+        <div class="recent-section" id="recentSection">
+            <div class="recent-section-header">
+                <h2>Недавно прослушанные</h2>
+                <div class="recent-section-actions">
+                    <button class="clear-recent-btn" id="clearRecentBtn">Очистить</button>
+                </div>
+            </div>
+            <div class="recent-cards-wrapper">
+                <div class="recent-cards empty" id="recentCards">
+                    <div class="empty-message">
+                        <i class="fa-regular fa-circle-play"></i>
+                        Послушайте что-нибудь
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        </div><!-- end home-wrapper -->
+
+        <div class="playlist-view" id="playlistView">
+            <div class="playlist-header">
+                <span style="color:#666;font-size:13px" id="playlistCount">0 треков • 0:00</span>
+                <div style="display:flex;gap:8px">
+                    <button class="add-track-btn" id="addTrackBtn">
+                        <i class="fa-solid fa-plus"></i> Добавить трек
+                    </button>
+                    <button class="add-folder-btn" id="addFolderBtn">
+                        <i class="fa-solid fa-folder-open"></i> Добавить папку
+                    </button>
+                </div>
+            </div>
+            <!-- Панель выделения (добавляется динамически) -->
+            <div class="playlist-grid" id="playlistGrid"></div>
+        </div>
+
+        <div class="settings-view" id="settingsView">
+            <div class="settings-group">
+                <h3><span class="settings-section-icon"><i class="fa-solid fa-chart-bar"></i></span> Статистика</h3>
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-value" id="statTotalTracks">0</div>
+                        <div class="stat-label">Треков</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="statTotalTime">0:00</div>
+                        <div class="stat-label">Общее время</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="statLiked">0</div>
+                        <div class="stat-label">В избранном</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="settings-group">
+                <h3><span class="settings-section-icon"><i class="fa-solid fa-sliders"></i></span> Аудио</h3>
+                <div class="setting-row">
+                    <div><div class="setting-label">Автовоспроизведение</div><div class="setting-desc">Начинать при запуске</div></div>
+                    <div class="toggle-switch" id="autoplayToggle" onclick="this.classList.toggle('on'); saveSettingToggle('autoplay', this.classList.contains('on'))"></div>
+                </div>
+                <div class="setting-row">
+                    <div><div class="setting-label">Продолжать с последнего трека</div><div class="setting-desc">Запоминать позицию воспроизведения</div></div>
+                    <div class="toggle-switch" id="resumeToggle" onclick="this.classList.toggle('on'); saveSettingToggle('resume', this.classList.contains('on'))"></div>
+                </div>
+                <div class="setting-row">
+                    <div><div class="setting-label">Анимации интерфейса</div><div class="setting-desc">Плавные переходы и эффекты</div></div>
+                    <div class="toggle-switch on" id="animationsToggle" onclick="this.classList.toggle('on'); saveSettingToggle('animations', this.classList.contains('on'))"></div>
+                </div>
+                <div class="setting-row">
+                    <div><div class="setting-label">Бегущая строка</div><div class="setting-desc">Прокрутка длинных названий в плеере</div></div>
+                    <div class="toggle-switch on" id="marqueeToggle" onclick="this.classList.toggle('on'); saveSettingToggle('marquee', this.classList.contains('on'))"></div>
+                </div>
+            </div>
+
+            <div class="settings-group">
+                <h3><span class="settings-section-icon"><i class="fa-solid fa-keyboard"></i></span> Горячие клавиши</h3>
+                <div class="shortcuts-grid">
+                    <div class="shortcut-item"><span class="shortcut-label">Пауза / Воспроизведение</span><span class="shortcut-key">Space</span></div>
+                    <div class="shortcut-item"><span class="shortcut-label">Перемотка вперёд</span><span class="shortcut-key">→</span></div>
+                    <div class="shortcut-item"><span class="shortcut-label">Перемотка назад</span><span class="shortcut-key">←</span></div>
+                    <div class="shortcut-item"><span class="shortcut-label">Снять выделение</span><span class="shortcut-key">Esc</span></div>
+                    <div class="shortcut-item"><span class="shortcut-label">Выделить трек</span><span class="shortcut-key">Ctrl+Click</span></div>
+                    <div class="shortcut-item"><span class="shortcut-label">Добавить файлы</span><span class="shortcut-key">Drag & Drop</span></div>
+                </div>
+            </div>
+
+            <div class="settings-group">
+                <h3><span class="settings-section-icon"><i class="fa-solid fa-circle-info"></i></span> О приложении</h3>
+                <div class="setting-row" style="margin-top:12px;border:none">
+                    <div><div class="setting-label">Playly</div><div class="setting-desc">Версия <span id="appVersion">1.1.2</span></div></div>
+                </div>
+                <div class="setting-row" style="border:none;padding-top:0">
+                    <div>
+                        <div class="setting-label">Разработчик</div>
+                        <div class="setting-desc">Aurum2347</div>
+                    </div>
+                </div>
+                <div class="setting-row" style="border:none;padding-top:0">
+                    <div>
+                        <div class="setting-label">Данные приложения</div>
+                        <div class="setting-desc">Папка с данными и файлом настроек</div>
+                    </div>
+                    <button class="settings-open-folder-btn" id="openAppFolderBtn">
+                        <i class="fa-solid fa-folder-open"></i> Открыть
+                    </button>
+                </div>
+                <div class="about-tg-wrap">
+                    <span class="about-tg-label">Поддержать разработчика</span>
+                    <a class="about-tg-btn" href="https://t.me/aurums2347" target="_blank" title="Telegram">
+                        <svg viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><path d="M11.944 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0a12 12 0 0 0-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 0 1 .171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.48.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z"/></svg>
+                        Telegram
+                    </a>
+                </div>
+                <button class="settings-reset-btn" id="resetLibraryBtn">
+                    <i class="fa-solid fa-trash-can"></i> Очистить библиотеку
+                </button>
+            </div>
+        </div>
+
+        <div class="player-bar">
+            <div class="player-progress-container" id="progressContainer">
+                <div class="player-progress-bg"><div class="player-progress-fill" id="progressFill"></div></div>
+            </div>
+            <div class="player-track-info">
+                <div class="player-track-art"><i class="fa-solid fa-music"></i></div>
+                <div class="player-track-details">
+                    <span class="player-track-name" id="trackName">Выберите трек</span>
+                    <span class="player-track-artist" id="trackArtist">—</span>
+                </div>
+                <button class="ctrl-btn" id="likeBtn" style="flex-shrink:0"><i class="fa-regular fa-heart"></i></button>
+            </div>
+            <div class="player-controls">
+                <button class="ctrl-btn" id="shuffleBtn"><i class="fa-solid fa-shuffle"></i></button>
+                <button class="ctrl-btn" id="prevBtn"><i class="fa-solid fa-backward-step"></i></button>
+                <button class="play-btn" id="playBtn"><i class="fa-solid fa-play" id="playIcon"></i></button>
+                <button class="ctrl-btn" id="nextBtn"><i class="fa-solid fa-forward-step"></i></button>
+                <button class="ctrl-btn" id="repeatBtn"><i class="fa-solid fa-repeat"></i></button>
+            </div>
+            <div class="player-time">
+                <span id="currentTime">0:00</span> / <span id="totalTime">0:00</span>
+            </div>
+            <div class="player-volume">
+                <i class="fa-solid fa-volume-high volume-icon" id="volumeIcon"></i>
+                <div class="volume-slider-container" id="volumeContainer">
+                        <div class="volume-slider-track">
+                            <div class="volume-slider-fill" id="volumeFill"></div>
+                        </div>
+                    </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- === КОНТЕКСТНОЕ МЕНЮ ТРЕКА === -->
+    <div class="context-menu" id="trackContextMenu">
+        <div class="context-item" data-action="details">
+            <i class="fa-solid fa-circle-info"></i><span>Подробнее</span>
+        </div>
+        <div class="context-item" data-action="edit">
+            <i class="fa-solid fa-pen"></i><span>Изменить</span>
+        </div>
+        <div class="context-item" data-action="playlist">
+            <i class="fa-solid fa-list"></i><span>Добавить в плейлист</span>
+        </div>
+        <div class="context-divider"></div>
+        <div class="context-item" data-action="select">
+            <i class="fa-solid fa-check"></i><span>Выделить</span>
+        </div>
+        <div class="context-item" data-action="open-explorer">
+            <i class="fa-solid fa-folder-open"></i><span>Открыть в проводнике</span>
+        </div>
+        <div class="context-divider"></div>
+        <div class="context-item danger" data-action="delete">
+            <i class="fa-solid fa-trash"></i><span>Удалить</span>
+        </div>
+    </div>
+
+    <!-- Модальные окна -->
+    <div class="modal-overlay" id="modalOverlay">
+        <div class="modal-box">
+            <div class="modal-header">
+                <h3>Новая категория</h3>
+                <button class="modal-close" id="modalClose"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <input type="text" class="modal-input" id="categoryInput" placeholder="Название категории..." maxlength="30">
+            <div class="modal-actions">
+                <button class="modal-btn modal-btn-cancel" id="modalCancel">Отмена</button>
+                <button class="modal-btn modal-btn-create" id="createBtn" disabled>Создать</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- === ДЕТАЛИ ТРЕКА — ПЕРЕДЕЛАНО === -->
+    <div class="modal-overlay" id="detailsModal">
+        <div class="modal-box">
+            <div class="modal-header">
+                <h3>Информация о треке</h3>
+                <button class="modal-close" data-modal="detailsModal"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="modal-body">
+                <div id="trackDetailsContent"></div>
+            </div>
+            <div class="modal-actions">
+                <button class="modal-btn modal-btn-cancel" data-modal="detailsModal">Закрыть</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="playlistModal">
+        <div class="modal-box">
+            <div class="modal-header">
+                <h3>Добавить в плейлист</h3>
+                <button class="modal-close" data-modal="playlistModal"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="modal-body">
+                <div class="playlist-list" id="playlistListContent"></div>
+            </div>
+            <div class="modal-actions">
+                <button class="modal-btn modal-btn-cancel" data-modal="playlistModal">Отмена</button>
+                <button class="modal-btn modal-btn-create" id="addToPlaylistBtn">Добавить</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- === МОДАЛЬНОЕ ОКНО УДАЛЕНИЯ === -->
+    <div class="modal-overlay" id="deleteModal">
+        <div class="modal-box">
+            <div class="modal-header">
+                <h3>Подтверждение удаления</h3>
+                <button class="modal-close" data-modal="deleteModal"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="modal-body delete-modal-content">
+                <i class="fa-solid fa-circle-exclamation delete-modal-icon"></i>
+                <p class="delete-modal-text">Трек <strong id="deleteTrackName">название</strong> будет безвозвратно удалён из библиотеки.</p>
+                <div class="delete-modal-actions">
+                    <button class="delete-modal-btn delete-modal-btn-cancel" data-modal="deleteModal">Отмена</button>
+                    <button class="delete-modal-btn delete-modal-btn-confirm" id="confirmDeleteBtn">Удалить</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="missingFileModal">
+        <div class="modal-box">
+            <div class="modal-header">
+                <h3>Файл не найден</h3>
+                <button class="modal-close" data-modal="missingFileModal"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="modal-body">
+                <i class="fa-solid fa-circle-exclamation missing-file-icon"></i>
+                <p class="modal-text">Трек <strong id="missingFileName">название</strong> не найден по пути:</p>
+                <div class="missing-file-path" id="missingFilePath">/path/to/file.mp3</div>
+                <p class="modal-text" style="font-size:12px;color:#666">Файл будет удалён из библиотеки.</p>
+            </div>
+            <div class="missing-file-actions">
+                <button class="missing-file-btn missing-file-btn-copy" id="copyMissingPathBtn">
+                    <svg class="svg-icon" viewBox="0 0 24 24"><path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/></svg>
+                    Копировать путь
+                </button>
+                <button class="missing-file-btn missing-file-btn-ok" id="okMissingFileBtn">Понятно...</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Контейнер для тост-уведомлений -->
+    <div id="toastContainer"></div>
+
+    <!-- === МОДАЛЬНОЕ ОКНО ЗАГРУЗКИ === -->
+    <div class="modal-overlay" id="loadingModal" style="z-index:20000">
+        <div class="modal-box" style="width:360px;text-align:center;padding:32px 28px">
+            <div class="loading-spinner-wrap">
+                <div class="loading-spinner" id="loadingSpinner"></div>
+            </div>
+            <div class="loading-title" id="loadingTitle">Загрузка файлов...</div>
+            <div class="loading-progress-bar-wrap">
+                <div class="loading-progress-bar" id="loadingProgressBar"></div>
+            </div>
+            <div class="loading-stats" id="loadingStats">0 / 0</div>
+            <div class="loading-current" id="loadingCurrent">Подготовка...</div>
+            <div class="loading-phrase" id="loadingPhrase"></div>
+        </div>
+    </div>
+
+    <!-- === МОДАЛЬНОЕ ОКНО РЕДАКТИРОВАНИЯ ТРЕКА === -->
+    <div class="modal-overlay" id="editTrackModal">
+        <div class="modal-box" style="width:520px;max-height:80vh;overflow-y:auto">
+            <div class="modal-header">
+                <h3><i class="fa-solid fa-pen" style="font-size:16px;margin-right:6px"></i>Редактировать трек</h3>
+                <button class="modal-close" data-modal="editTrackModal"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="modal-body" style="margin:0">
+                <!-- Обложка -->
+                <div class="edit-cover-section">
+                    <div class="edit-cover-preview" id="editCoverPreview">
+                        <i class="fa-solid fa-music"></i>
+                        <div class="edit-cover-overlay">
+                            <i class="fa-solid fa-camera"></i>
+                            <span>Загрузить GIF/изображение</span>
+                        </div>
+                    </div>
+                    <input type="file" id="editCoverInput" accept="image/*,.gif" style="display:none">
+                </div>
+                <!-- Поля -->
+                <div class="edit-field-group">
+                    <label class="edit-label">Название</label>
+                    <input type="text" class="modal-input" id="editTrackName" placeholder="Название трека...">
+                </div>
+                <div class="edit-field-group">
+                    <label class="edit-label">Исполнитель</label>
+                    <input type="text" class="modal-input" id="editTrackArtist" placeholder="Исполнитель...">
+                </div>
+                <div class="edit-field-group">
+                    <label class="edit-label">Скорость воспроизведения</label>
+                    <div class="edit-speed-row">
+                        <input type="range" id="editSpeedSlider" min="0.25" max="3" step="0.05" value="1" class="edit-range">
+                        <span class="edit-speed-val" id="editSpeedVal">1.00×</span>
+                    </div>
+                </div>
+                <div class="edit-field-group">
+                    <label class="edit-label">Цвет карточки</label>
+                    <div style="display:flex;align-items:center;gap:10px">
+                        <input type="color" id="editTrackColor" value="#ffffff"
+                            style="width:36px;height:28px;border:1px solid rgba(255,255,255,0.15);border-radius:7px;background:none;cursor:pointer;padding:2px">
+                        <button id="editTrackColorReset"
+                            style="font-size:11px;color:#666;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);border-radius:6px;padding:5px 10px;cursor:pointer;font-family:Inter,sans-serif">
+                            Сброс
+                        </button>
+                        <span style="font-size:10px;color:#444">Цвет акцента карточки</span>
+                    </div>
+                </div>
+                <!-- Эквалайзер 10 полос -->
+                <div class="edit-field-group">
+                    <label class="edit-label">Эквалайзер</label>
+                    <div class="eq-grid" id="eqGrid"></div>
+                </div>
+            </div>
+            <div class="modal-actions" style="margin-top:20px;flex-wrap:wrap;gap:8px">
+                <button class="modal-btn" id="editResetBtn" style="background:rgba(255,255,255,0.06);color:#888;flex:0 0 auto">
+                    <i class="fa-solid fa-rotate-left"></i> Сбросить
+                </button>
+                <button class="modal-btn modal-btn-cancel" data-modal="editTrackModal" style="flex:1">Закрыть</button>
+                <button class="modal-btn modal-btn-create" id="editSaveBtn" style="flex:1">Сохранить</button>
+            </div>
+        </div>
+    </div>
+
+    <audio id="audio"></audio>
+    <script src="config.js"></script>
+    <script src="renderer.js"></script>
+</body>
+</html>
