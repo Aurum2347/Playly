@@ -25,6 +25,12 @@
             display: flex;
             font-size: var(--font-base);
         }
+        
+        /* Оптимизация: отключаем transitions во время прокрутки */
+        .playlist-view.is-scrolling .track-card,
+        .playlist-view.is-scrolling .song-card {
+            transition: none !important;
+        }
 
         /* Полоса для перетаскивания окна — только верхние 40px */
         .drag-region {
@@ -212,6 +218,9 @@
             min-width: 0; width: 100%; cursor: default;
             scrollbar-width: auto;
             scrollbar-color: rgba(255,255,255,0.2) transparent;
+            /* Оптимизация прокрутки */
+            -webkit-overflow-scrolling: touch;
+            scroll-behavior: smooth;
         }
         .playlist-view::-webkit-scrollbar { width: 8px; }
         .playlist-view::-webkit-scrollbar-track { background: rgba(255,255,255,0.03); border-radius: 4px; }
@@ -243,6 +252,9 @@
             grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
             gap: 8px;
             width: 100%;
+            /* GPU-ускорение для плавной прокрутки */
+            transform: translateZ(0);
+            backface-visibility: hidden;
         }
         
         .track-card {
@@ -251,13 +263,14 @@
             border-radius: 12px;
             padding: 12px 14px;
             cursor: pointer;
-            transition: background 0.15s, border-color 0.15s, transform 0.15s;
+            transition: background 0.1s ease, border-color 0.1s ease, transform 0.1s ease;
             display: flex;
             align-items: center;
             gap: 12px;
             position: relative;
             content-visibility: auto;
             contain-intrinsic-size: 0 68px;
+            will-change: transform;
         }
         .track-card:hover {
             background: rgba(255,255,255,0.06);
@@ -406,8 +419,10 @@
         .song-card {
             min-width: 160px; width: 160px;
             background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.05);
-            border-radius: 12px; padding: 12px; cursor: pointer; transition: all 0.2s ease;
+            border-radius: 12px; padding: 12px; cursor: pointer; 
+            transition: background 0.1s ease, border-color 0.1s ease, transform 0.1s ease;
             position: relative; overflow: hidden; flex-shrink: 0; display: flex; flex-direction: column;
+            will-change: transform;
         }
         .song-card:hover {
             background: rgba(255,255,255,0.06); border-color: rgba(255,255,255,0.09);
@@ -1366,6 +1381,21 @@
         .context-item.danger { color: #f87171; }
         .context-item.danger i { color: #f87171; }
         .context-item.danger:hover { background: rgba(239,68,68,0.08); }
+        
+        /* Оптимизация анимаций */
+        .track-card,
+        .song-card,
+        .progress-fill,
+        .volume-fill {
+        will-change: transform, opacity;
+        }
+
+        /* Убираем will-change после анимации, чтобы не грузить память */
+        .track-card:not(:hover),
+        .song-card:not(:hover) {
+        will-change: auto;
+        }
+
         .context-divider { height: 1px; background: rgba(255,255,255,0.06); margin: 3px 0; }
     </style>
     <link rel="stylesheet" href="style.css">

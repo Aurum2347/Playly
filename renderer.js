@@ -79,6 +79,8 @@ let searchQuery = '';
 let recentlyPlayed = []; // отдельный список недавно воспроизведённых
 let marqueeEnabled = true; // бегущая строка в player-bar
 let _marqueeTimers = {}; // таймеры для бегущей строки
+let _lastActiveCard = null; // кэш для активной карточки
+const _cardElements = new Map(); // кэш: track.path → HTMLElement
 
 // ===== ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ =====
 function escapeHtml(str) {
@@ -157,6 +159,7 @@ function showToast(message, type = 'success') {
 
 // ===== ЛЕНИВАЯ ЗАГРУЗКА ОБЛОЖЕК =====
 let _coverObserver = null;
+let _loadedCovers = new Set(); // Кэш загруженных обложек
 
 function initCoverObserver() {
   if (_coverObserver) return;
@@ -165,24 +168,24 @@ function initCoverObserver() {
       if (!entry.isIntersecting) return;
       const img = entry.target;
       const coverData = img.dataset.coverData;
-      if (coverData) {
-        // Плавное появление
-        img.style.opacity = '0';
-        img.style.transition = 'opacity 0.3s ease';
+      if (coverData && !_loadedCovers.has(coverData)) {
         img.src = coverData;
+        _loadedCovers.add(coverData);
         img.onload = () => {
-          img.style.opacity = '1';
           delete img.dataset.coverData;
         };
         img.onerror = () => {
-          img.style.opacity = '1';
           delete img.dataset.coverData;
         };
+      } else if (_loadedCovers.has(coverData)) {
+        // Уже загружена - ставим сразу
+        img.src = coverData;
+        delete img.dataset.coverData;
       }
       _coverObserver.unobserve(img);
     });
   }, {
-    rootMargin: '200px 0px',
+    rootMargin: '400px 0px',
     threshold: 0
   });
 }
@@ -370,6 +373,15 @@ function setupEventListeners() {
   audio.onended = handleTrackEnded;
   document.addEventListener('keydown', handleKeyDown);
   
+  // Оптимизация: дебаунс для resize чтобы не лагало при fullscreen
+  let resizeTimer = null;
+  window.addEventListener('resize', () => {
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(() => {
+      // Ничего не делаем - карточки адаптируются через CSS grid
+    }, 250);
+  }, { passive: true });
+  
   // Кнопка очистки недавних
   const clearRecentBtn = document.getElementById('clearRecentBtn');
   if (clearRecentBtn) {
@@ -384,9 +396,21 @@ function setupEventListeners() {
   // Wheel scroll for recent cards
   if (recentCards) {
     recentCards.addEventListener('wheel', (e) => {
-      e.preventDefault();
       recentCards.scrollLeft += e.deltaY;
-    }, { passive: false });
+    }, { passive: true }); 
+  }
+  
+  // Оптимизация: отключаем transitions во время прокрутки для плавности
+  let scrollTimer = null;
+  const playlistView = document.getElementById('playlistView');
+  if (playlistView) {
+    playlistView.addEventListener('scroll', () => {
+      playlistView.classList.add('is-scrolling');
+      clearTimeout(scrollTimer);
+      scrollTimer = setTimeout(() => {
+        playlistView.classList.remove('is-scrolling');
+      }, 150);
+    }, { passive: true });
   }
   
   // Fix scroll on all scrollable sections — Electron blocks wheel on empty areas
@@ -446,6 +470,48 @@ function setupEventListeners() {
         showToast('Библиотека очищена');
       }
     };
+  }
+
+  // === ДЕЛЕГИРОВАНИЕ СОБЫТИЙ ДЛЯ ПЛЕЙЛИСТА ===
+  if (playlistGrid) {
+    playlistGrid.addEventListener('click', (e) => {
+      const menuBtn = e.target.closest('.track-menu-btn');
+      const card = e.target.closest('.track-card');
+      
+      // Клик по кнопке меню
+      if (menuBtn) {
+        e.stopPropagation();
+        contextTrackIndex = parseInt(menuBtn.dataset.index);
+        showContextMenu(e, menuBtn);
+        return;
+      }
+      
+      // Клик по карточке
+      if (card) {
+        const realIndex = parseInt(card.dataset.index);
+        const trackPath = card.dataset.path;
+        
+        if (isSelecting || e.ctrlKey || e.metaKey) {
+          e.stopPropagation();
+          toggleTrackSelection(trackPath);
+        } else if (realIndex === currentIndex) {
+          togglePlay();
+        } else {
+          currentIndex = realIndex;
+          loadTrack(realIndex);
+          play();
+        }
+      }
+    });
+    
+    playlistGrid.addEventListener('contextmenu', (e) => {
+      const card = e.target.closest('.track-card');
+      if (card) {
+        e.preventDefault();
+        contextTrackIndex = parseInt(card.dataset.index);
+        showContextMenu(e, card);
+      }
+    });
   }
 }
 
@@ -902,6 +968,11 @@ let _currentDisplayTracks = [];
 let _currentPage = 0;
 let _lastSortKey = '';
 
+// Вспомогательная функция для плавного батчинга
+const scheduleBatch = window.requestIdleCallback 
+  ? (fn) => requestIdleCallback(fn, { timeout: 100 })
+  : (fn) => setTimeout(fn, 32); // ~2 кадра при 60fps
+
 function renderPlaylist(page) {
   if (!playlistGrid) return;
   if (page !== undefined) _currentPage = page;
@@ -956,13 +1027,16 @@ function renderPlaylist(page) {
   const endIdx = Math.min(startIdx + PAGE_SIZE, displayTracks.length);
   const pageTracks = displayTracks.slice(startIdx, endIdx);
 
+  // КРИТИЧНО: очищаем кэш карточек перед рендерингом
+  _cardElements.clear();
+  
   playlistGrid.innerHTML = '';
   updatePlaylistInfo(displayTracks);
   updateSelectionBar(displayTracks);
 
-  // Простой рендеринг маленькими батчами
+  // Оптимизированный рендеринг большими батчами
   const isSelecting = selectedTracks.size > 0;
-  const BATCH = 10; // Уменьшил батч для плавности
+  const BATCH = 30;
   let batchIdx = 0;
 
   function renderNextBatch() {
@@ -980,8 +1054,7 @@ function renderPlaylist(page) {
     batchIdx = end;
     
     if (batchIdx < pageTracks.length) {
-      // Увеличил задержку для плавности
-      setTimeout(renderNextBatch, 8);
+      requestAnimationFrame(renderNextBatch);
     } else {
       // Пагинация
       if (totalPages > 1) {
@@ -990,12 +1063,12 @@ function renderPlaylist(page) {
         paginationEl.innerHTML = buildPaginationHTML(totalPages, _currentPage);
         playlistGrid.appendChild(paginationEl);
       }
-      loadMetadataForPageIfNeeded(pageTracks);
+      // Загружаем метаданные только после полной отрисовки
+      requestAnimationFrame(() => loadMetadataForPageIfNeeded(pageTracks));
     }
   }
   
-  // Начинаем рендеринг через небольшую задержку
-  setTimeout(renderNextBatch, 1);
+  renderNextBatch();
 }
 
 function buildPaginationHTML(totalPages, currentPage) {
@@ -1021,11 +1094,20 @@ function buildPaginationHTML(totalPages, currentPage) {
 
 window.goToPage = function(page) {
   _currentPage = page;
-  renderPlaylist();
-  loadTrackDurationsForPage();
-  // Скроллим наверх плейлиста
+  
+  // Плавный скролл наверх перед рендерингом
   const pv = document.getElementById('playlistView');
-  if (pv) pv.scrollTop = 0;
+  if (pv) {
+    pv.style.scrollBehavior = 'auto';
+    pv.scrollTop = 0;
+    pv.style.scrollBehavior = '';
+  }
+  
+  // Рендерим новую страницу
+  requestAnimationFrame(() => {
+    renderPlaylist();
+    loadTrackDurationsForPage();
+  });
 };
 
 // Загружаем метаданные только для треков БЕЗ данных (старые сохранения без _metaLoaded)
@@ -1066,7 +1148,7 @@ function buildTrackCard(track, realIndex, isSelecting) {
   const artContent = isSelected
     ? `<div class="select-check"><i class="fa-solid fa-check"></i></div>`
     : track.cover
-      ? `<img class="lazy-cover" style="width:100%;height:100%;object-fit:cover;border-radius:10px;"><div class="play-overlay"><i class="fa-solid fa-${iconClass}"></i></div>`
+      ? `<img src="${track.cover}" style="width:100%;height:100%;object-fit:cover;border-radius:10px;"><div class="play-overlay"><i class="fa-solid fa-${iconClass}"></i></div>`
       : `<i class="fa-solid fa-music"></i><div class="play-overlay"><i class="fa-solid fa-${iconClass}"></i></div>`;
 
   card.innerHTML = `
@@ -1086,42 +1168,9 @@ function buildTrackCard(track, realIndex, isSelecting) {
     </div>
   `;
 
-  card.addEventListener('click', (e) => {
-    if (e.target.closest('.track-menu-btn')) return;
-    if (isSelecting || e.ctrlKey || e.metaKey) {
-      e.stopPropagation();
-      toggleTrackSelection(track.path);
-    } else if (realIndex === currentIndex) {
-      togglePlay();
-    } else {
-      currentIndex = realIndex;
-      loadTrack(realIndex);
-      play();
-    }
-  });
-
-  const menuBtn = card.querySelector('.track-menu-btn');
-  menuBtn.addEventListener('click', (e) => {
-    e.stopPropagation();
-    contextTrackIndex = realIndex;
-    showContextMenu(e, menuBtn);
-  });
-
-  card.addEventListener('contextmenu', (e) => {
-    e.preventDefault();
-    contextTrackIndex = realIndex;
-    showContextMenu(e, card);
-  });
-
-  // Ленивая загрузка обложки
-  if (track.cover && !isSelected && _coverObserver) {
-    const lazyImg = card.querySelector('img.lazy-cover');
-    if (lazyImg) {
-      lazyImg.dataset.coverData = track.cover;
-      _coverObserver.observe(lazyImg);
-    }
-  }
-
+  // Сохраняем в кэш
+  _cardElements.set(track.path, card);
+  
   return card;
 }
 
@@ -1184,8 +1233,14 @@ function toggleTrackSelection(trackPath) {
   } else {
     selectedTracks.add(trackPath);
   }
-  // Update only the affected card visually, avoid full re-render
-  const card = playlistGrid?.querySelector(`[data-path="${CSS.escape(trackPath)}"]`);
+    // Update only the affected card visually, avoid full re-render
+    // Сначала пробуем взять из кэша
+  let card = _cardElements.get(trackPath);
+  // Если нет в кэше или карточка удалена — ищем в DOM
+  if (!card || !document.body.contains(card)) {
+    card = playlistGrid?.querySelector(`[data-path="${CSS.escape(trackPath)}"]`);
+    if (card) _cardElements.set(trackPath, card); // сохраняем в кэш
+  }
   if (card) {
     const isSelected = selectedTracks.has(trackPath);
     card.classList.toggle('selected', isSelected);
@@ -1404,7 +1459,7 @@ function renderRecent() {
     
     card.innerHTML = `
       <div class="song-card-art">
-        ${track.cover ? `<img class="lazy-cover" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;border-radius:8px;">` : '<i class="fa-solid fa-music"></i>'}
+        ${track.cover ? `<img src="${track.cover}" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;border-radius:8px;">` : '<i class="fa-solid fa-music"></i>'}
         <div class="play-overlay"><i class="fa-solid fa-${isCurrentAndPlaying ? 'pause' : 'play'}"></i></div>
       </div>
       <div class="song-card-title">${escapeHtml(track.name)}</div>
@@ -1425,14 +1480,6 @@ function renderRecent() {
       showContextMenu(e, card);
     });
     recentCards.appendChild(card);
-    // Регистрируем ленивую загрузку обложки
-    if (track.cover && _coverObserver) {
-      const lazyImg = card.querySelector('img.lazy-cover');
-      if (lazyImg) {
-        lazyImg.dataset.coverData = track.cover;
-        _coverObserver.observe(lazyImg);
-      }
-    }
   });
 }
 
@@ -1514,7 +1561,7 @@ function saveDataDebounced() {
 }
 
 // ===== ЗАГРУЗКА МЕТАДАННЫХ (очередь, не зависает) =====
-const META_CONCURRENCY = 2;
+const META_CONCURRENCY = 1; // Уменьшил до 1 для плавности UI
 let _metaQueue = [];
 let _metaActive = 0;
 let _metaPaused = false;
@@ -1538,16 +1585,16 @@ function _metaWorker() {
   if (_metaPaused || !_metaQueue.length) return;
   const track = _metaQueue.shift();
   if (!track || track._metaLoaded) { 
-    // Небольшая пауза между треками чтобы не блокировать UI
-    setTimeout(_metaWorker, 10);
+    // Увеличил паузу между треками для плавности UI
+    setTimeout(_metaWorker, 50);
     return; 
   }
   track._metaLoaded = true;
   _metaActive++;
   loadMetadataForTrack(track).then(() => {
     _metaActive--;
-    // Пауза между загрузками чтобы UI оставался отзывчивым
-    setTimeout(_metaWorker, 30);
+    // Увеличил паузу между загрузками для плавности UI
+    setTimeout(_metaWorker, 100);
   });
 }
 
@@ -1564,7 +1611,8 @@ async function loadMetadataForTrack(track) {
       if (meta.cover && meta.cover.length > 50) { track.cover = meta.cover; changed = true; }
 
       if (changed) {
-        requestAnimationFrame(() => {
+        // Используем requestIdleCallback для отложенного обновления UI
+        const updateUI = () => {
           // Обновляем player-bar если это текущий трек
           if (tracks[currentIndex]?.path === track.path) {
             trackNameEl.textContent = track.name;
@@ -1595,7 +1643,7 @@ async function loadMetadataForTrack(track) {
             const artistEl = recentCard.querySelector('.song-card-artist');
             if (artistEl) artistEl.textContent = track.artist || getFileTypeText(track.ext);
           }
-          // Обновляем карточку в плейлисте
+          // Обновляем карточку в плейлисте БЕЗ полной перерисовки
           const card = playlistGrid?.querySelector(`[data-path="${CSS.escape(track.path)}"]`);
           if (card) {
             const titleEl = card.querySelector('.track-card-title');
@@ -1620,7 +1668,15 @@ async function loadMetadataForTrack(track) {
               }
             }
           }
-        });
+        };
+        
+        // Откладываем обновление UI чтобы не блокировать рендеринг
+        if (window.requestIdleCallback) {
+          requestIdleCallback(updateUI, { timeout: 2000 });
+        } else {
+          setTimeout(updateUI, 100);
+        }
+        
         saveDataDebounced();
       }
     }
@@ -1781,18 +1837,25 @@ function pause() {
 // Обновляет только иконку play/pause на активной карточке без полного ре-рендера
 function updateActiveCardIcon() {
   if (!playlistGrid) return;
-  playlistGrid.querySelectorAll('.track-card').forEach(card => {
-    const idx = parseInt(card.dataset.index);
-    const overlay = card.querySelector('.play-overlay i');
-    if (!overlay) return;
-    if (idx === currentIndex) {
-      card.classList.add('active-track');
+  
+  // Убираем выделение с предыдущей активной карточки
+  if (_lastActiveCard) {
+    _lastActiveCard.classList.remove('active-track');
+    const overlay = _lastActiveCard.querySelector('.play-overlay i');
+    if (overlay) overlay.className = 'fa-solid fa-play';
+    _lastActiveCard = null;
+  }
+  
+  // Находим новую активную карточку по индексу
+  const newActive = playlistGrid.querySelector(`[data-index="${currentIndex}"]`);
+  if (newActive) {
+    newActive.classList.add('active-track');
+    const overlay = newActive.querySelector('.play-overlay i');
+    if (overlay) {
       overlay.className = isPlaying ? 'fa-solid fa-pause' : 'fa-solid fa-play';
-    } else {
-      card.classList.remove('active-track');
-      overlay.className = 'fa-solid fa-play';
     }
-  });
+    _lastActiveCard = newActive; // запоминаем для следующего раза
+  }
 }
 
 function togglePlay() {
@@ -2303,6 +2366,7 @@ function showMissingFileModal(t) {
 function removeTrack(index) {
   const track = tracks[index];
   tracks.splice(index, 1);
+  _cardElements.delete(track.path);
   selectedTracks.delete(track.path);
   Object.values(playlists).forEach(pl => pl.trackPaths?.delete(track.path));
   
