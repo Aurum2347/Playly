@@ -1,0 +1,64 @@
+appId: com.playly.app
+productName: Playly
+copyright: "© 2025 Aurum2347"
+
+# Что включать в сборку
+files:
+  - main.js
+  - preload.js
+  - renderer.js
+  - config.js
+  - index.html
+  - splash.html
+  - loading-phrases.json
+  - icon.ico
+  - TopMusicLogo.svg
+  - package.json
+  - node_modules/**/*
+  - "!node_modules/.cache/**/*"
+  - "!dist/**/*"
+  - "!.git/**/*"
+  - "!.vscode/**/*"
+
+# Папка вывода
+directories:
+  output: dist
+
+# ──────────────────────────────────────────
+# Windows — две цели одновременно
+# ──────────────────────────────────────────
+win:
+  icon: icon.ico
+  # Отключаем подпись кода — не нужна для личного использования
+  # и убирает необходимость скачивать winCodeSign
+  signingHashAlgorithms: null
+  sign: null
+  target:
+    # Версия 1: установщик (один клик → ярлык → запуск)
+    - target: nsis
+      arch: [x64]
+    # Версия 2: portable (один exe, без установки)
+    - target: portable
+      arch: [x64]
+
+# ──────────────────────────────────────────
+# Настройки установщика
+# oneClick = true: запустил → тихо поставил → ярлык → запустил приложение
+# ──────────────────────────────────────────
+nsis:
+  oneClick: true
+  perMachine: false
+  allowElevation: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: Playly
+  runAfterFinish: true
+  artifactName: "Playly-${version}-Setup.exe"
+
+# ──────────────────────────────────────────
+# Настройки portable
+# Один exe-файл, запускается без установки
+# Данные хранятся в %APPDATA%\Playly (стандартное место)
+# ──────────────────────────────────────────
+portable:
+  artifactName: "Playly-${version}-Portable.exe"
