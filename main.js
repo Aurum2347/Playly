@@ -16,7 +16,26 @@ protocol.registerSchemesAsPrivileged([
 ]);
 
 let mainWindow;
+let splashWindow;
 const DATA_PATH = path.join(app.getPath('userData'), 'topmusic-data.json');
+
+function createSplashWindow() {
+  splashWindow = new BrowserWindow({
+    width: 340,
+    height: 340,
+    frame: false,
+    transparent: false,
+    resizable: false,
+    center: true,
+    backgroundColor: '#0a0a0a',
+    skipTaskbar: true,
+    webPreferences: {
+      contextIsolation: true,
+      nodeIntegration: false,
+    },
+  });
+  splashWindow.loadFile('splash.html');
+}
 
 function createWindow() {
   mainWindow = new BrowserWindow({
@@ -25,6 +44,7 @@ function createWindow() {
     minWidth: appConfig.minWindowWidth,
     minHeight: appConfig.minWindowHeight,
     frame: false,
+    show: false, // скрыто до готовности
     backgroundColor: '#0a0a0a',
     title: `${appConfig.appName} v${appConfig.version}`,
     webPreferences: {
@@ -37,13 +57,29 @@ function createWindow() {
   });
 
   mainWindow.loadFile('index.html');
-  
+
+  // Когда основное окно готово — закрываем сплэш и показываем главное
+  mainWindow.once('ready-to-show', () => {
+    if (splashWindow && !splashWindow.isDestroyed()) {
+      // Небольшая задержка чтобы сплэш не мигал при быстрой загрузке
+      setTimeout(() => {
+        splashWindow.destroy();
+        splashWindow = null;
+        mainWindow.show();
+        mainWindow.focus();
+      }, 600);
+    } else {
+      mainWindow.show();
+    }
+  });
+
   if (process.argv.includes('--dev')) {
     mainWindow.webContents.openDevTools();
   }
 }
 
 app.whenReady().then(() => {
+  createSplashWindow();
   // Кастомный протокол для стриминга локальных аудиофайлов
   protocol.handle('localfile', async (request) => {
     try {

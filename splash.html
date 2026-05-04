@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Playly</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; user-select: none; -webkit-user-select: none; }
+
+    html, body {
+      width: 100%; height: 100%;
+      background: #0a0a0a;
+      display: flex; align-items: center; justify-content: center;
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      overflow: hidden;
+      -webkit-app-region: drag;
+    }
+
+    .splash {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 0;
+      animation: fadeIn 0.4s ease forwards;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    .logo-wrap {
+      position: relative;
+      width: 72px; height: 72px;
+      display: flex; align-items: center; justify-content: center;
+      margin-bottom: 20px;
+    }
+
+    /* Пульсирующее кольцо */
+    .logo-ring {
+      position: absolute; inset: -10px;
+      border-radius: 50%;
+      border: 1.5px solid rgba(255,255,255,0.08);
+      animation: ring-pulse 2s ease-in-out infinite;
+    }
+    .logo-ring:nth-child(2) { inset: -20px; animation-delay: 0.4s; border-color: rgba(255,255,255,0.04); }
+
+    @keyframes ring-pulse {
+      0%, 100% { transform: scale(1);   opacity: 1; }
+      50%       { transform: scale(1.06); opacity: 0.5; }
+    }
+
+    .logo-box {
+      width: 72px; height: 72px;
+      background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 20px;
+      display: flex; align-items: center; justify-content: center;
+      position: relative; z-index: 1;
+    }
+
+    .logo-box svg {
+      width: 36px; height: 36px;
+    }
+
+    .app-name {
+      font-size: 22px;
+      font-weight: 700;
+      letter-spacing: -0.5px;
+      color: #e0e0e0;
+      margin-bottom: 6px;
+    }
+
+    .app-name span { color: #fff; }
+
+    .app-tagline {
+      font-size: 12px;
+      color: #333;
+      font-weight: 400;
+      margin-bottom: 36px;
+      letter-spacing: 0.2px;
+    }
+
+    /* Прогресс-бар */
+    .progress-wrap {
+      width: 140px;
+      height: 2px;
+      background: rgba(255,255,255,0.06);
+      border-radius: 2px;
+      overflow: hidden;
+    }
+
+    .progress-bar {
+      height: 100%;
+      width: 0%;
+      background: rgba(255,255,255,0.4);
+      border-radius: 2px;
+      transition: width 0.3s ease;
+      animation: indeterminate 1.6s ease-in-out infinite;
+    }
+
+    @keyframes indeterminate {
+      0%   { width: 0%;   margin-left: 0%; }
+      40%  { width: 60%;  margin-left: 20%; }
+      100% { width: 0%;   margin-left: 100%; }
+    }
+
+    .status-text {
+      margin-top: 14px;
+      font-size: 11px;
+      color: #2a2a2a;
+      letter-spacing: 0.3px;
+    }
+  </style>
+</head>
+<body>
+  <div class="splash">
+    <div class="logo-wrap">
+      <div class="logo-ring"></div>
+      <div class="logo-ring"></div>
+      <div class="logo-box">
+        <svg viewBox="0 0 422 372" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M168.406 107.775C166.834 101.908 160.769 98.3656 155.129 100.623C139.768 106.771 126.269 116.956 116.115 130.19C103.719 146.344 97 166.138 97 186.5C97 206.862 103.719 226.656 116.115 242.81C126.269 256.044 139.768 266.229 155.129 272.377C160.769 274.634 166.834 271.092 168.406 265.225C169.978 259.357 166.445 253.403 160.893 250.939C150.183 246.184 140.77 238.808 133.566 229.42C124.118 217.107 118.997 202.02 118.997 186.5C118.997 170.98 124.118 155.893 133.566 143.58C140.77 134.192 150.183 126.816 160.893 122.061C166.445 119.597 169.978 113.643 168.406 107.775Z" fill="#E8E8E8"/>
+          <path d="M253.594 107.775C255.166 101.908 261.231 98.3656 266.871 100.623C282.232 106.771 295.731 116.956 305.885 130.19C318.281 146.344 325 166.138 325 186.5C325 206.862 318.281 226.656 305.885 242.81C295.731 256.044 282.232 266.229 266.871 272.377C261.231 274.634 255.166 271.092 253.594 265.225C252.022 259.357 255.555 253.403 261.107 250.939C271.817 246.184 281.23 238.808 288.434 229.42C297.882 217.107 303.003 202.02 303.003 186.5C303.003 170.98 297.882 155.893 288.434 143.58C281.23 134.192 271.817 126.816 261.107 122.061C255.555 119.597 252.022 113.643 253.594 107.775Z" fill="#E8E8E8"/>
+          <circle cx="211" cy="186.5" r="28" fill="#E8E8E8"/>
+        </svg>
+      </div>
+    </div>
+
+    <div class="app-name"><span>Play</span>ly</div>
+    <div class="app-tagline">Музыкальный плеер</div>
+
+    <div class="progress-wrap">
+      <div class="progress-bar" id="progressBar"></div>
+    </div>
+    <div class="status-text" id="statusText">Запуск...</div>
+  </div>
+</body>
+</html>

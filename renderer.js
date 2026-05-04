@@ -155,6 +155,18 @@ function showToast(message, type = 'success') {
   }, 2500);
 }
 
+// ===== КЭШ ИНДЕКСОВ (path → index) для O(1) поиска =====
+let _trackIndexCache = new Map();
+
+function rebuildIndexCache() {
+  _trackIndexCache.clear();
+  tracks.forEach((t, i) => _trackIndexCache.set(t.path, i));
+}
+
+function getTrackIndex(path) {
+  return _trackIndexCache.has(path) ? _trackIndexCache.get(path) : tracks.findIndex(t => t.path === path);
+}
+
 // ===== ИНИЦИАЛИЗАЦИЯ =====
 async function init() {
   if (appVersionEl && window.appConfig) {
@@ -164,6 +176,7 @@ async function init() {
   updateVolumeUI();
   
   await loadData();
+  rebuildIndexCache();
   renderRecent();
   renderSyncList();
   renderSyncCategories();
@@ -172,11 +185,21 @@ async function init() {
   updateNowPlayingCard();
   applyAnimationSetting();
   loadUIPreferences();
-  await checkMissingFiles();
   initGraph();
-  // Load durations and metadata with throttling to avoid UI freeze
-  loadTrackDurations();
-  loadAllMetadata();
+
+  // Откладываем тяжёлые фоновые задачи — не блокируем первый рендер
+  // checkMissingFiles запускаем через 4с после старта
+  setTimeout(() => checkMissingFiles(), 4000);
+
+  // Метаданные и длительности — через requestIdleCallback чтобы не мешать UI
+  const scheduleIdle = window.requestIdleCallback
+    ? (fn) => requestIdleCallback(fn, { timeout: 3000 })
+    : (fn) => setTimeout(fn, 500);
+
+  scheduleIdle(() => {
+    loadTrackDurations();
+    loadAllMetadata();
+  });
 }
 
 // ===== ОТРИСОВКА КАТЕГОРИЙ В САЙДБАРЕ (исправление бага) =====
@@ -729,6 +752,7 @@ async function loadMetadataInModal(newTracks, totalFiles) {
 
   // === Фаза 3: рендеринг карточек пока модалка открыта ===
   setLoadingPhase('processing', 'Отрисовка карточек...');
+  rebuildIndexCache(); // обновляем кэш после добавления новых треков
   await renderPlaylistInBackground();
 
   saveDataDebounced();
@@ -772,7 +796,7 @@ async function renderPlaylistInBackground() {
     const fragment = document.createDocumentFragment();
     for (let i = start; i < end; i++) {
       const track = pageTracks[i];
-      const realIndex = tracks.findIndex(t => t.path === track.path);
+      const realIndex = getTrackIndex(track.path);
       if (realIndex === -1) continue;
       fragment.appendChild(buildTrackCard(track, realIndex, false));
     }
@@ -901,9 +925,9 @@ function renderPlaylist(page) {
   updatePlaylistInfo(displayTracks);
   updateSelectionBar(displayTracks);
 
-  // Рендерим батчами по 20 карточек через rAF чтобы не блокировать UI
+  // Рендерим батчами по 30 карточек через rAF чтобы не блокировать UI
   const isSelecting = selectedTracks.size > 0;
-  const BATCH = 20;
+  const BATCH = 30;
   let batchIdx = 0;
 
   function renderNextBatch() {
@@ -911,7 +935,7 @@ function renderPlaylist(page) {
     const fragment = document.createDocumentFragment();
     for (let i = batchIdx; i < end; i++) {
       const track = pageTracks[i];
-      const realIndex = tracks.findIndex(t => t.path === track.path);
+      const realIndex = getTrackIndex(track.path); // O(1) вместо O(n)
       if (realIndex === -1) continue;
       fragment.appendChild(buildTrackCard(track, realIndex, isSelecting));
     }
@@ -2285,6 +2309,7 @@ async function loadData() {
 }
 
 function renderAll() {
+  rebuildIndexCache();
   renderPlaylist();
   renderRecent();
 }
