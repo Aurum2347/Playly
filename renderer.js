@@ -522,15 +522,23 @@ function setupEventListeners() {
         const realIndex = parseInt(card.dataset.index);
         const trackPath = card.dataset.path;
         
-        if (isSelecting || e.ctrlKey || e.metaKey) {
+        console.log('Card clicked:', { realIndex, trackPath, currentIndex });
+        
+        if (e.ctrlKey || e.metaKey) {
           e.stopPropagation();
           toggleTrackSelection(trackPath);
         } else if (realIndex === currentIndex) {
+          console.log('Toggling play for current track');
           togglePlay();
         } else {
+          console.log('Loading new track:', realIndex);
           currentIndex = realIndex;
-          loadTrack(realIndex);
-          play();
+          loadTrack(realIndex).then(() => {
+            console.log('Track loaded, starting playback');
+            play();
+          }).catch(err => {
+            console.error('Failed to load track:', err);
+          });
         }
       }
     });
@@ -931,9 +939,9 @@ async function loadMetadataInModal(newTracks, totalFiles) {
                     if (meta.artist && meta.artist.trim()) track.artist = meta.artist.trim();
                     if (meta.album) track.album = meta.album;
                     
-                    // === КОНВЕРТАЦИЯ ОБЛОЖКИ В BLOB ===
+                    // === СОХРАНЯЕМ ОБЛОЖКУ КАК DATA URL ===
                     if (meta.cover && meta.cover.length > 50) {
-                        track.coverBlobUrl = base64ToBlobUrl(meta.cover, meta.picture?.format || 'image/jpeg');
+                        track.coverBlobUrl = meta.cover;
                     }
                 }
             } catch (e) {
@@ -1085,6 +1093,10 @@ async function renderPlaylist(page) {
 
     // === ГЛАВНОЕ: Обновляем карточки БЕЗ скрытия всего списка ===
     // Это предотвращает "мигание" при переключении страниц
+    // Обновляем все карточки синхронно для мгновенного отображения
+    const fragment = document.createDocumentFragment();
+    const cardsToUpdate = [];
+    
     for (let i = 0; i < PAGE_SIZE; i++) {
         const card = window._cardPool[i];
         
@@ -1291,50 +1303,42 @@ function updateTrackCard(cardElement, track, realIndex) {
     
     if (isSelected) {
         // Режим выделения: показываем чекбокс
-        if (!cardElement._isShowingCheck) {
-            nodes.img.style.display = 'none';
-            nodes.musicIcon.style.display = 'none';
-            nodes.overlay.style.display = 'none';
-            nodes.check.style.display = 'flex';
-            cardElement._isShowingCheck = true;
-            cardElement._isShowingCover = false;
-        }
+        nodes.img.style.display = 'none';
+        nodes.musicIcon.style.display = 'none';
+        nodes.overlay.style.display = 'none';
+        nodes.check.style.display = 'flex';
+        cardElement._isShowingCheck = true;
+        cardElement._isShowingCover = false;
+        cardElement._currentCoverUrl = null;
     } else if (track.coverBlobUrl) {
         // ЕСТЬ ОБЛОЖКА
-        if (!cardElement._isShowingCover || cardElement._currentCoverUrl !== track.coverBlobUrl) {
-            // Показываем картинку
-            nodes.check.style.display = 'none';
-            nodes.musicIcon.style.display = 'none';
-            
-            // Меняем src только если отличается (важно!)
-            if (nodes.img.src !== track.coverBlobUrl) {
-                nodes.img.src = track.coverBlobUrl;
-            }
-            nodes.img.style.display = 'block';
-            
-            // Показываем оверлей play/pause
-            nodes.overlay.style.display = 'flex';
-            nodes.overlayIcon.className = `fa-solid fa-${iconClass}`;
-            
-            cardElement._isShowingCover = true;
-            cardElement._isShowingCheck = false;
-            cardElement._currentCoverUrl = track.coverBlobUrl;
-        } else {
-            // Картинка уже показана, обновляем только иконку play/pause
-            nodes.overlayIcon.className = `fa-solid fa-${iconClass}`;
+        nodes.check.style.display = 'none';
+        nodes.musicIcon.style.display = 'none';
+        
+        // ВАЖНО: Всегда обновляем src для предотвращения "призрачных" обложек
+        if (nodes.img.src !== track.coverBlobUrl) {
+            nodes.img.src = track.coverBlobUrl;
         }
+        nodes.img.style.display = 'block';
+        
+        // Показываем оверлей play/pause
+        nodes.overlay.style.display = 'flex';
+        nodes.overlayIcon.className = `fa-solid fa-${iconClass}`;
+        
+        cardElement._isShowingCover = true;
+        cardElement._isShowingCheck = false;
+        cardElement._currentCoverUrl = track.coverBlobUrl;
     } else {
         // НЕТ ОБЛОЖКИ: показываем иконку ноты
-        if (cardElement._isShowingCover || cardElement._isShowingCheck) {
-            nodes.check.style.display = 'none';
-            nodes.img.style.display = 'none';
-            nodes.overlay.style.display = 'none';
-            nodes.musicIcon.style.display = 'block';
-            cardElement._isShowingCover = false;
-            cardElement._isShowingCheck = false;
-            cardElement._currentCoverUrl = null;
-        }
-        // Иконку play/pause поверх ноты можно показать по ховеру через CSS
+        nodes.check.style.display = 'none';
+        nodes.img.style.display = 'none';
+        nodes.img.src = ''; // Очищаем src для освобождения памяти
+        nodes.overlay.style.display = 'flex'; // Показываем overlay даже без обложки
+        nodes.overlayIcon.className = `fa-solid fa-${iconClass}`;
+        nodes.musicIcon.style.display = 'block';
+        cardElement._isShowingCover = false;
+        cardElement._isShowingCheck = false;
+        cardElement._currentCoverUrl = null;
     }
     
     // === 3. Текстовые данные (быстрое присваивание) ===
@@ -1548,8 +1552,8 @@ function buildTrackCard(track, realIndex, isSelecting) {
   let artHTML;
   if (isSelected) {
     artHTML = '<div class="select-check"><i class="fa-solid fa-check"></i></div>';
-  } else if (track.cover) {
-    artHTML = `<img src="${track.cover}" style="width:100%;height:100%;object-fit:cover;border-radius:10px;"><div class="play-overlay"><i class="fa-solid fa-${iconClass}"></i></div>`;
+  } else if (track.coverBlobUrl) {
+    artHTML = `<img src="${track.coverBlobUrl}" style="width:100%;height:100%;object-fit:cover;border-radius:10px;"><div class="play-overlay"><i class="fa-solid fa-${iconClass}"></i></div>`;
   } else {
     artHTML = `<i class="fa-solid fa-music"></i><div class="play-overlay"><i class="fa-solid fa-${iconClass}"></i></div>`;
   }
@@ -1648,14 +1652,14 @@ function toggleTrackSelection(trackPath) {
           const isActive = realIndex === currentIndex;
           const iconClass = isActive && isPlaying ? 'pause' : 'play';
           
-          if (track?.cover) {
+          if (track?.coverBlobUrl) {
             // Создаём img элемент
             if (!card._coverImg) {
               card._coverImg = document.createElement('img');
               card._coverImg.style.cssText = 'width:100%;height:100%;object-fit:cover;border-radius:10px;';
             }
-            card._coverImg.src = track.cover;
-            card._currentCoverSrc = track.cover;
+            card._coverImg.src = track.coverBlobUrl;
+            card._currentCoverSrc = track.coverBlobUrl;
             
             // Создаём overlay
             if (!card._playOverlay) {
@@ -1871,7 +1875,7 @@ function renderRecent() {
     
     card.innerHTML = `
       <div class="song-card-art">
-        ${track.cover ? `<img src="${track.cover}" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;border-radius:8px;">` : '<i class="fa-solid fa-music"></i>'}
+        ${track.coverBlobUrl ? `<img src="${track.coverBlobUrl}" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;border-radius:8px;">` : '<i class="fa-solid fa-music"></i>'}
         <div class="play-overlay"><i class="fa-solid fa-${isCurrentAndPlaying ? 'pause' : 'play'}"></i></div>
       </div>
       <div class="song-card-title">${escapeHtml(track.name)}</div>
@@ -2031,14 +2035,9 @@ async function loadMetadataForTrack(track) {
             }
             if (meta.album) track.album = meta.album;
             
-            // === КОНВЕРТАЦИЯ ОБЛОЖКИ В BLOB URL ===
+            // === СОХРАНЯЕМ ОБЛОЖКУ КАК DATA URL ===
             if (meta.cover && meta.cover.length > 50) {
-                // Освобождаем старую память если есть
-                if (track.coverBlobUrl) {
-                    revokeBlobUrl(track.coverBlobUrl);
-                }
-                // Конвертируем base64 в blob
-                track.coverBlobUrl = base64ToBlobUrl(meta.cover, meta.picture?.format || 'image/jpeg');
+                track.coverBlobUrl = meta.cover;
                 changed = true;
             }
 
@@ -2207,12 +2206,18 @@ function buildFileUrlFallback(filePath) {
 // ===== ЗАГРУЗКА ТРЕКА (с async URL) =====
 
 async function loadTrack(index) {
-    if (index < 0 || index >= tracks.length) return;
+    console.log('loadTrack called with index:', index);
+    if (index < 0 || index >= tracks.length) {
+        console.error('Invalid track index:', index, 'tracks.length:', tracks.length);
+        return;
+    }
     currentIndex = index;
     const track = tracks[index];
+    console.log('Loading track:', track.name, track.path);
     
     // === АСИНХРОННО получаем URL ===
     const fileUrl = await getFileUrl(track.path);
+    console.log('Got file URL:', fileUrl);
     if (!fileUrl) {
         console.error('Failed to get URL for:', track.path);
         showToast('Ошибка загрузки трека', 'error');
@@ -2821,14 +2826,12 @@ function showMissingFileModal(t) {
 }
 
 function cleanupTrackMemory(track) {
-    // Освобождаем Blob URL обложки
+    // Очищаем обложку (data URL не требует освобождения)
     if (track.coverBlobUrl) {
-        revokeBlobUrl(track.coverBlobUrl);
         delete track.coverBlobUrl;
     }
-    // Освобождаем URL аудио если он был создан
+    // Очищаем URL аудио если он был создан
     if (track.audioUrl) {
-        revokeBlobUrl(track.audioUrl);
         delete track.audioUrl;
     }
 }
@@ -3263,14 +3266,14 @@ function updateNowPlayingCard() {
   if (artEl) {
     let img = artEl.querySelector('img');
     let musicIcon = artEl.querySelector('i.fa-music');
-    if (track.cover) {
+    if (track.coverBlobUrl) {
       artEl.classList.add('has-cover');
       if (!img) {
         img = document.createElement('img');
         img.alt = '';
         artEl.insertBefore(img, artEl.firstChild);
       }
-      img.src = track.cover;
+      img.src = track.coverBlobUrl;
       if (musicIcon) musicIcon.style.display = 'none';
     } else {
       artEl.classList.remove('has-cover');
@@ -3335,8 +3338,8 @@ function openEditTrackModal(trackIndex) {
   
   // Обложка
   const preview = document.getElementById('editCoverPreview');
-  if (track.cover) {
-    preview.innerHTML = `<img src="${track.cover}" alt=""><div class="edit-cover-overlay"><i class="fa-solid fa-camera"></i><span>Изменить</span></div>`;
+  if (track.coverBlobUrl) {
+    preview.innerHTML = `<img src="${track.coverBlobUrl}" alt=""><div class="edit-cover-overlay"><i class="fa-solid fa-camera"></i><span>Изменить</span></div>`;
   } else {
     preview.innerHTML = `<i class="fa-solid fa-music"></i><div class="edit-cover-overlay"><i class="fa-solid fa-camera"></i><span>Загрузить GIF/изображение</span></div>`;
   }
@@ -3350,7 +3353,8 @@ function openEditTrackModal(trackIndex) {
       const src = ev.target.result;
       preview.innerHTML = `<img src="${src}" alt=""><div class="edit-cover-overlay"><i class="fa-solid fa-camera"></i><span>Изменить</span></div>`;
       preview.onclick = () => document.getElementById('editCoverInput').click();
-      track._pendingCover = src;
+      // Сохраняем как data URL
+      track._pendingCoverBlobUrl = src;
     };
     reader.readAsDataURL(file);
   };
@@ -3394,10 +3398,10 @@ function openEditTrackModal(trackIndex) {
       document.getElementById(`eqRange${i}`).value = 0;
       document.getElementById(`eqVal${i}`).textContent = '0';
     });
-    if (track._origCover !== undefined) {
-      track._pendingCover = track._origCover;
-      if (track._origCover) {
-        preview.innerHTML = `<img src="${track._origCover}" alt=""><div class="edit-cover-overlay"><i class="fa-solid fa-camera"></i><span>Изменить</span></div>`;
+    if (track._origCoverBlobUrl !== undefined) {
+      track._pendingCoverBlobUrl = track._origCoverBlobUrl;
+      if (track._origCoverBlobUrl) {
+        preview.innerHTML = `<img src="${track._origCoverBlobUrl}" alt=""><div class="edit-cover-overlay"><i class="fa-solid fa-camera"></i><span>Изменить</span></div>`;
       } else {
         preview.innerHTML = `<i class="fa-solid fa-music"></i><div class="edit-cover-overlay"><i class="fa-solid fa-camera"></i><span>Загрузить GIF/изображение</span></div>`;
       }
@@ -3422,16 +3426,16 @@ function saveEditTrack(trackIndex) {
   // Сохраняем оригиналы при первом редактировании
   if (track._origName === undefined) track._origName = track.name;
   if (track._origArtist === undefined) track._origArtist = track.artist || '';
-  if (track._origCover === undefined) track._origCover = track.cover || null;
+  if (track._origCoverBlobUrl === undefined) track._origCoverBlobUrl = track.coverBlobUrl || null;
   
   track.name = document.getElementById('editTrackName').value.trim() || track.name;
   track.artist = document.getElementById('editTrackArtist').value.trim();
   track.speed = parseFloat(document.getElementById('editSpeedSlider').value);
   track.eq = EQ_BANDS.map((_, i) => parseInt(document.getElementById(`eqRange${i}`)?.value || 0));
   
-  if (track._pendingCover !== undefined) {
-    track.cover = track._pendingCover;
-    delete track._pendingCover;
+  if (track._pendingCoverBlobUrl !== undefined) {
+    track.coverBlobUrl = track._pendingCoverBlobUrl;
+    delete track._pendingCoverBlobUrl;
   }
   
   // Применяем цвет карточки
