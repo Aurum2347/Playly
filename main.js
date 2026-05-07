@@ -10,6 +10,12 @@ const jsmediatags = require('jsmediatags');
 const DEBUG = false;
 function dbg(...args) { if (DEBUG) console.log('[Playly DEBUG]', ...args); }
 
+// ===== SPLASH LOADING FLAG =====
+// Установи SPLASH_LOADING = true для предзагрузки треков во время splash экрана
+// Установи SPLASH_LOADING = false для отключения предзагрузки (быстрый запуск)
+const SPLASH_LOADING = false;
+function splashLog(...args) { console.log('[Splash Loading]', ...args); }
+
 // Регистрируем схему до ready
 protocol.registerSchemesAsPrivileged([
   { scheme: 'localfile', privileges: { secure: true, standard: true, stream: true, bypassCSP: true } }
@@ -28,19 +34,29 @@ async function ensureCoversDir() {
 function createSplashWindow() {
   splashWindow = new BrowserWindow({
     width: 340,
-    height: 340,
+    height: 380,
     frame: false,
     transparent: false,
     resizable: false,
     center: true,
     backgroundColor: '#0a0a0a',
     skipTaskbar: true,
+    alwaysOnTop: true,
     webPreferences: {
-      contextIsolation: true,
-      nodeIntegration: false,
+      contextIsolation: false,
+      nodeIntegration: true,
     },
   });
+  
   splashWindow.loadFile('splash.html');
+  
+  // Предотвращаем закрытие splash окна пользователем
+  splashWindow.on('close', (e) => {
+    // Если главное окно ещё не создано - отменяем закрытие
+    if (!mainWindow) {
+      e.preventDefault();
+    }
+  });
 }
 
 function createWindow() {
@@ -66,16 +82,32 @@ function createWindow() {
 
   // Когда основное окно готово — закрываем сплэш и показываем главное
   mainWindow.once('ready-to-show', () => {
+    // Показываем главное окно
+    mainWindow.show();
+    mainWindow.focus();
+    
+    // Закрываем splash окно если оно ещё существует
     if (splashWindow && !splashWindow.isDestroyed()) {
-      // Небольшая задержка чтобы сплэш не мигал при быстрой загрузке
+      // Показываем финальное сообщение
+      try {
+        splashWindow.webContents.send('preload-progress', {
+          phase: 'complete',
+          current: 100,
+          total: 100,
+          percent: 100,
+          message: 'Запуск приложения...'
+        });
+      } catch (e) {
+        // Игнорируем ошибки если окно уже закрыто
+      }
+      
+      // Небольшая задержка для плавности
       setTimeout(() => {
-        splashWindow.destroy();
-        splashWindow = null;
-        mainWindow.show();
-        mainWindow.focus();
-      }, 600);
-    } else {
-      mainWindow.show();
+        if (splashWindow && !splashWindow.isDestroyed()) {
+          splashWindow.destroy();
+          splashWindow = null;
+        }
+      }, 800);
     }
   });
 
@@ -84,9 +116,270 @@ function createWindow() {
   }
 }
 
-app.whenReady().then(() => {
-  ensureCoversDir();
+// ===== ПРЕДЗАГРУЗКА ВСЕХ ДАННЫХ =====
+async function preloadAllData() {
+  // Если предзагрузка отключена - пропускаем
+  if (!SPLASH_LOADING) {
+    splashLog('Preloading disabled, skipping...');
+    return { success: true, tracksCount: 0, skipped: true };
+  }
+
+  splashLog('Starting preload...');
+  
+  try {
+    // Загружаем данные из JSON
+    const data = await loadDataSync();
+    if (!data || !data.tracks || data.tracks.length === 0) {
+      splashLog('No tracks found');
+      return { success: true, tracksCount: 0 };
+    }
+
+    const tracks = data.tracks;
+    
+    // Проверяем сколько треков нуждаются в загрузке
+    const tracksNeedingMeta = tracks.filter(t => !t._metaLoaded && !t.path.startsWith('demo-'));
+    const tracksNeedingDuration = tracks.filter(t => !t.duration && !t.path.startsWith('demo-'));
+    
+    splashLog(`Tracks needing metadata: ${tracksNeedingMeta.length}`);
+    splashLog(`Tracks needing duration: ${tracksNeedingDuration.length}`);
+    
+    // Если все треки уже загружены - пропускаем предзагрузку
+    if (tracksNeedingMeta.length === 0 && tracksNeedingDuration.length === 0) {
+      splashLog('All tracks already preloaded, skipping...');
+      return { success: true, tracksCount: tracks.length, skipped: true };
+    }
+
+    const total = Math.max(tracksNeedingMeta.length, tracksNeedingDuration.length);
+    let processed = 0;
+
+    // Отправляем начальный прогресс
+    if (splashWindow && !splashWindow.isDestroyed()) {
+      splashWindow.webContents.send('preload-progress', {
+        phase: 'metadata',
+        current: 0,
+        total,
+        percent: 0,
+        message: 'Загрузка метаданных...'
+      });
+    }
+
+    // Загружаем метаданные и обложки батчами
+    const BATCH_SIZE = 5;
+    const coverIds = new Set();
+
+    if (tracksNeedingMeta.length > 0) {
+      splashLog('Loading metadata...');
+      for (let i = 0; i < tracksNeedingMeta.length; i += BATCH_SIZE) {
+        const batch = tracksNeedingMeta.slice(i, Math.min(i + BATCH_SIZE, tracksNeedingMeta.length));
+        
+        await Promise.all(batch.map(async (track) => {
+          try {
+            const meta = await new Promise((resolve) => {
+              jsmediatags.read(track.path, {
+                onSuccess: (tag) => {
+                  const result = {
+                    title: tag.tags.title || null,
+                    artist: tag.tags.artist || null,
+                    album: tag.tags.album || null,
+                  };
+                  if (tag.tags.picture) {
+                    const { data, format } = tag.tags.picture;
+                    const base64 = Buffer.from(data).toString('base64');
+                    result.cover = `data:${format};base64,${base64}`;
+                  }
+                  resolve(result);
+                },
+                onError: () => resolve(null)
+              });
+            });
+
+            if (meta) {
+              if (meta.title) track.name = meta.title;
+              if (meta.artist) track.artist = meta.artist;
+              if (meta.album) track.album = meta.album;
+              if (meta.cover) {
+                // Сохраняем обложку на диск
+                const coverId = Math.abs(track.path.split('').reduce((h, c) => (Math.imul(31, h) + c.charCodeAt(0)) | 0, 0)).toString(36);
+                const matches = meta.cover.match(/^data:([^;]+);base64,(.+)$/);
+                if (matches) {
+                  const ext = matches[1].split('/')[1]?.replace('jpeg', 'jpg') || 'jpg';
+                  const buffer = Buffer.from(matches[2], 'base64');
+                  const filePath = path.join(COVERS_DIR, `${coverId}.${ext}`);
+                  await fs.writeFile(filePath, buffer);
+                  track.coverId = `${coverId}.${ext}`;
+                  coverIds.add(`${coverId}.${ext}`);
+                }
+              }
+              track._metaLoaded = true;
+            }
+          } catch (e) {
+            splashLog('Preload meta error:', e);
+          }
+        }));
+
+        processed += batch.length;
+        const percent = Math.round((processed / total) * 100);
+
+        // Отправляем прогресс в splash
+        if (splashWindow && !splashWindow.isDestroyed()) {
+          splashWindow.webContents.send('preload-progress', {
+            phase: 'metadata',
+            current: processed,
+            total,
+            percent,
+            message: `Обработано ${processed} из ${total} треков...`
+          });
+        }
+
+        // Даём время на обработку других событий
+        await new Promise(resolve => setTimeout(resolve, 10));
+      }
+    }
+
+    // Загружаем длительности
+    if (tracksNeedingDuration.length > 0) {
+      splashLog('Loading durations...');
+      processed = 0;
+      for (let i = 0; i < tracksNeedingDuration.length; i += BATCH_SIZE) {
+        const batch = tracksNeedingDuration.slice(i, Math.min(i + BATCH_SIZE, tracksNeedingDuration.length));
+        
+        await Promise.all(batch.map(async (track) => {
+          try {
+            const dur = await getAudioDurationSync(track.path);
+            if (dur && dur > 0) track.duration = dur;
+          } catch (e) {
+            splashLog('Preload duration error:', e);
+          }
+        }));
+
+        processed += batch.length;
+        const percent = Math.round((processed / tracksNeedingDuration.length) * 100);
+
+        if (splashWindow && !splashWindow.isDestroyed()) {
+          splashWindow.webContents.send('preload-progress', {
+            phase: 'processing',
+            current: processed,
+            total: tracksNeedingDuration.length,
+            percent,
+            message: `Определение длительности ${processed} из ${tracksNeedingDuration.length}...`
+          });
+        }
+
+        await new Promise(resolve => setTimeout(resolve, 10));
+      }
+    }
+
+    // Сохраняем обновлённые данные
+    splashLog('Saving data...');
+    if (splashWindow && !splashWindow.isDestroyed()) {
+      splashWindow.webContents.send('preload-progress', {
+        phase: 'saving',
+        current: total,
+        total,
+        percent: 100,
+        message: 'Сохранение данных...'
+      });
+    }
+
+    // Обновляем только треки, остальные данные оставляем как есть
+    data.tracks = tracks;
+    
+    // Сериализуем данные правильно (как в save-data handler)
+    const serializable = JSON.parse(JSON.stringify(data, (key, value) => {
+      if (key.startsWith('_')) return undefined;
+      if (key === 'coverBlobUrl') return undefined;
+      if (key === 'cover' && value && !value.startsWith('data:')) return undefined;
+      return value instanceof Set ? Array.from(value) : value;
+    }));
+    
+    await fs.writeFile(DATA_PATH, JSON.stringify(serializable, null, 2));
+
+    splashLog(`Preload complete: ${tracksNeedingMeta.length} metadata, ${tracksNeedingDuration.length} durations, ${coverIds.size} covers`);
+
+    return { 
+      success: true, 
+      tracksCount: tracks.length,
+      coversCount: coverIds.size,
+      metaLoaded: tracksNeedingMeta.length,
+      durationsLoaded: tracksNeedingDuration.length
+    };
+  } catch (e) {
+    console.error('Preload error:', e);
+    return { success: false, error: e.message };
+  }
+}
+
+// Синхронная загрузка данных
+async function loadDataSync() {
+  try {
+    const content = await fs.readFile(DATA_PATH, 'utf-8');
+    const data = JSON.parse(content);
+    if (data.playlists) {
+      Object.values(data.playlists).forEach(p => {
+        if (p.trackPaths) p.trackPaths = new Set(p.trackPaths);
+      });
+    }
+    return data;
+  } catch {
+    return null;
+  }
+}
+
+// Синхронное получение длительности
+async function getAudioDurationSync(filePath) {
+  try {
+    const ext = path.extname(filePath).toLowerCase();
+    const fd = await fs.open(filePath, 'r');
+    try {
+      if (ext === '.mp3') {
+        const buf10 = Buffer.alloc(10);
+        await fd.read(buf10, 0, 10, 0);
+        let audioStart = 0;
+        if (buf10[0] === 0x49 && buf10[1] === 0x44 && buf10[2] === 0x33) {
+          const id3Size = ((buf10[6] & 0x7f) << 21) | ((buf10[7] & 0x7f) << 14) |
+                          ((buf10[8] & 0x7f) << 7) | (buf10[9] & 0x7f);
+          audioStart = id3Size + 10;
+        }
+        const frameBuf = Buffer.alloc(4);
+        await fd.read(frameBuf, 0, 4, audioStart);
+        const b0 = frameBuf[0], b1 = frameBuf[1];
+        if (b0 === 0xFF && (b1 & 0xE0) === 0xE0) {
+          const header = (b0 << 24) | (b1 << 16) | (frameBuf[2] << 8) | frameBuf[3];
+          const bitrateIdx = (header >> 12) & 0xF;
+          const sampleRateIdx = (header >> 10) & 0x3;
+          const bitrates = [0,32,40,48,56,64,80,96,112,128,160,192,224,256,320,0];
+          const sampleRates = [44100,48000,32000,0];
+          const bitrate = bitrates[bitrateIdx] * 1000;
+          const sampleRate = sampleRates[sampleRateIdx];
+          if (bitrate > 0 && sampleRate > 0) {
+            const stat = await fs.stat(filePath);
+            return (stat.size - audioStart) * 8 / bitrate;
+          }
+        }
+      }
+      return null;
+    } finally {
+      await fd.close();
+    }
+  } catch {
+    return null;
+  }
+}
+
+app.whenReady().then(async () => {
+  await ensureCoversDir();
   createSplashWindow();
+  
+  // Ждём пока splash окно загрузится
+  await new Promise(resolve => {
+    splashWindow.webContents.once('did-finish-load', resolve);
+  });
+
+  // Запускаем предзагрузку всех данных
+  const preloadResult = await preloadAllData();
+  
+  splashLog('Preload completed:', preloadResult);
+
   // Кастомный протокол для стриминга локальных аудиофайлов
   protocol.handle('localfile', async (request) => {
     try {
@@ -140,6 +433,8 @@ app.whenReady().then(() => {
       return new Response('Not found', { status: 404 });
     }
   });
+  
+  // Создаём главное окно в любом случае
   createWindow();
 });
 
@@ -236,6 +531,8 @@ ipcMain.handle('save-data', async (_, data) => {
     const serializable = JSON.parse(JSON.stringify(data, (key, value) => {
       // Не сохраняем служебные поля с подчёркиванием
       if (key.startsWith('_')) return undefined;
+      // Не сохраняем временные Blob URLs
+      if (key === 'coverBlobUrl') return undefined;
       // Не сохраняем битые обложки (без data: префикса)
       if (key === 'cover' && value && !value.startsWith('data:')) return undefined;
       return value instanceof Set ? Array.from(value) : value;

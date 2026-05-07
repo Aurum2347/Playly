@@ -85,19 +85,23 @@
 
     /* Прогресс-бар */
     .progress-wrap {
-      width: 140px;
-      height: 2px;
+      width: 200px;
+      height: 3px;
       background: rgba(255,255,255,0.06);
       border-radius: 2px;
       overflow: hidden;
+      position: relative;
     }
 
     .progress-bar {
       height: 100%;
       width: 0%;
-      background: rgba(255,255,255,0.4);
+      background: rgba(255,255,255,0.5);
       border-radius: 2px;
       transition: width 0.3s ease;
+    }
+
+    .progress-bar.indeterminate {
       animation: indeterminate 1.6s ease-in-out infinite;
     }
 
@@ -112,6 +116,15 @@
       font-size: 11px;
       color: #2a2a2a;
       letter-spacing: 0.3px;
+      min-height: 16px;
+    }
+
+    .progress-percent {
+      margin-top: 8px;
+      font-size: 10px;
+      color: #1a1a1a;
+      font-weight: 600;
+      letter-spacing: 0.5px;
     }
   </style>
 </head>
@@ -133,9 +146,39 @@
     <div class="app-tagline">Музыкальный плеер</div>
 
     <div class="progress-wrap">
-      <div class="progress-bar" id="progressBar"></div>
+      <div class="progress-bar indeterminate" id="progressBar"></div>
     </div>
+    <div class="progress-percent" id="progressPercent"></div>
     <div class="status-text" id="statusText">Запуск...</div>
   </div>
+
+  <script>
+    const { ipcRenderer } = require('electron');
+    const progressBar = document.getElementById('progressBar');
+    const statusText = document.getElementById('statusText');
+    const progressPercent = document.getElementById('progressPercent');
+
+    // Слушаем прогресс предзагрузки
+    ipcRenderer.on('preload-progress', (event, data) => {
+      const { phase, current, total, percent, message } = data;
+      
+      // Убираем анимацию indeterminate когда есть реальный прогресс
+      if (percent > 0) {
+        progressBar.classList.remove('indeterminate');
+        progressBar.style.width = percent + '%';
+        progressPercent.textContent = percent + '%';
+      } else {
+        progressBar.classList.add('indeterminate');
+        progressPercent.textContent = '';
+      }
+      
+      statusText.textContent = message || 'Загрузка...';
+      
+      // Финальная фаза - делаем прогресс-бар зелёным
+      if (phase === 'complete') {
+        progressBar.style.background = 'rgba(16, 185, 129, 0.8)';
+      }
+    });
+  </script>
 </body>
 </html>

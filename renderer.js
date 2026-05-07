@@ -306,8 +306,8 @@ async function init() {
   await loadData();
   rebuildIndexCache();
   
-  // Запускаем предзагрузку обложек в фоне сразу после загрузки данных
-  setTimeout(() => preloadAllCovers(), 100);
+  // Загружаем все обложки батчами в фоне
+  await loadAllCoversInBackground();
   
   renderRecent();
   renderSyncList();
@@ -330,6 +330,46 @@ async function init() {
     loadTrackDurations();
     loadAllMetadata();
   });
+}
+
+// Загружает все обложки батчами в фоне
+async function loadAllCoversInBackground() {
+  const tracksWithCovers = tracks.filter(t => t.coverId && !t.coverBlobUrl);
+  if (tracksWithCovers.length === 0) return;
+  
+  console.log(`Loading ${tracksWithCovers.length} covers...`);
+  
+  const BATCH_SIZE = 20;
+  for (let i = 0; i < tracksWithCovers.length; i += BATCH_SIZE) {
+    const batch = tracksWithCovers.slice(i, Math.min(i + BATCH_SIZE, tracksWithCovers.length));
+    const coverIds = batch.map(t => t.coverId);
+    
+    try {
+      // Загружаем батч обложек
+      const covers = await window.electronAPI.loadCoversBatch(coverIds);
+      
+      // Конвертируем в Blob URLs
+      batch.forEach(track => {
+        const base64Cover = covers[track.coverId];
+        if (base64Cover) {
+          track.coverBlobUrl = base64ToBlobUrl(base64Cover);
+          if (track.coverBlobUrl) {
+            addCoverToCache(track.path, track.coverBlobUrl);
+          }
+        }
+      });
+    } catch (e) {
+      console.warn('Failed to load cover batch:', e);
+    }
+    
+    // Даём браузеру передышку
+    await new Promise(resolve => setTimeout(resolve, 50));
+  }
+  
+  console.log(`Loaded ${tracksWithCovers.length} covers`);
+  
+  // Перерисовываем плейлист после загрузки обложек
+  renderPlaylist();
 }
 
 // ===== ОТРИСОВКА КАТЕГОРИЙ В САЙДБАРЕ (исправление бага) =====
@@ -1004,12 +1044,21 @@ async function loadMetadataInModal(newTracks, totalFiles) {
                     if (meta.artist && meta.artist.trim()) track.artist = meta.artist.trim();
                     if (meta.album) track.album = meta.album;
                     
-                    // === СОХРАНЯЕМ ОБЛОЖКУ КАК BLOB URL ===
+                    // === СОХРАНЯЕМ ОБЛОЖКУ НА ДИСК ===
                     if (meta.cover && meta.cover.length > 50) {
-                        track.coverBlobUrl = base64ToBlobUrl(meta.cover, meta.picture?.format || 'image/jpeg');
-                        // Добавляем в кэш сразу
-                        if (track.coverBlobUrl) {
-                            addCoverToCache(track.path, track.coverBlobUrl);
+                        // Генерируем coverId из пути трека
+                        const coverId = Math.abs(track.path.split('').reduce((h, c) => (Math.imul(31, h) + c.charCodeAt(0)) | 0, 0)).toString(36);
+                        
+                        // Сохраняем на диск через IPC
+                        const savedCoverId = await window.electronAPI.saveCover(coverId, meta.cover);
+                        if (savedCoverId) {
+                            track.coverId = savedCoverId;
+                            
+                            // Создаём Blob URL для немедленного отображения
+                            track.coverBlobUrl = base64ToBlobUrl(meta.cover, meta.picture?.format || 'image/jpeg');
+                            if (track.coverBlobUrl) {
+                                addCoverToCache(track.path, track.coverBlobUrl);
+                            }
                         }
                     }
                 }
@@ -2823,15 +2872,39 @@ async function loadData() {
       tracks.forEach(t => {
         if (!t.categories) t.categories = ['all-songs'];
         else if (!t.categories.includes('all-songs')) t.categories.push('all-songs');
-        delete t._metaLoaded;
-        // Валидация обложек
+        
+        // Конвертируем coverId в Blob URL для быстрой отрисовки
+        if (t.coverId && !t.coverBlobUrl) {
+          // Загружаем обложку асинхронно
+          loadCoverForTrack(t);
+        }
+        
+        // Валидация обложек (старый формат)
         if (t.cover && !t.cover.startsWith('data:')) t.cover = null;
-        // Треки с обложкой И исполнителем считаем загруженными
-        if (t.cover && t.artist) t._metaLoaded = true;
+        
+        // Треки с coverId считаем загруженными
+        if (t.coverId || (t.cover && t.artist)) t._metaLoaded = true;
       });
     }
   } catch(e) {
     console.error('Ошибка загрузки:', e);
+  }
+}
+
+// Загружает обложку для трека и конвертирует в Blob URL
+async function loadCoverForTrack(track) {
+  if (!track.coverId || track.coverBlobUrl) return;
+  
+  try {
+    const base64Cover = await window.electronAPI.loadCover(track.coverId);
+    if (base64Cover) {
+      track.coverBlobUrl = base64ToBlobUrl(base64Cover);
+      if (track.coverBlobUrl) {
+        addCoverToCache(track.path, track.coverBlobUrl);
+      }
+    }
+  } catch (e) {
+    console.warn('Failed to load cover:', e);
   }
 }
 
