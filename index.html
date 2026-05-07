@@ -270,6 +270,8 @@
             position: relative;
             content-visibility: auto;
             contain-intrinsic-size: 0 68px;
+            /* Оптимизация: изолируем перерисовку каждой карточки */
+            contain: layout style;
             will-change: transform;
         }
         .track-card:hover {
