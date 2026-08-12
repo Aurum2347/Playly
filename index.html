@@ -1,50 +1,1277 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Скоро...</title>
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-        body {
-            min-height: 100vh;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            background: #191a1b;
-            font-family: 'Segoe UI', Arial, sans-serif;
-        }
-        .container {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-        }
-        .icon {
-            width: 120px;
-            height: auto;
-            filter: drop-shadow(0 0 25px rgba(255, 255, 255, 0.6)) drop-shadow(0 0 50px rgba(255, 255, 255, 0.3));
-        }
-        .text {
-            color: #ffffff;
-            font-size: 3rem;
-            font-weight: 300;
-            letter-spacing: 0.1em;
-            margin-top: 20px;
-            text-shadow: 0 0 20px rgba(255, 255, 255, 0.2);
-        }
-    </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Playly</title>
+<meta name="description" content="Playly — офлайн аудиоплеер с современным дизайном, эквалайзером, кроссфейдом и продуманной навигацией. Твоя музыка — твои правила.">
+<link rel="icon" type="image/svg+xml" href='data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 494 436"><path fill="%23f0f0f0" d="M400 0C451.915 4.50986e-06 494 42.0852 494 94V342C494 393.915 451.915 436 400 436H94C42.0852 436 6.76562e-07 393.915 0 342V94C0 42.0852 42.0852 5.31519e-07 94 0H400ZM222.417 36.333C122.208 36.3331 40.9719 117.668 40.9717 218C40.9719 318.332 122.208 399.666 222.417 399.666H387.028C423.479 399.666 453.028 370.117 453.028 333.666V102.333C453.028 65.8824 423.479 36.3331 387.028 36.333H222.417ZM200.919 66.1699C207.926 65.5792 213.638 71.335 213.638 78.3672C213.638 85.3995 207.922 91.0338 200.926 91.7432C188.719 92.9809 176.735 95.9976 165.358 100.716C150.052 107.064 136.144 116.367 124.429 128.097C112.714 139.826 103.421 153.751 97.0811 169.076C90.741 184.401 87.4775 200.826 87.4775 217.414C87.4775 234.002 90.741 250.427 97.0811 265.752C103.421 281.077 112.714 295.002 124.429 306.731C136.144 318.461 150.052 327.764 165.358 334.112C176.735 338.831 188.719 341.847 200.926 343.085C207.922 343.794 213.638 349.429 213.638 356.461C213.637 363.493 207.926 369.249 200.919 368.658C185.369 367.347 170.089 363.638 155.625 357.64C137.233 350.012 120.52 338.832 106.443 324.738C92.3666 310.644 81.2003 293.912 73.582 275.497C65.9638 257.082 62.043 237.346 62.043 217.414C62.043 197.482 65.9637 177.745 73.582 159.33C81.2003 140.916 92.3667 124.184 106.443 110.09C120.52 95.9958 137.233 84.8151 155.625 77.1875C170.089 71.1892 185.369 67.4807 200.919 66.1699ZM214.223 118.382C214.223 102.211 231.733 92.1086 245.732 100.201L418.064 199.818C432.052 207.904 432.051 228.095 418.064 236.181L245.732 335.798C231.732 343.89 214.223 333.787 214.223 317.616V268.383C213.834 268.392 213.444 268.397 213.053 268.397C185.253 268.397 162.716 245.833 162.716 217.999C162.716 190.165 185.253 167.602 213.053 167.602C213.444 167.602 213.834 167.606 214.223 167.615V118.382ZM181.577 117.941C188.187 115.291 195.299 119.446 197.141 126.325C198.98 133.199 194.842 140.173 188.34 143.063C175.804 148.636 164.787 157.28 156.354 168.282C145.294 182.714 139.3 200.396 139.3 218.586C139.3 236.776 145.294 254.458 156.354 268.89C164.787 279.892 175.804 288.536 188.34 294.109C194.842 297 198.98 303.973 197.141 310.847C195.299 317.726 188.187 321.881 181.577 319.23C163.603 312.024 147.808 300.088 135.926 284.584C121.415 265.65 113.55 242.451 113.55 218.586C113.55 194.72 121.415 171.522 135.926 152.588C147.808 137.084 163.603 125.148 181.577 117.941Z"/></svg>'>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/manrope@5/400.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/manrope@5/500.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/manrope@5/600.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/manrope@5/700.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/manrope@5/800.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/unbounded@5/500.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/unbounded@5/700.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/unbounded@5/800.css">
+<style>
+/* ============================================================
+   PLAYLY · Лендинг · монохром
+   ============================================================ */
+:root{
+  --bg:#0a0a0c; --bg-2:#0d0d0f; --panel:#141417; --panel-2:#1c1c20;
+  --border:rgba(255,255,255,.08); --border-soft:rgba(255,255,255,.06); --border-faint:rgba(255,255,255,.04);
+  --text:#f0f0f0; --text-2:#c8c8ce; --muted:#8a8a90; --faint:#6a6a72;
+  --accent:#f0f0f0; --accent-2:#c8c8ce; --accent-ink:#0a0a0c;
+  --grad:linear-gradient(135deg,#f0f0f0 0%,#c8c8ce 100%);
+  --font-body:'Manrope',system-ui,-apple-system,'Segoe UI',sans-serif;
+  --font-display:'Unbounded','Manrope',system-ui,sans-serif;
+  --shadow:0 20px 60px rgba(0,0,0,.6);
+  --glow:0 10px 40px rgba(240,240,240,.14);
+  --r-lg:20px; --r-md:14px;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+/* ===== Полный запрет выделения (даже Ctrl+A) ===== */
+*,*::before,*::after{user-select:none;-webkit-user-select:none}
+input,textarea{user-select:text;-webkit-user-select:text}
+img{-webkit-user-drag:none;user-drag:none}
+html{scroll-behavior:auto;scroll-padding-top:96px;overflow-x:clip}
+body{
+  background:var(--bg);color:var(--text);
+  font-family:var(--font-body);font-size:16px;line-height:1.6;
+  overflow-x:clip;overflow-wrap:break-word;-webkit-font-smoothing:antialiased;
+}
+body::before{
+  content:'';position:fixed;inset:0;z-index:-2;
+  background:
+    radial-gradient(900px 480px at 78% -10%, rgba(240,240,240,.06), transparent 70%),
+    radial-gradient(700px 420px at 8% 22%, rgba(240,240,240,.035), transparent 70%),
+    radial-gradient(900px 520px at 60% 105%, rgba(240,240,240,.045), transparent 70%);
+}
+/* ===== Пылинки на фоне ===== */
+#dust{position:fixed;inset:0;z-index:-1;pointer-events:none;overflow:hidden}
+#dust span{position:absolute;border-radius:50%;background:#f0f0f0;animation:dustDrift linear infinite}
+@keyframes dustDrift{
+  0%{transform:translate(0,0)} 25%{transform:translate(34px,-46px)}
+  50%{transform:translate(-24px,-90px)} 75%{transform:translate(42px,-44px)} 100%{transform:translate(0,0)}
+}
+::selection{background:rgba(240,240,240,.25);color:var(--text)}
+::-webkit-scrollbar{width:10px}
+::-webkit-scrollbar-track{background:var(--bg)}
+::-webkit-scrollbar-thumb{background:#2a2a2d;border-radius:5px;border:2px solid var(--bg)}
+img{display:block;max-width:100%}
+a{color:inherit;text-decoration:none}
+button{font-family:inherit}
+.container{max-width:1200px;margin:0 auto;padding:0 clamp(16px,4.5vw,44px);min-width:0}
+.ic{width:20px;height:20px;flex-shrink:0}
+.zoomable{cursor:zoom-in}
+
+/* ===== Reveal ===== */
+[data-reveal]{opacity:0;transform:translateY(26px);transition:opacity .7s ease,transform .7s cubic-bezier(.22,1,.36,1);transition-delay:var(--d,0ms)}
+[data-reveal].in{opacity:1;transform:none}
+
+/* ===== Кнопки ===== */
+.btn{
+  display:inline-flex;align-items:center;justify-content:center;gap:10px;
+  padding:14px 24px;border-radius:12px;border:1px solid transparent;
+  font-size:15px;font-weight:700;cursor:pointer;transition:all .18s ease;
+  white-space:nowrap;user-select:none;min-width:0;position:relative;
+}
+.btn:active{transform:scale(.97)}
+.btn .ic{width:18px;height:18px}
+.btn-primary{background:var(--accent);color:var(--accent-ink);box-shadow:var(--glow);overflow:hidden}
+.btn-primary::after{
+  content:'';position:absolute;top:0;left:-70%;width:45%;height:100%;
+  background:linear-gradient(100deg,transparent,rgba(10,10,12,.16),transparent);
+  transform:skewX(-20deg);transition:left .55s ease;pointer-events:none;
+}
+.btn-primary:hover{transform:translateY(-2px);background:#fff;box-shadow:0 14px 44px rgba(240,240,240,.2)}
+.btn-primary:hover::after{left:125%}
+.btn-ghost{background:var(--panel);border-color:var(--border);color:var(--text-2)}
+.btn-ghost:hover{border-color:rgba(240,240,240,.4);color:var(--text);transform:translateY(-2px)}
+.btn-sm{padding:9px 16px;font-size:13px;border-radius:10px}
+.btn-sm .ic{width:15px;height:15px}
+
+/* ===== Шапка ===== */
+.site-header{
+  position:fixed;top:0;left:0;right:0;z-index:100;max-width:100%;
+  background:rgba(10,10,12,.65);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);
+  border-bottom:1px solid transparent;
+  transition:border-color .25s ease,background .25s ease,box-shadow .25s ease;
+}
+.site-header.scrolled{border-color:var(--border-soft);background:rgba(10,10,12,.88);box-shadow:0 10px 40px rgba(0,0,0,.4)}
+.header-inner{height:72px;display:flex;align-items:center;justify-content:space-between;gap:12px}
+.brand{display:flex;align-items:center;gap:12px;flex-shrink:0;min-width:0}
+.brand-logo{width:38px;height:34px;color:var(--text);filter:drop-shadow(0 4px 14px rgba(240,240,240,.25))}
+.brand-name{font-family:var(--font-display);font-weight:700;font-size:17px}
+.nav-links{display:flex;align-items:center;gap:4px}
+.nav-links a{padding:8px 14px;border-radius:10px;font-size:14px;font-weight:600;color:var(--muted);transition:color .15s ease,background .15s ease}
+.nav-links a:hover{color:var(--text);background:rgba(255,255,255,.05)}
+.header-actions{display:flex;align-items:center;gap:10px;flex-shrink:0}
+.icon-btn{
+  width:38px;height:38px;border-radius:10px;border:1px solid var(--border);
+  background:var(--panel);color:var(--muted);cursor:pointer;
+  display:flex;align-items:center;justify-content:center;transition:all .15s ease;flex-shrink:0;
+}
+.icon-btn:hover{color:var(--text);border-color:rgba(240,240,240,.4);transform:translateY(-1px)}
+.icon-btn .ic{width:17px;height:17px}
+
+/* ===== Бургер ===== */
+.burger{display:none;width:38px;height:38px;border-radius:10px;border:1px solid var(--border);background:var(--panel);cursor:pointer;flex-direction:column;align-items:center;justify-content:center;gap:5px;flex-shrink:0}
+.burger i{display:block;width:16px;height:2px;border-radius:1px;background:var(--text-2);transition:transform .22s ease,opacity .22s ease}
+.burger.open i:nth-child(1){transform:translateY(7px) rotate(45deg)}
+.burger.open i:nth-child(2){opacity:0}
+.burger.open i:nth-child(3){transform:translateY(-7px) rotate(-45deg)}
+.mobile-menu{
+  position:fixed;top:78px;left:14px;right:14px;z-index:99;
+  background:rgba(13,13,15,.97);border:1px solid var(--border);border-radius:16px;padding:10px;
+  backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);
+  box-shadow:0 20px 60px rgba(0,0,0,.55);
+  opacity:0;transform:translateY(-10px) scale(.98);pointer-events:none;
+  transition:opacity .2s ease,transform .2s ease;
+}
+.mobile-menu.open{opacity:1;transform:none;pointer-events:auto}
+.mm-link{display:block;padding:13px 14px;border-radius:10px;font-size:15px;font-weight:600;color:var(--text-2)}
+.mm-link:hover{background:rgba(255,255,255,.05);color:var(--text)}
+.mm-actions{display:flex;gap:8px;padding:10px 6px 6px;border-top:1px solid var(--border-soft);margin-top:8px}
+.mm-actions .icon-btn{flex:1;height:42px}
+.mm-actions .btn{flex:1;min-width:0}
+
+/* ===== Hero ===== */
+.hero{padding:160px 0 40px;text-align:center;position:relative;min-width:0}
+.hero-badge{
+  display:inline-flex;align-items:center;gap:8px;padding:8px 16px;border-radius:999px;
+  background:rgba(255,255,255,.06);border:1px solid rgba(240,240,240,.25);
+  color:var(--text);font-size:13px;font-weight:700;margin-bottom:26px;max-width:100%;
+}
+.hero-badge .ic{width:14px;height:14px}
+.hero h1{font-family:var(--font-display);font-weight:800;font-size:clamp(26px,5.4vw,62px);line-height:1.14;letter-spacing:-.01em;margin-bottom:22px;text-wrap:balance}
+.hero h1 .grad{background:linear-gradient(100deg,#ffffff 0%,#c8c8ce 60%,#f0f0f0 100%);-webkit-background-clip:text;background-clip:text;color:transparent}
+.hero-sub{max-width:640px;margin:0 auto 36px;color:var(--muted);font-size:clamp(14.5px,1.8vw,17px);line-height:1.7}
+.hero-sub strong{color:var(--text-2);font-weight:600}
+.hero-cta{display:flex;justify-content:center;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:24px}
+.hero-meta{display:flex;justify-content:center;gap:10px;flex-wrap:wrap}
+.meta-chip{display:inline-flex;align-items:center;gap:8px;padding:8px 14px;border-radius:999px;background:var(--panel);border:1px solid var(--border-soft);color:var(--muted);font-size:12.5px;font-weight:600;max-width:100%}
+.meta-chip .ic{width:14px;height:14px;color:var(--accent)}
+
+/* ===== Окно плеера ===== */
+.hero-shot{position:relative;margin-top:64px;min-width:0}
+.hero-shot::before{content:'';position:absolute;inset:-6% -3%;z-index:0;background:radial-gradient(58% 58% at 50% 42%,rgba(240,240,240,.09),transparent 72%);filter:blur(10px);pointer-events:none}
+.window{position:relative;z-index:1;border-radius:18px;border:1px solid var(--border);background:var(--bg-2);box-shadow:var(--shadow),0 0 0 1px var(--border-soft);overflow:hidden;max-width:100%}
+.window-bar{height:44px;position:relative;display:flex;align-items:center;justify-content:center;background:rgba(255,255,255,.02);border-bottom:1px solid var(--border-soft)}
+.window-title{font-size:12px;color:var(--muted);font-weight:600;letter-spacing:.04em}
+.window-ctrl{position:absolute;right:10px;top:50%;transform:translateY(-50%);display:flex;gap:2px}
+.window-ctrl span{width:34px;height:28px;border-radius:7px;display:flex;align-items:center;justify-content:center;color:var(--muted)}
+.window-ctrl .ic{width:13px;height:13px}
+.window-body{background:var(--bg-2)}
+.window-body img{width:100%;aspect-ratio:16/9.4;object-fit:cover;object-position:top;transition:opacity .25s ease,transform .25s ease}
+.window-body.fading img{opacity:0;transform:scale(.985)}
+.float-chip{position:absolute;z-index:2;display:flex;align-items:center;gap:9px;padding:11px 16px;border-radius:12px;background:rgba(20,20,23,.9);border:1px solid var(--border);backdrop-filter:blur(8px);font-size:13px;font-weight:700;color:var(--text-2);box-shadow:0 14px 40px rgba(0,0,0,.5);animation:chipFloat 6s ease-in-out infinite}
+.float-chip .ic{width:16px;height:16px;color:var(--accent)}
+.float-chip.chip-a{left:-26px;top:24%}
+.float-chip.chip-b{right:-22px;top:44%;animation-delay:1.4s}
+.float-chip.chip-c{left:6%;bottom:-18px;animation-delay:2.6s}
+@keyframes chipFloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-9px)}}
+
+/* ===== Marquee ===== */
+.marquee{margin:88px 0 0;border-top:1px solid var(--border-soft);border-bottom:1px solid var(--border-soft);padding:18px 0;overflow:hidden;max-width:100%;mask-image:linear-gradient(90deg,transparent,#000 12%,#000 88%,transparent);-webkit-mask-image:linear-gradient(90deg,transparent,#000 12%,#000 88%,transparent)}
+.marquee-inner{display:flex;width:max-content;animation:marquee 30s linear infinite}
+.marquee:hover .marquee-inner{animation-play-state:paused}
+.marquee-group{display:flex;align-items:center;gap:44px;padding-right:44px}
+.marquee-group span{display:flex;align-items:center;gap:44px;font-size:13px;font-weight:800;letter-spacing:.22em;text-transform:uppercase;color:var(--faint);white-space:nowrap}
+.marquee-group span::after{content:'';width:5px;height:5px;border-radius:50%;background:var(--accent-2);opacity:.7}
+.marquee-group span.hl{color:var(--text)}
+@keyframes marquee{to{transform:translateX(-50%)}}
+
+/* ===== Секции ===== */
+.section{padding:104px 0 0;min-width:0}
+.overline{display:inline-flex;align-items:center;gap:8px;font-size:12px;font-weight:800;letter-spacing:.2em;text-transform:uppercase;color:var(--text);margin-bottom:14px}
+.overline::before{content:'';width:22px;height:2px;border-radius:1px;background:var(--accent)}
+.section h2{font-family:var(--font-display);font-weight:700;font-size:clamp(21px,3.4vw,40px);line-height:1.22;letter-spacing:-.01em;margin-bottom:14px;text-wrap:balance}
+.section-lead{color:var(--muted);font-size:clamp(14px,1.7vw,16px);max-width:640px;margin-bottom:52px}
+
+/* ===== Bento ===== */
+.bento{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:18px}
+.b-card{border-radius:var(--r-lg);border:1px solid var(--border);background:linear-gradient(180deg,var(--panel) 0%,rgba(20,20,23,.6) 100%);padding:26px;display:flex;flex-direction:column;gap:20px;transition:transform .25s ease,border-color .25s ease,box-shadow .25s ease;position:relative;overflow:hidden;min-width:0}
+.b-card:hover{transform:translateY(-4px);border-color:rgba(240,240,240,.28);box-shadow:0 20px 50px rgba(0,0,0,.45)}
+.b-card::after{content:'';position:absolute;inset:0;pointer-events:none;opacity:0;transition:opacity .3s ease;background:radial-gradient(420px 200px at 20% 0%,rgba(240,240,240,.07),transparent 70%)}
+.b-card:hover::after{opacity:1}
+.b-head{display:flex;gap:15px;align-items:flex-start;min-width:0}
+.b-icon{width:46px;height:46px;border-radius:12px;flex-shrink:0;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.14);display:flex;align-items:center;justify-content:center;color:var(--text)}
+.b-icon .ic{width:21px;height:21px}
+.b-head h3{font-size:16.5px;font-weight:800;letter-spacing:-.01em;margin-bottom:5px}
+.b-head p{font-size:13.5px;color:var(--muted);line-height:1.6}
+.b-visual{margin-top:auto;min-width:0}
+
+/* Широкая карточка эквалайзера */
+.b-wide{grid-column:1/-1;display:grid;grid-template-columns:minmax(0,5fr) minmax(0,7fr);gap:32px;align-items:center;padding:32px}
+.bw-left{display:flex;flex-direction:column;gap:14px;min-width:0}
+.b-wide h3{font-size:20px;font-weight:800;letter-spacing:-.01em}
+.b-wide p{font-size:14.5px;color:var(--muted);line-height:1.65;max-width:440px}
+.eq-visual{position:relative;height:150px;border-radius:14px;background:rgba(0,0,0,.28);border:1px solid var(--border-soft);overflow:hidden;display:flex;align-items:flex-end;gap:5px;padding:16px;min-width:0}
+.eq-bar{flex:1 1 0;min-width:0;border-radius:3px 3px 0 0;background:linear-gradient(180deg,#f0f0f0 0%,#8a8a90 100%);animation:eqPulse 1s ease-in-out infinite alternate;opacity:.92;transition:height .4s ease}
+@keyframes eqPulse{from{height:calc(var(--h) * .3)}to{height:var(--h)}}
+.eq-tag{position:absolute;right:12px;top:12px;padding:5px 10px;border-radius:8px;background:rgba(20,20,23,.85);border:1px solid var(--border);font-size:11px;font-weight:800;color:var(--text)}
+.eq-presets{display:flex;flex-wrap:wrap;gap:8px}
+.eq-preset{padding:7px 13px;border-radius:9px;border:1px solid var(--border-soft);background:rgba(255,255,255,.03);color:var(--muted);font-size:12px;font-weight:700;cursor:pointer;transition:all .15s ease}
+.eq-preset:hover{color:var(--text-2);border-color:rgba(240,240,240,.3)}
+.eq-preset:active{transform:scale(.94)}
+.eq-preset.active{background:rgba(240,240,240,.14);border-color:rgba(240,240,240,.4);color:var(--text)}
+
+/* Офлайн-карточка: интерактив */
+.offline-stat{display:flex;align-items:baseline;gap:14px;margin-bottom:14px}
+.offline-stat b{font-family:var(--font-display);font-weight:800;font-size:42px;line-height:1;background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent}
+.offline-stat span{font-size:13px;color:var(--muted);line-height:1.45}
+.off-demo{display:flex;flex-direction:column;gap:10px}
+.off-btn{padding:9px 14px;border-radius:10px;border:1px solid var(--border);background:var(--panel);color:var(--text-2);font-size:12.5px;font-weight:700;cursor:pointer;transition:all .15s ease;align-self:flex-start}
+.off-btn:hover{border-color:rgba(240,240,240,.35);color:var(--text)}
+.off-btn:active{transform:scale(.96)}
+.off-btn.active{background:rgba(240,240,240,.12);border-color:rgba(240,240,240,.4);color:var(--text)}
+.off-player{display:none;align-items:center;gap:10px;padding:10px 14px;border-radius:12px;background:rgba(0,0,0,.28);border:1px solid var(--border-soft)}
+.off-demo.on .off-player{display:flex;animation:offIn .3s cubic-bezier(.34,1.4,.64,1)}
+@keyframes offIn{from{opacity:0;transform:translateY(6px) scale(.97)}to{opacity:1;transform:none}}
+.off-eq{display:flex;align-items:flex-end;gap:2px;height:16px;flex-shrink:0}
+.off-eq i{width:3px;border-radius:2px;background:var(--accent);animation:offEq .8s ease-in-out infinite alternate}
+.off-eq i:nth-child(1){height:60%;animation-delay:-.1s}
+.off-eq i:nth-child(2){height:100%;animation-delay:-.35s}
+.off-eq i:nth-child(3){height:45%;animation-delay:-.6s}
+.off-eq i:nth-child(4){height:80%;animation-delay:-.2s}
+@keyframes offEq{from{transform:scaleY(.4)}to{transform:scaleY(1)}}
+.off-text{font-size:12.5px;color:var(--text-2);font-weight:600}
+
+/* Форматы */
+.fmt-grid{display:flex;flex-wrap:wrap;gap:8px}
+.fmt-chip{padding:7px 12px;border-radius:9px;background:rgba(255,255,255,.04);border:1px solid var(--border-soft);font-size:12px;font-weight:800;letter-spacing:.06em;color:var(--text-2);cursor:pointer;transition:all .15s ease}
+.fmt-chip:nth-child(odd){color:var(--text)}
+.fmt-chip:hover{border-color:rgba(240,240,240,.35);transform:translateY(-1px)}
+.fmt-chip:active{transform:scale(.92)}
+
+/* Мини-список (своя библиотека) */
+.mini-list{display:flex;flex-direction:column;gap:8px}
+.mini-row{display:flex;align-items:center;gap:12px;padding:9px 12px;border-radius:11px;background:rgba(255,255,255,.03);border:1px solid var(--border-soft);min-width:0;transition:border-color .15s ease}
+.mini-row:hover{border-color:rgba(240,240,240,.25)}
+.mini-cover{width:36px;height:36px;border-radius:8px;flex-shrink:0;border:none;cursor:pointer;position:relative;overflow:hidden;display:flex;align-items:center;justify-content:center;color:var(--text-2);transition:transform .15s ease}
+.mini-cover:active{transform:scale(.92)}
+.mini-cover.c1{background:linear-gradient(135deg,#26262a,#3f3f45)}
+.mini-cover.c2{background:linear-gradient(135deg,#1c1c20,#333338)}
+.mini-cover.c3{background:linear-gradient(135deg,#2e2e33,#4a4a50)}
+.mini-cover svg{width:16px;height:16px}
+.mini-eq{position:absolute;inset:0;display:none;align-items:center;justify-content:center;gap:2px;background:rgba(10,10,12,.72)}
+.mini-row.playing .mini-eq{display:flex}
+.mini-eq i{width:3px;border-radius:2px;background:var(--accent);animation:offEq .7s ease-in-out infinite alternate}
+.mini-eq i:nth-child(1){height:55%;animation-delay:-.15s}
+.mini-eq i:nth-child(2){height:90%;animation-delay:-.4s}
+.mini-eq i:nth-child(3){height:40%;animation-delay:-.25s}
+.mini-bars{flex:1;display:flex;flex-direction:column;gap:6px;min-width:0}
+.mini-bars i{display:block;height:7px;border-radius:4px;background:rgba(255,255,255,.12)}
+.mini-bars i:last-child{height:6px;background:rgba(255,255,255,.07)}
+.mini-like{width:30px;height:30px;border-radius:8px;border:none;background:transparent;color:var(--faint);cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .15s ease;flex-shrink:0}
+.mini-like:hover{color:var(--text-2);background:rgba(255,255,255,.06)}
+.mini-like svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:2}
+.mini-like.liked{color:var(--text)}
+.mini-like.liked svg{fill:currentColor;stroke-width:1}
+.mini-like.pop{animation:likePop .3s cubic-bezier(.34,1.4,.64,1)}
+@keyframes likePop{0%{transform:scale(1)}40%{transform:scale(1.3)}100%{transform:scale(1)}}
+
+/* Чипы-визуалы */
+.v-row{display:flex;flex-wrap:wrap;gap:8px}
+.v-chip{display:inline-flex;align-items:center;gap:7px;padding:8px 13px;border-radius:9px;border:1px solid var(--border-soft);background:rgba(255,255,255,.03);color:var(--muted);font-size:12.5px;font-weight:800;font-variant-numeric:tabular-nums;transition:all .2s ease;cursor:default}
+button.v-chip{cursor:pointer}
+button.v-chip:active{transform:scale(.93)}
+.v-chip .ic{width:13px;height:13px}
+.v-chip.active{background:rgba(240,240,240,.14);border-color:rgba(240,240,240,.4);color:var(--text);transform:scale(1.05)}
+.v-chip.dashed{border-style:dashed}
+.v-chip.pulse{animation:likePop .3s cubic-bezier(.34,1.4,.64,1)}
+
+/* Dropzone */
+.dropzone{border:2px dashed rgba(240,240,240,.3);border-radius:14px;padding:18px 14px;text-align:center;color:var(--muted);display:flex;flex-direction:column;align-items:center;gap:9px;background:rgba(255,255,255,.03);transition:border-color .2s ease;cursor:pointer}
+.b-card:hover .dropzone{border-color:rgba(240,240,240,.55)}
+.dropzone.boing{animation:dzBoing .4s ease}
+@keyframes dzBoing{0%{transform:scale(1)}30%{transform:scale(.96)}60%{transform:scale(1.02)}100%{transform:scale(1)}}
+.dropzone .dz-icon{width:44px;height:44px;border-radius:12px;color:var(--text);background:rgba(255,255,255,.07);display:flex;align-items:center;justify-content:center;animation:dzBounce 2.4s ease-in-out infinite}
+.dropzone .dz-icon .ic{width:20px;height:20px}
+@keyframes dzBounce{0%,100%{transform:translateY(0)}50%{transform:translateY(-7px)}}
+.dropzone b{font-size:13px;color:var(--text-2)}
+.dropzone small{font-size:11px;color:var(--faint)}
+
+/* Синхронизация */
+.sync-visual{display:flex;align-items:center;gap:12px;padding:13px 14px;border-radius:12px;background:rgba(0,0,0,.28);border:1px solid var(--border-soft);min-width:0}
+.sync-folder{width:40px;height:40px;border-radius:11px;flex-shrink:0;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.14);color:var(--text);display:flex;align-items:center;justify-content:center}
+.sync-folder .ic{width:18px;height:18px}
+.sync-lines{min-width:0;flex:1}
+.sync-lines b{display:block;font-size:13px;font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sync-lines span{font-size:11.5px;color:var(--muted)}
+.sync-badge{display:inline-flex;align-items:center;gap:6px;margin-left:auto;flex-shrink:0;padding:5px 11px;border-radius:999px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.2);color:var(--text-2);font-size:11px;font-weight:800;cursor:pointer;transition:all .15s ease}
+.sync-badge:active{transform:scale(.94)}
+.sync-badge .ic{width:12px;height:12px;animation:spin 5s linear infinite}
+.sync-badge.fast .ic{animation-duration:.8s}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* Discord RPC */
+.rpc-visual{display:flex;align-items:center;gap:12px;padding:13px 14px;border-radius:12px;background:rgba(0,0,0,.28);border:1px solid var(--border-soft);min-width:0}
+.rpc-avatar{width:40px;height:40px;border-radius:11px;flex-shrink:0;background:var(--panel-2);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;color:var(--text)}
+.rpc-avatar .ic{width:20px;height:20px}
+.rpc-lines{min-width:0}
+.rpc-lines b{display:flex;align-items:center;gap:7px;font-size:13px}
+.rpc-dot{width:7px;height:7px;border-radius:50%;background:var(--accent);box-shadow:0 0 8px rgba(240,240,240,.5);flex-shrink:0}
+.rpc-lines span{display:block;font-size:11.5px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+/* ===== Скриншоты ===== */
+.shots-tabs{display:flex;justify-content:center;gap:8px;flex-wrap:wrap;margin-bottom:32px}
+.shot-tab{display:inline-flex;align-items:center;gap:9px;padding:11px 20px;border-radius:999px;border:1px solid var(--border);background:var(--panel);color:var(--muted);font-size:14px;font-weight:700;cursor:pointer;transition:all .18s ease;flex-shrink:0}
+.shot-tab .ic{width:15px;height:15px}
+.shot-tab:hover{color:var(--text);border-color:rgba(240,240,240,.35)}
+.shot-tab.active{background:var(--accent);color:var(--accent-ink);border-color:transparent;box-shadow:var(--glow)}
+.shots-note{margin-top:20px;text-align:center;font-size:13px;color:var(--faint)}
+
+/* ===== Лайтбокс ===== */
+.lightbox{position:fixed;inset:0;z-index:10000;background:rgba(5,5,7,.92);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);display:flex;align-items:center;justify-content:center;opacity:0;pointer-events:none;transition:opacity .25s ease}
+.lightbox.open{opacity:1;pointer-events:auto}
+.lightbox img{max-width:min(92vw,1100px);max-height:84vh;border-radius:14px;border:1px solid var(--border);box-shadow:0 30px 90px rgba(0,0,0,.7);transform:scale(.95);transition:transform .25s ease}
+.lightbox.open img{transform:scale(1)}
+.lb-close{position:absolute;top:18px;right:18px;width:44px;height:44px;border-radius:12px;border:1px solid var(--border);background:var(--panel);color:var(--text);cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .15s ease}
+.lb-close:hover{background:var(--panel-2);transform:translateY(-1px)}
+.lb-close .ic{width:18px;height:18px}
+.lb-hint{position:absolute;bottom:16px;left:50%;transform:translateX(-50%);font-size:12px;color:var(--muted)}
+
+/* ===== Роадмап ===== */
+.rm-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:18px;align-items:stretch}
+.rm-card{border:1px solid var(--border);border-radius:var(--r-lg);background:var(--panel);padding:26px;display:flex;flex-direction:column;gap:16px;min-width:0;transition:border-color .25s ease,transform .25s ease}
+.rm-card:hover{border-color:rgba(240,240,240,.28);transform:translateY(-4px)}
+.rm-card.current{border-color:rgba(240,240,240,.35);background:linear-gradient(180deg,rgba(240,240,240,.06),rgba(20,20,23,.7) 60%)}
+.rm-top{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.rm-dot{width:52px;height:52px;border-radius:14px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-family:var(--font-display);font-weight:700;font-size:14px;background:var(--panel-2);border:1px solid var(--border);color:var(--text)}
+.rm-card.current .rm-dot{background:var(--accent);color:var(--accent-ink);border-color:transparent;box-shadow:var(--glow)}
+.rm-badge{padding:5px 12px;border-radius:999px;font-size:11px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;white-space:nowrap}
+.rm-badge.now{background:rgba(240,240,240,.12);color:var(--text);border:1px solid rgba(240,240,240,.35)}
+.rm-badge.plan{background:rgba(255,255,255,.05);color:var(--muted);border:1px solid var(--border)}
+.rm-card h3{font-size:16.5px;font-weight:800;letter-spacing:-.01em}
+.rm-sub{font-size:13px;color:var(--muted);line-height:1.55;margin-top:-8px}
+.rm-list{list-style:none;display:flex;flex-direction:column;gap:9px}
+.rm-list li{display:flex;gap:10px;align-items:flex-start;font-size:13.5px;color:var(--text-2);line-height:1.5}
+.rm-list li .ic{width:15px;height:15px;margin-top:3.5px;color:var(--text);flex-shrink:0}
+.rm-list li.todo .ic{color:var(--muted)}
+.rm-list li.idea .ic{color:var(--faint)}
+.rm-list li b{color:var(--text);font-weight:700}
+/* Превью темы Frutiger Aero */
+.theme-preview{margin-top:4px;position:relative;border-radius:12px;border:1px solid var(--border);overflow:hidden;cursor:zoom-in;flex-shrink:0}
+.theme-preview img{width:100%;height:120px;object-fit:cover;transition:transform .3s ease}
+.theme-preview:hover img{transform:scale(1.05)}
+.tp-hint{position:absolute;left:8px;bottom:8px;display:flex;align-items:center;gap:6px;padding:5px 10px;border-radius:8px;background:rgba(10,10,12,.8);border:1px solid var(--border);font-size:11px;font-weight:700;color:var(--text-2)}
+.tp-hint .ic{width:12px;height:12px}
+
+/* ===== Философия ===== */
+.philo-quote{position:relative;border-radius:var(--r-lg);border:1px solid var(--border);background:linear-gradient(135deg,rgba(240,240,240,.05),rgba(20,20,23,.7) 55%);padding:clamp(24px,4vw,46px) clamp(20px,4vw,48px);margin-bottom:18px;overflow:hidden}
+.philo-quote::before{content:'';position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--accent)}
+.philo-quote .q-mark{position:absolute;right:30px;top:20px;width:60px;height:60px;color:rgba(240,240,240,.1)}
+.philo-quote p{font-size:clamp(14px,1.9vw,20px);font-weight:600;line-height:1.65;color:var(--text-2);max-width:880px}
+.philo-quote p b{color:var(--text)}
+.philo-author{display:flex;align-items:center;gap:12px;margin-top:24px}
+.philo-author .author-logo{width:40px;height:36px;color:var(--text)}
+.philo-author b{display:block;font-size:14px}
+.philo-author span{font-size:12.5px;color:var(--muted)}
+.philo-cards{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px;margin-bottom:18px}
+.p-card{border-radius:var(--r-lg);border:1px solid var(--border);background:var(--panel);padding:26px;min-width:0;transition:transform .25s ease,border-color .25s ease}
+.p-card:hover{transform:translateY(-4px);border-color:rgba(240,240,240,.28)}
+.p-card .b-icon{margin-bottom:16px}
+.p-card h3{font-size:16.5px;font-weight:800;margin-bottom:8px}
+.p-card p{font-size:13.5px;color:var(--muted)}
+.link-cards{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:18px}
+.link-card{display:flex;align-items:center;gap:14px;border-radius:var(--r-md);border:1px solid var(--border);background:var(--panel);padding:18px 20px;transition:all .2s ease;min-width:0}
+.link-card:hover{transform:translateY(-3px);border-color:rgba(240,240,240,.3);background:var(--panel-2)}
+.lc-icon{width:44px;height:44px;border-radius:11px;flex-shrink:0;display:flex;align-items:center;justify-content:center;background:rgba(255,255,255,.06);color:#e6e6ee;border:1px solid rgba(255,255,255,.14)}
+.lc-icon .ic{width:20px;height:20px}
+.lc-info{flex:1;min-width:0}
+.lc-info b{display:block;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.lc-info span{font-size:12.5px;color:var(--muted);display:block;line-height:1.4}
+.link-card .arrow{color:var(--faint);transition:all .2s ease;flex-shrink:0}
+.link-card:hover .arrow{color:var(--text);transform:translateX(3px)}
+.arrow .ic{width:17px;height:17px}
+
+/* ===== Download CTA ===== */
+.cta-card{position:relative;border-radius:26px;border:1px solid rgba(240,240,240,.2);background:linear-gradient(180deg,var(--panel) 0%,rgba(20,20,23,.75) 100%);padding:clamp(44px,7vw,76px) clamp(18px,5vw,56px);text-align:center;overflow:hidden}
+.cta-card::before{content:'';position:absolute;inset:0;pointer-events:none;background:radial-gradient(600px 300px at 50% -20%,rgba(240,240,240,.1),transparent 70%)}
+.cta-logo{width:92px;height:81px;margin:0 auto 26px;color:var(--text);filter:drop-shadow(0 14px 40px rgba(240,240,240,.25));animation:ctaPulse 4s ease-in-out infinite}
+@keyframes ctaPulse{0%,100%{transform:translateY(0)}50%{transform:translateY(-7px)}}
+.cta-card h2{font-family:var(--font-display);font-weight:800;font-size:clamp(21px,3.6vw,42px);margin-bottom:14px;text-wrap:balance}
+.cta-card .cta-sub{color:var(--muted);max-width:520px;margin:0 auto 34px;font-size:clamp(14px,1.8vw,16px)}
+.cta-actions{display:flex;justify-content:center;gap:14px;flex-wrap:wrap;margin-bottom:24px;position:relative}
+.cta-note{position:relative;max-width:620px;margin:0 auto 20px;font-size:13.5px;color:var(--muted);line-height:1.65;padding:14px 18px;border-radius:12px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.12)}
+.cta-note b{color:var(--text);font-weight:800}
+.cta-info-grid{position:relative;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;max-width:720px;margin:0 auto 24px;text-align:left}
+.cta-info{padding:14px 16px;border-radius:12px;background:rgba(255,255,255,.03);border:1px solid var(--border-soft)}
+.cta-info b{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--text);margin-bottom:6px}
+.cta-info b .ic{width:14px;height:14px;color:var(--accent)}
+.cta-info span{font-size:12.5px;color:var(--muted);line-height:1.55}
+.cta-info span code{font-family:inherit;font-weight:800;color:var(--text-2)}
+.cta-alt{position:relative;font-size:13.5px;color:var(--muted);margin-bottom:26px;overflow-wrap:anywhere}
+.cta-alt a{color:var(--text);font-weight:700;border-bottom:1px solid rgba(240,240,240,.35)}
+.cta-alt a:hover{border-color:var(--accent)}
+.cta-meta{display:flex;justify-content:center;gap:10px;flex-wrap:wrap;position:relative}
+
+/* ===== Футер ===== */
+.site-footer{margin-top:112px;border-top:1px solid var(--border-soft);padding:34px 0}
+.footer-inner{display:flex;align-items:center;justify-content:space-between;gap:20px;flex-wrap:wrap}
+.footer-brand{display:flex;align-items:center;gap:12px;min-width:0}
+.footer-brand .brand-logo{width:30px;height:27px}
+.footer-brand span{font-size:13px;color:var(--faint)}
+.footer-nav{display:flex;gap:6px;flex-wrap:wrap}
+.footer-nav a{font-size:13px;font-weight:600;color:var(--muted);padding:6px 10px;border-radius:8px}
+.footer-nav a:hover{color:var(--text)}
+.footer-social{display:flex;gap:8px}
+
+/* ===== Адаптив ===== */
+@media (max-width:1020px){
+  .float-chip{display:none}
+  .bento{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .b-wide{grid-template-columns:minmax(0,1fr);gap:22px}
+  .eq-visual{height:120px}
+  .rm-grid{grid-template-columns:minmax(0,1fr)}
+  .rm-card{gap:14px}
+}
+@media (max-width:960px){
+  .nav-links{display:none}
+  .burger{display:flex}
+  .philo-cards{grid-template-columns:minmax(0,1fr)}
+  .link-cards{grid-template-columns:minmax(0,1fr)}
+  .section{padding-top:84px}
+}
+@media (max-width:640px){
+  html{scroll-padding-top:80px}
+  body{font-size:15px}
+  .header-inner{height:64px;gap:8px}
+  .mobile-menu{top:70px}
+  .header-actions .btn-sm{display:none}
+  .header-actions{gap:8px}
+  .brand{gap:10px}
+  .brand-logo{width:34px;height:30px}
+  .brand-name{font-size:16px}
+  .hero{padding-top:116px}
+  .hero-badge{font-size:12px;padding:7px 14px}
+  .hero-cta{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .hero-cta .btn{width:100%;padding:13px 10px;font-size:14px;white-space:normal}
+  .hero-cta .btn-primary{grid-column:1/-1;padding:15px 10px;font-size:15px}
+  .hero-meta{gap:8px}
+  .meta-chip{font-size:11px;padding:7px 11px}
+  .hero-shot{margin-top:44px}
+  .window-body img{aspect-ratio:4/3}
+  .marquee{margin-top:60px}
+  .marquee-group{gap:28px;padding-right:28px}
+  .marquee-group span{gap:28px;font-size:11px}
+  .section{padding-top:72px}
+  .section-lead{margin-bottom:38px}
+  .bento{grid-template-columns:minmax(0,1fr);gap:14px}
+  .b-card{padding:22px 18px;gap:16px}
+  .b-wide{padding:22px 18px}
+  .b-wide h3{font-size:17px}
+  .eq-visual{height:96px;padding:12px;gap:4px}
+  .offline-stat b{font-size:36px}
+  .shots-tabs{flex-wrap:nowrap;justify-content:flex-start;overflow-x:auto;scrollbar-width:none;padding-bottom:6px;margin:0 -4px 26px;padding-left:4px;padding-right:4px}
+  .shots-tabs::-webkit-scrollbar{display:none}
+  .shot-tab{padding:10px 16px;font-size:13px}
+  .rm-dot{width:46px;height:46px;font-size:12.5px}
+  .rm-card{padding:22px 18px}
+  .rm-list li{font-size:13px}
+  .q-mark{display:none}
+  .cta-card{border-radius:20px}
+  .cta-logo{width:76px;height:67px}
+  .cta-actions{display:grid;grid-template-columns:1fr;gap:10px}
+  .cta-actions .btn{width:100%;padding:13px 10px;font-size:14px;white-space:normal}
+  .cta-note{font-size:12.5px;padding:12px 14px}
+  .cta-info-grid{grid-template-columns:minmax(0,1fr)}
+  .site-footer{margin-top:84px}
+  .footer-inner{flex-direction:column;justify-content:center;text-align:center;gap:16px}
+  .footer-nav{justify-content:center}
+}
+@media (max-width:400px){
+  .header-actions .gh-btn{display:none}
+  .brand-name{font-size:15px}
+  .hero h1{font-size:24px}
+}
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation-duration:.01ms !important;animation-iteration-count:1 !important;transition-duration:.01ms !important}
+}
+</style>
 </head>
 <body>
-    <div class="container">
-        <svg class="icon" width="494" height="436" viewBox="0 0 494 436" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M400 0C451.915 4.50986e-06 494 42.0852 494 94V342C494 393.915 451.915 436 400 436H94C42.0852 436 6.76562e-07 393.915 0 342V94C0 42.0852 42.0852 5.31519e-07 94 0H400ZM222.417 36.333C122.208 36.3331 40.9719 117.668 40.9717 218C40.9719 318.332 122.208 399.666 222.417 399.666H387.028C423.479 399.666 453.028 370.117 453.028 333.666V102.333C453.028 65.8824 423.479 36.3331 387.028 36.333H222.417ZM200.919 66.1699C207.926 65.5792 213.638 71.335 213.638 78.3672C213.638 85.3995 207.922 91.0338 200.926 91.7432C188.719 92.9809 176.735 95.9976 165.358 100.716C150.052 107.064 136.144 116.367 124.429 128.097C112.714 139.826 103.421 153.751 97.0811 169.076C90.741 184.401 87.4775 200.826 87.4775 217.414C87.4775 234.002 90.741 250.427 97.0811 265.752C103.421 281.077 112.714 295.002 124.429 306.731C136.144 318.461 150.052 327.764 165.358 334.112C176.735 338.831 188.719 341.847 200.926 343.085C207.922 343.794 213.638 349.429 213.638 356.461C213.637 363.493 207.926 369.249 200.919 368.658C185.369 367.347 170.089 363.638 155.625 357.64C137.233 350.012 120.52 338.832 106.443 324.738C92.3666 310.644 81.2003 293.912 73.582 275.497C65.9638 257.082 62.043 237.346 62.043 217.414C62.043 197.482 65.9637 177.745 73.582 159.33C81.2003 140.916 92.3667 124.184 106.443 110.09C120.52 95.9958 137.233 84.8151 155.625 77.1875C170.089 71.1892 185.369 67.4807 200.919 66.1699ZM214.223 118.382C214.223 102.211 231.733 92.1086 245.732 100.201L418.064 199.818C432.052 207.904 432.051 228.095 418.064 236.181L245.732 335.798C231.732 343.89 214.223 333.787 214.223 317.616V268.383C213.834 268.392 213.444 268.397 213.053 268.397C185.253 268.397 162.716 245.833 162.716 217.999C162.716 190.165 185.253 167.602 213.053 167.602C213.444 167.602 213.834 167.606 214.223 167.615V118.382ZM181.577 117.941C188.187 115.291 195.299 119.446 197.141 126.325C198.98 133.199 194.842 140.173 188.34 143.063C175.804 148.636 164.787 157.28 156.354 168.282C145.294 182.714 139.3 200.396 139.3 218.586C139.3 236.776 145.294 254.458 156.354 268.89C164.787 279.892 175.804 288.536 188.34 294.109C194.842 297 198.98 303.973 197.141 310.847C195.299 317.726 188.187 321.881 181.577 319.23C163.603 312.024 147.808 300.088 135.926 284.584C121.415 265.65 113.55 242.451 113.55 218.586C113.55 194.72 121.415 171.522 135.926 152.588C147.808 137.084 163.603 125.148 181.577 117.941Z" fill="white"/>
-        </svg>
-        <div class="text">Скоро...</div>
+
+<!-- ===== SVG: твой логотип + иконки ===== -->
+<svg xmlns="http://www.w3.org/2000/svg" style="display:none" aria-hidden="true">
+  <symbol id="logo" viewBox="0 0 494 436">
+    <path d="M400 0C451.915 4.50986e-06 494 42.0852 494 94V342C494 393.915 451.915 436 400 436H94C42.0852 436 6.76562e-07 393.915 0 342V94C0 42.0852 42.0852 5.31519e-07 94 0H400ZM222.417 36.333C122.208 36.3331 40.9719 117.668 40.9717 218C40.9719 318.332 122.208 399.666 222.417 399.666H387.028C423.479 399.666 453.028 370.117 453.028 333.666V102.333C453.028 65.8824 423.479 36.3331 387.028 36.333H222.417ZM200.919 66.1699C207.926 65.5792 213.638 71.335 213.638 78.3672C213.638 85.3995 207.922 91.0338 200.926 91.7432C188.719 92.9809 176.735 95.9976 165.358 100.716C150.052 107.064 136.144 116.367 124.429 128.097C112.714 139.826 103.421 153.751 97.0811 169.076C90.741 184.401 87.4775 200.826 87.4775 217.414C87.4775 234.002 90.741 250.427 97.0811 265.752C103.421 281.077 112.714 295.002 124.429 306.731C136.144 318.461 150.052 327.764 165.358 334.112C176.735 338.831 188.719 341.847 200.926 343.085C207.922 343.794 213.638 349.429 213.638 356.461C213.637 363.493 207.926 369.249 200.919 368.658C185.369 367.347 170.089 363.638 155.625 357.64C137.233 350.012 120.52 338.832 106.443 324.738C92.3666 310.644 81.2003 293.912 73.582 275.497C65.9638 257.082 62.043 237.346 62.043 217.414C62.043 197.482 65.9637 177.745 73.582 159.33C81.2003 140.916 92.3667 124.184 106.443 110.09C120.52 95.9958 137.233 84.8151 155.625 77.1875C170.089 71.1892 185.369 67.4807 200.919 66.1699ZM214.223 118.382C214.223 102.211 231.733 92.1086 245.732 100.201L418.064 199.818C432.052 207.904 432.051 228.095 418.064 236.181L245.732 335.798C231.732 343.89 214.223 333.787 214.223 317.616V268.383C213.834 268.392 213.444 268.397 213.053 268.397C185.253 268.397 162.716 245.833 162.716 217.999C162.716 190.165 185.253 167.602 213.053 167.602C213.444 167.602 213.834 167.606 214.223 167.615V118.382ZM181.577 117.941C188.187 115.291 195.299 119.446 197.141 126.325C198.98 133.199 194.842 140.173 188.34 143.063C175.804 148.636 164.787 157.28 156.354 168.282C145.294 182.714 139.3 200.396 139.3 218.586C139.3 236.776 145.294 254.458 156.354 268.89C164.787 279.892 175.804 288.536 188.34 294.109C194.842 297 198.98 303.973 197.141 310.847C195.299 317.726 188.187 321.881 181.577 319.23C163.603 312.024 147.808 300.088 135.926 284.584C121.415 265.65 113.55 242.451 113.55 218.586C113.55 194.72 121.415 171.522 135.926 152.588C147.808 137.084 163.603 125.148 181.577 117.941Z" fill="currentColor"/>
+  </symbol>
+  <symbol id="i-download" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></symbol>
+  <symbol id="i-github" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12z"/></symbol>
+  <symbol id="i-telegram" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.562 8.161l-1.97 9.291c-.145.658-.537.818-1.084.508l-3-2.211-1.446 1.394c-.14.18-.357.295-.6.295l.213-3.053 5.56-5.023c.24-.213-.054-.334-.373-.121l-6.869 4.326-2.96-.924c-.64-.203-.658-.64.135-.954l11.566-4.458c.538-.196 1.006.128.832.93z"/></symbol>
+  <symbol id="i-discord" viewBox="0 0 24 24" fill="currentColor"><path d="M20.317 4.37a19.79 19.79 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.865-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.058a.082.082 0 0 0 .031.056 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028 14.09 14.09 0 0 0 1.226-1.994.076.076 0 0 0-.041-.106 13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.291.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.892.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.03zM8.02 15.33c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.956-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.956 2.418-2.157 2.418zm7.975 0c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.955-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.946 2.418-2.157 2.418z"/></symbol>
+  <symbol id="i-sparkles" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2c.6 3.9 3.5 6.8 7.4 7.4-3.9.6-6.8 3.5-7.4 7.4-.6-3.9-3.5-6.8-7.4-7.4C8.5 8.8 11.4 5.9 12 2z"/><path d="M19 14.6l.7 2 2 .7-2 .7-.7 2-.7-2-2-.7 2-.7z"/></symbol>
+  <symbol id="i-wifi-off" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="1" y1="1" x2="23" y2="23"/><path d="M16.72 11.06A10.94 10.94 0 0 1 19 12.55"/><path d="M5 12.55a10.94 10.94 0 0 1 5.17-2.39"/><path d="M10.71 5.05A16 16 0 0 1 22.58 9"/><path d="M1.42 9a15.91 15.91 0 0 1 4.7-2.88"/><path d="M8.53 16.11a6 6 0 0 1 6.95 0"/><line x1="12" y1="20" x2="12.01" y2="20"/></symbol>
+  <symbol id="i-disc" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3"/></symbol>
+  <symbol id="i-heart" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></symbol>
+  <symbol id="i-activity" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></symbol>
+  <symbol id="i-droptray" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/><polyline points="8 11 12 15 16 11"/><line x1="12" y1="3" x2="12" y2="15"/></symbol>
+  <symbol id="i-sliders" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/></symbol>
+  <symbol id="i-monitor" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></symbol>
+  <symbol id="i-folder" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></symbol>
+  <symbol id="i-refresh" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></symbol>
+  <symbol id="i-headphones" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 18v-6a9 9 0 0 1 18 0v6"/><path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z"/></symbol>
+  <symbol id="i-volume" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/></symbol>
+  <symbol id="i-globe" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></symbol>
+  <symbol id="i-home" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></symbol>
+  <symbol id="i-list" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></symbol>
+  <symbol id="i-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></symbol>
+  <symbol id="i-key" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M6 10h.01M10 10h.01M14 10h.01M18 10h.01M8 14h8"/></symbol>
+  <symbol id="i-box" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8l-9-5-9 5v8l9 5 9-5V8z"/><polyline points="3 8 12 13 21 8"/><line x1="12" y1="13" x2="12" y2="21"/></symbol>
+  <symbol id="i-zoom" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/></symbol>
+  <symbol id="i-close" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="6" y1="6" x2="18" y2="18"/><line x1="18" y1="6" x2="6" y2="18"/></symbol>
+  <symbol id="i-min" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="5" y1="12" x2="19" y2="12"/></symbol>
+  <symbol id="i-max" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="6" y="6" width="12" height="12" rx="2"/></symbol>
+  <symbol id="i-quote" viewBox="0 0 24 24" fill="currentColor"><path d="M10 7H6a3 3 0 0 0-3 3v4a3 3 0 0 0 3 3h2a3 3 0 0 0 3-3v-7zm11 0h-4a3 3 0 0 0-3 3v4a3 3 0 0 0 3 3h2a3 3 0 0 0 3-3v-7z" opacity=".9"/></symbol>
+  <symbol id="i-music" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></symbol>
+</svg>
+
+<div id="dust" aria-hidden="true"></div>
+
+<!-- ===== ШАПКА ===== -->
+<header class="site-header" id="siteHeader">
+  <div class="container header-inner">
+    <a class="brand" href="#top" aria-label="Playly — на главную">
+      <svg class="brand-logo" aria-hidden="true"><use href="#logo"/></svg>
+      <span class="brand-name">Playly</span>
+    </a>
+    <nav class="nav-links" aria-label="Навигация">
+      <a href="#features">Возможности</a>
+      <a href="#screenshots">Скриншоты</a>
+      <a href="#roadmap">Планы</a>
+      <a href="#philosophy">Философия</a>
+      <a href="#download">Скачать</a>
+    </nav>
+    <div class="header-actions">
+      <a class="icon-btn" href="https://t.me/aurums2347" target="_blank" rel="noreferrer" title="Основной телеграм-канал" aria-label="Основной телеграм-канал"><svg class="ic"><use href="#i-telegram"/></svg></a>
+      <a class="icon-btn gh-btn" href="https://github.com/Aurum2347/playly" target="_blank" rel="noreferrer" title="GitHub" aria-label="GitHub"><svg class="ic"><use href="#i-github"/></svg></a>
+      <a class="btn btn-primary btn-sm" href="https://github.com/Aurum2347/playly/releases/latest" target="_blank" rel="noreferrer"><svg class="ic"><use href="#i-download"/></svg>Скачать</a>
+      <button class="burger" id="burgerBtn" aria-label="Открыть меню" aria-expanded="false" aria-controls="mobileMenu"><i></i><i></i><i></i></button>
     </div>
+  </div>
+</header>
+
+<!-- ===== Мобильное меню ===== -->
+<div class="mobile-menu" id="mobileMenu">
+  <a class="mm-link" href="#features">Возможности</a>
+  <a class="mm-link" href="#screenshots">Скриншоты</a>
+  <a class="mm-link" href="#roadmap">Планы</a>
+  <a class="mm-link" href="#philosophy">Философия</a>
+  <a class="mm-link" href="#download">Скачать</a>
+  <div class="mm-actions">
+    <a class="btn btn-primary" href="https://github.com/Aurum2347/playly/releases/latest" target="_blank" rel="noreferrer"><svg class="ic"><use href="#i-download"/></svg>Скачать</a>
+    <a class="icon-btn" href="https://t.me/aurums2347" target="_blank" rel="noreferrer" aria-label="Основной телеграм-канал"><svg class="ic"><use href="#i-telegram"/></svg></a>
+    <a class="icon-btn" href="https://t.me/thermodynamicprogrammer" target="_blank" rel="noreferrer" aria-label="Канал о программировании"><svg class="ic"><use href="#i-telegram"/></svg></a>
+  </div>
+</div>
+
+<main id="top">
+  <!-- ===== HERO ===== -->
+  <section class="hero container">
+    <div class="hero-badge" data-reveal><svg class="ic"><use href="#i-sparkles"/></svg>Версия 2.0 уже доступна</div>
+    <h1 data-reveal style="--d:80ms">Твоя музыка —<br><span class="grad">твои правила</span></h1>
+    <p class="hero-sub" data-reveal style="--d:160ms"><strong>Playly</strong> — офлайн аудиоплеер с современным дизайном и продуманной навигацией. Никакого стриминга и перегруженных меню — только твоя коллекция, твои плейлисты и звук, который всегда с тобой.</p>
+    <div class="hero-cta" data-reveal style="--d:240ms">
+      <a class="btn btn-primary" href="https://github.com/Aurum2347/playly/releases/latest" target="_blank" rel="noreferrer"><svg class="ic"><use href="#i-download"/></svg>Скачать последний релиз</a>
+      <a class="btn btn-ghost" href="https://github.com/Aurum2347/playly" target="_blank" rel="noreferrer"><svg class="ic"><use href="#i-github"/></svg>Исходный код</a>
+      <a class="btn btn-ghost" href="https://t.me/aurums2347" target="_blank" rel="noreferrer"><svg class="ic"><use href="#i-telegram"/></svg>Telegram-канал</a>
+    </div>
+    <div class="hero-meta" data-reveal style="--d:320ms">
+      <span class="meta-chip"><svg class="ic"><use href="#i-monitor"/></svg>Windows 10 / 11</span>
+      <span class="meta-chip"><svg class="ic"><use href="#i-disc"/></svg>8 форматов из коробки</span>
+      <span class="meta-chip"><svg class="ic"><use href="#i-wifi-off"/></svg>100% офлайн</span>
+      <span class="meta-chip"><svg class="ic"><use href="#i-box"/></svg>Портативная версия</span>
+    </div>
+
+    <div class="hero-shot" data-reveal style="--d:380ms">
+      <div class="float-chip chip-a"><svg class="ic"><use href="#i-sliders"/></svg>Эквалайзер с пресетами</div>
+      <div class="float-chip chip-b"><svg class="ic"><use href="#i-heart"/></svg>Плейлисты и лайки</div>
+      <div class="float-chip chip-c"><svg class="ic"><use href="#i-wifi-off"/></svg>0 запросов к сети</div>
+      <div class="window">
+        <div class="window-bar">
+          <span class="window-title">Playly</span>
+          <div class="window-ctrl" aria-hidden="true"><span><svg class="ic"><use href="#i-min"/></svg></span><span><svg class="ic"><use href="#i-max"/></svg></span><span><svg class="ic"><use href="#i-close"/></svg></span></div>
+        </div>
+        <div class="window-body">
+          <img class="zoomable" data-lightbox="img/main.png" src="img/main.png" alt="Playly — главный экран" loading="eager">
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== MARQUEE ===== -->
+  <div class="marquee" aria-hidden="true">
+    <div class="marquee-inner">
+      <div class="marquee-group">
+        <span>MP3</span><span>WAV</span><span>FLAC</span><span>OGG</span><span>AAC</span><span>M4A</span><span>OPUS</span><span>WMA</span>
+        <span class="hl">100% офлайн</span><span>Эквалайзер</span><span>Кроссфейд</span><span>Плейлисты</span><span class="hl">Drag &amp; Drop</span><span>Discord RPC</span><span>Синхронизация папок</span><span>Переводы</span><span>Хоткеи</span>
+      </div>
+      <div class="marquee-group">
+        <span>MP3</span><span>WAV</span><span>FLAC</span><span>OGG</span><span>AAC</span><span>M4A</span><span>OPUS</span><span>WMA</span>
+        <span class="hl">100% офлайн</span><span>Эквалайзер</span><span>Кроссфейд</span><span>Плейлисты</span><span class="hl">Drag &amp; Drop</span><span>Discord RPC</span><span>Синхронизация папок</span><span>Переводы</span><span>Хоткеи</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== ВОЗМОЖНОСТИ ===== -->
+  <section class="section container" id="features">
+    <div class="overline" data-reveal>Возможности</div>
+    <h2 data-reveal style="--d:60ms">Всё, что нужно от плеера.<br>И ничего лишнего.</h2>
+    <p class="section-lead" data-reveal style="--d:120ms">Playly создан, чтобы управлять музыкой было так же приятно, как её слушать. Почти каждую карточку можно потрогать.</p>
+
+    <div class="bento">
+      <!-- Эквалайзер -->
+      <article class="b-card b-wide" data-reveal>
+        <div class="bw-left">
+          <div class="b-head">
+            <div class="b-icon"><svg class="ic"><use href="#i-sliders"/></svg></div>
+            <div><h3>Эквалайзер с пресетами</h3></div>
+          </div>
+          <p>Настрой звук под себя за секунду: пять готовых пресетов для любого жанра и настроения — без лишних окон и сложных настроек. Потыкай по пресетам — спектр ниже живой.</p>
+          <div class="eq-presets" id="eqPresets">
+            <button class="eq-preset" data-eq="flat" type="button">Плоский</button>
+            <button class="eq-preset active" data-eq="rock" type="button">Рок</button>
+            <button class="eq-preset" data-eq="pop" type="button">Поп</button>
+            <button class="eq-preset" data-eq="bass" type="button">Бас</button>
+            <button class="eq-preset" data-eq="classic" type="button">Классика</button>
+          </div>
+        </div>
+        <div class="eq-visual" id="eqVisual" aria-hidden="true">
+          <span class="eq-tag" id="eqTag">preset: rock</span>
+          <span class="eq-bar" style="--h:62%;animation-duration:.9s"></span>
+          <span class="eq-bar" style="--h:84%;animation-duration:1.1s"></span>
+          <span class="eq-bar" style="--h:48%;animation-duration:1.3s"></span>
+          <span class="eq-bar" style="--h:92%;animation-duration:1s"></span>
+          <span class="eq-bar" style="--h:58%;animation-duration:1.2s"></span>
+          <span class="eq-bar" style="--h:74%;animation-duration:.8s"></span>
+          <span class="eq-bar" style="--h:40%;animation-duration:1.15s"></span>
+          <span class="eq-bar" style="--h:88%;animation-duration:.95s"></span>
+          <span class="eq-bar" style="--h:66%;animation-duration:1.25s"></span>
+          <span class="eq-bar" style="--h:95%;animation-duration:.85s"></span>
+          <span class="eq-bar" style="--h:52%;animation-duration:1.05s"></span>
+          <span class="eq-bar" style="--h:78%;animation-duration:1.2s"></span>
+          <span class="eq-bar" style="--h:44%;animation-duration:.9s"></span>
+          <span class="eq-bar" style="--h:82%;animation-duration:1.1s"></span>
+          <span class="eq-bar" style="--h:60%;animation-duration:1.3s"></span>
+          <span class="eq-bar" style="--h:70%;animation-duration:1s"></span>
+        </div>
+      </article>
+
+      <!-- Офлайн -->
+      <article class="b-card" data-reveal>
+        <div class="b-head">
+          <div class="b-icon"><svg class="ic"><use href="#i-wifi-off"/></svg></div>
+          <div>
+            <h3>Полный офлайн</h3>
+            <p>Интернет не нужен вообще: ни аккаунтов, ни подписок, ни буферизации. Музыка не остановится из-за обрыва сети — её просто нет в уравнении.</p>
+          </div>
+        </div>
+        <div class="b-visual">
+          <div class="offline-stat"><b>0</b><span>запросов к серверам<br>после установки</span></div>
+          <div class="off-demo" id="offDemo">
+            <button class="off-btn" id="offBtn" type="button">Отключить интернет</button>
+            <div class="off-player">
+              <span class="off-eq" aria-hidden="true"><i></i><i></i><i></i><i></i></span>
+              <span class="off-text">Сеть отключена — музыка продолжает играть</span>
+            </div>
+          </div>
+        </div>
+      </article>
+
+      <!-- Форматы -->
+      <article class="b-card" data-reveal style="--d:60ms">
+        <div class="b-head">
+          <div class="b-icon"><svg class="ic"><use href="#i-disc"/></svg></div>
+          <div>
+            <h3>Все форматы</h3>
+            <p>Любая коллекция откроется из коробки, без конвертеров и кодеков.</p>
+          </div>
+        </div>
+        <div class="fmt-grid b-visual">
+          <span class="fmt-chip">MP3</span><span class="fmt-chip">WAV</span><span class="fmt-chip">FLAC</span><span class="fmt-chip">OGG</span>
+          <span class="fmt-chip">AAC</span><span class="fmt-chip">M4A</span><span class="fmt-chip">OPUS</span><span class="fmt-chip">WMA</span>
+        </div>
+      </article>
+
+      <!-- Своя библиотека -->
+      <article class="b-card" data-reveal style="--d:120ms">
+        <div class="b-head">
+          <div class="b-icon"><svg class="ic"><use href="#i-heart"/></svg></div>
+          <div>
+            <h3>Своя библиотека</h3>
+            <p>Плейлисты, лайки, поиск, сортировки, редактирование метаданных и обложек. Полайкай «треки» ниже — они ненастоящие, но анимации честные.</p>
+          </div>
+        </div>
+        <div class="mini-list b-visual">
+          <div class="mini-row">
+            <button class="mini-cover c1" type="button" aria-label="Слушать"><svg><use href="#i-music"/></svg><span class="mini-eq"><i></i><i></i><i></i></span></button>
+            <span class="mini-bars"><i style="width:72%"></i><i style="width:44%"></i></span>
+            <button class="mini-like liked" type="button" aria-label="Лайк"><svg viewBox="0 0 24 24"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg></button>
+          </div>
+          <div class="mini-row">
+            <button class="mini-cover c2" type="button" aria-label="Слушать"><svg><use href="#i-music"/></svg><span class="mini-eq"><i></i><i></i><i></i></span></button>
+            <span class="mini-bars"><i style="width:58%"></i><i style="width:36%"></i></span>
+            <button class="mini-like" type="button" aria-label="Лайк"><svg viewBox="0 0 24 24"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg></button>
+          </div>
+          <div class="mini-row">
+            <button class="mini-cover c3" type="button" aria-label="Слушать"><svg><use href="#i-music"/></svg><span class="mini-eq"><i></i><i></i><i></i></span></button>
+            <span class="mini-bars"><i style="width:66%"></i><i style="width:40%"></i></span>
+            <button class="mini-like liked" type="button" aria-label="Лайк"><svg viewBox="0 0 24 24"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg></button>
+          </div>
+        </div>
+      </article>
+
+      <!-- Кроссфейд -->
+      <article class="b-card" data-reveal>
+        <div class="b-head">
+          <div class="b-icon"><svg class="ic"><use href="#i-activity"/></svg></div>
+          <div>
+            <h3>Кроссфейд до 12 секунд</h3>
+            <p>Плавный переход между треками: один затихает, следующий нарастает. Ползунок от 0 до 12 секунд — или полностью выключить.</p>
+          </div>
+        </div>
+        <div class="v-row b-visual" data-radio>
+          <button class="v-chip" type="button">0 сек</button>
+          <button class="v-chip active" type="button">6 сек</button>
+          <button class="v-chip" type="button">12 сек</button>
+        </div>
+      </article>
+
+      <!-- Скорость -->
+      <article class="b-card" data-reveal style="--d:60ms">
+        <div class="b-head">
+          <div class="b-icon"><svg class="ic"><use href="#i-activity"/></svg></div>
+          <div>
+            <h3>Скорость трека</h3>
+            <p>Персональная скорость воспроизведения от 0.5× до 2× для каждого трека — удобно для подкастов и обучения.</p>
+          </div>
+        </div>
+        <div class="v-row b-visual" id="speedRow" data-radio>
+          <button class="v-chip" type="button">0.5×</button>
+          <button class="v-chip" type="button">0.75×</button>
+          <button class="v-chip active" type="button">1×</button>
+          <button class="v-chip" type="button">1.25×</button>
+          <button class="v-chip" type="button">1.5×</button>
+          <button class="v-chip" type="button">2×</button>
+        </div>
+      </article>
+
+      <!-- Drag&Drop -->
+      <article class="b-card" data-reveal style="--d:120ms">
+        <div class="b-head">
+          <div class="b-icon"><svg class="ic"><use href="#i-droptray"/></svg></div>
+          <div>
+            <h3>Drag &amp; Drop импорт</h3>
+            <p>Перетащи файлы прямо в окно — Playly сам разберёт метаданные и обложки.</p>
+          </div>
+        </div>
+        <div class="dropzone b-visual" id="dropzone" aria-hidden="true">
+          <div class="dz-icon"><svg class="ic"><use href="#i-droptray"/></svg></div>
+          <b>Перетащи файлы сюда</b>
+          <small>MP3, WAV, M4A, FLAC, OGG, AAC, OPUS, WMA</small>
+        </div>
+      </article>
+
+      <!-- Синхронизация -->
+      <article class="b-card" data-reveal>
+        <div class="b-head">
+          <div class="b-icon"><svg class="ic"><use href="#i-folder"/></svg></div>
+          <div>
+            <h3>Синхронизация папок</h3>
+            <p>Укажи папку с музыкой — библиотека будет обновляться сама (авто-режим) или по кнопке (ручной).</p>
+          </div>
+        </div>
+        <div class="sync-visual b-visual">
+          <div class="sync-folder"><svg class="ic"><use href="#i-folder"/></svg></div>
+          <div class="sync-lines"><b>D:\Music</b><span>автообновление включено</span></div>
+          <span class="sync-badge" id="syncBadge"><svg class="ic"><use href="#i-refresh"/></svg>sync</span>
+        </div>
+      </article>
+
+      <!-- Discord RPC -->
+      <article class="b-card" data-reveal style="--d:60ms">
+        <div class="b-head">
+          <div class="b-icon"><svg class="ic"><use href="#i-discord"/></svg></div>
+          <div>
+            <h3>Discord RPC</h3>
+            <p>Статус в Discord: друзья видят, какой трек играет в Playly. Отключается одной кнопкой в настройках.</p>
+          </div>
+        </div>
+        <div class="rpc-visual b-visual" aria-hidden="true">
+          <div class="rpc-avatar"><svg class="ic"><use href="#i-discord"/></svg></div>
+          <div class="rpc-lines">
+            <b><span class="rpc-dot"></span>Aurum2347</b>
+            <span>слушает в Playly · Гражданская оборона — Про дурачка</span>
+          </div>
+        </div>
+      </article>
+
+      <!-- Устройства -->
+      <article class="b-card" data-reveal style="--d:120ms">
+        <div class="b-head">
+          <div class="b-icon"><svg class="ic"><use href="#i-headphones"/></svg></div>
+          <div>
+            <h3>Выбор устройства вывода</h3>
+            <p>Колонки, наушники или HDMI — переключается прямо в настройках, без перезапуска и запоминается автоматически.</p>
+          </div>
+        </div>
+        <div class="v-row b-visual" data-radio>
+          <button class="v-chip active" type="button"><svg class="ic"><use href="#i-headphones"/></svg>Наушники</button>
+          <button class="v-chip" type="button"><svg class="ic"><use href="#i-volume"/></svg>Колонки</button>
+          <button class="v-chip" type="button"><svg class="ic"><use href="#i-monitor"/></svg>HDMI</button>
+        </div>
+      </article>
+
+      <!-- Переводы -->
+      <article class="b-card" data-reveal>
+        <div class="b-head">
+          <div class="b-icon"><svg class="ic"><use href="#i-globe"/></svg></div>
+          <div>
+            <h3>Система переводов</h3>
+            <p>Русский и английский из коробки плюс переводы от сообщества: создай шаблон, заполни файл — и язык появится в списке.</p>
+          </div>
+        </div>
+        <div class="v-row b-visual" data-radio>
+          <button class="v-chip active" type="button">Русский</button>
+          <button class="v-chip" type="button">English</button>
+          <span class="v-chip dashed">+ свой перевод</span>
+        </div>
+      </article>
+
+      <!-- Хоткеи -->
+      <article class="b-card" data-reveal style="--d:60ms">
+        <div class="b-head">
+          <div class="b-icon"><svg class="ic"><use href="#i-key"/></svg></div>
+          <div>
+            <h3>Горячие клавиши</h3>
+            <p>Пробел — пауза, стрелки — перемотка и громкость, Ctrl+стрелки — треки, M — mute, L — лайк. Работают на любой раскладке.</p>
+          </div>
+        </div>
+        <div class="v-row b-visual">
+          <span class="v-chip">Space</span><span class="v-chip">← →</span><span class="v-chip">↑ ↓</span><span class="v-chip">M</span><span class="v-chip">L</span>
+        </div>
+      </article>
+
+      <!-- Портативность -->
+      <article class="b-card" data-reveal style="--d:120ms">
+        <div class="b-head">
+          <div class="b-icon"><svg class="ic"><use href="#i-box"/></svg></div>
+          <div>
+            <h3>Портативная версия</h3>
+            <p>Сейчас раздаётся не установщик, а один exe-файл: положи на флешку или в любую папку и запускай двойным кликом — без установки.</p>
+          </div>
+        </div>
+        <div class="v-row b-visual">
+          <span class="v-chip active">Playly.exe</span><span class="v-chip">без установки</span>
+        </div>
+      </article>
+    </div>
+  </section>
+
+  <!-- ===== СКРИНШОТЫ ===== -->
+  <section class="section container" id="screenshots">
+    <div class="overline" data-reveal>Скриншоты</div>
+    <h2 data-reveal style="--d:60ms">Выглядит так же аккуратно,<br>как звучит</h2>
+    <p class="section-lead" data-reveal style="--d:120ms">Тёмная и светлая темы, плавные анимации и ни одной лишней кнопки. Переключайся между экранами, клик по картинке — приблизить.</p>
+
+    <div class="shots-tabs" data-reveal role="tablist" aria-label="Экраны приложения">
+      <button class="shot-tab active" data-shot="home" role="tab" aria-selected="true"><svg class="ic"><use href="#i-home"/></svg>Главная</button>
+      <button class="shot-tab" data-shot="tracks" role="tab" aria-selected="false"><svg class="ic"><use href="#i-list"/></svg>Все треки</button>
+      <button class="shot-tab" data-shot="liked" role="tab" aria-selected="false"><svg class="ic"><use href="#i-heart"/></svg>Понравившиеся</button>
+      <button class="shot-tab" data-shot="settings" role="tab" aria-selected="false"><svg class="ic"><use href="#i-sliders"/></svg>Настройки</button>
+    </div>
+
+    <div class="window" data-reveal style="--d:80ms">
+      <div class="window-bar">
+        <span class="window-title">Playly</span>
+        <div class="window-ctrl" aria-hidden="true"><span><svg class="ic"><use href="#i-min"/></svg></span><span><svg class="ic"><use href="#i-max"/></svg></span><span><svg class="ic"><use href="#i-close"/></svg></span></div>
+      </div>
+      <div class="window-body" id="shotStage">
+        <img id="shotImg" class="zoomable" src="img/main.png" alt="Playly — главный экран" loading="lazy">
+      </div>
+    </div>
+    <p class="shots-note" data-reveal>Интерактивные вкладки — каждый экран открывается одним кликом.</p>
+  </section>
+
+  <!-- ===== ПЛАНЫ ===== -->
+  <section class="section container" id="roadmap">
+    <div class="overline" data-reveal>Роадмап</div>
+    <h2 data-reveal style="--d:60ms">Планы на будущее</h2>
+    <p class="section-lead" data-reveal style="--d:120ms">Playly развивается по чёткому вектору: от надёжной базы — к полной кастомизации и собственной экосистеме.</p>
+
+    <div class="rm-grid">
+      <article class="rm-card current" data-reveal>
+        <div class="rm-top"><div class="rm-dot">2.0</div><span class="rm-badge now">уже здесь</span></div>
+        <h3>Новая база</h3>
+        <p class="rm-sub">Полная переделка на стек Tauri + React + TypeScript. Пока что — только Windows 10 / 11.</p>
+        <ul class="rm-list">
+          <li><svg class="ic"><use href="#i-check"/></svg><span><b>Эквалайзер с пресетами</b> и темы: тёмная, светлая, системная</span></li>
+          <li><svg class="ic"><use href="#i-check"/></svg><span><b>Кроссфейд до 12 секунд</b> и персональная скорость трека (0.5×–2×)</span></li>
+          <li><svg class="ic"><use href="#i-check"/></svg><span><b>Выбор устройства вывода</b> — переключение без перезапуска</span></li>
+          <li><svg class="ic"><use href="#i-check"/></svg><span><b>Система переводов</b>: русский, английский + пользовательские переводы</span></li>
+          <li><svg class="ic"><use href="#i-check"/></svg><span><b>Профиль</b> с никнеймом и аватаркой — общий для всех моих приложений</span></li>
+          <li><svg class="ic"><use href="#i-check"/></svg><span>Папка с музыкой, <b>синхронизация</b>, метаданные, обложки, плейлисты и лайки</span></li>
+          <li><svg class="ic"><use href="#i-check"/></svg><span><b>Discord RPC</b>, горячие клавиши и портативная версия без установки</span></li>
+        </ul>
+      </article>
+
+      <article class="rm-card" data-reveal style="--d:80ms">
+        <div class="rm-top"><div class="rm-dot">2.1</div><span class="rm-badge plan">в планах</span></div>
+        <h3>Плеер под себя</h3>
+        <p class="rm-sub">Общая идея — плеер можно подстроить под себя, от языка до внешнего вида.</p>
+        <ul class="rm-list">
+          <li class="todo"><svg class="ic"><use href="#i-sparkles"/></svg><span><b>Изменение фона</b> приложения + возможность размытия</span></li>
+          <li class="todo"><svg class="ic"><use href="#i-sparkles"/></svg><span><b>Смена логотипа</b>: у ярлыков на рабочем столе и в панели задач</span></li>
+          <li class="todo"><svg class="ic"><use href="#i-sparkles"/></svg><span>Эффекты и <b>«расширенный режим»</b> прослушивания с визуализаторами — как в Windows Media Player и KMPlayer</span></li>
+          <li class="todo"><svg class="ic"><use href="#i-sparkles"/></svg><span><b>Автоматические обновления</b> — скорее всего появятся именно здесь</span></li>
+          <li class="todo"><svg class="ic"><use href="#i-sparkles"/></svg><span>Скорее всего порты для <b>Linux и iOS</b> (+ возможно поддержка Windows 7)</span></li>
+        </ul>
+      </article>
+
+      <article class="rm-card" data-reveal style="--d:160ms">
+        <div class="rm-top"><div class="rm-dot">2.2</div><span class="rm-badge plan">в планах</span></div>
+        <h3>Плагины, темы и библиотека</h3>
+        <p class="rm-sub">Экосистема, как в Vencord: сообщество расширяет плеер само.</p>
+        <ul class="rm-list">
+          <li class="idea"><svg class="ic"><use href="#i-arrow"/></svg><span><b>Плагины и темы</b> — создавай свои и скачивай чужие</span></li>
+          <li class="idea"><svg class="ic"><use href="#i-arrow"/></svg><span>Библиотека контента для переводов, плагинов и тем позже появится <b>прямо на этом сайте</b></span></li>
+          <li class="idea"><svg class="ic"><use href="#i-arrow"/></svg><span>Первая тема-кандидат — <b>Frutiger Aero</b></span></li>
+        </ul>
+        <div class="theme-preview" data-lightbox="img/frutigeraero.png" role="button" tabindex="0" aria-label="Открыть превью темы Frutiger Aero">
+          <img src="img/frutigeraero.png" alt="Frutiger Aero — превью темы" loading="lazy">
+          <span class="tp-hint"><svg class="ic"><use href="#i-zoom"/></svg>кликни, чтобы посмотреть</span>
+        </div>
+      </article>
+    </div>
+  </section>
+
+  <!-- ===== ФИЛОСОФИЯ ===== -->
+  <section class="section container" id="philosophy">
+    <div class="overline" data-reveal>Философия</div>
+    <h2 data-reveal style="--d:60ms">Почему Playly</h2>
+    <p class="section-lead" data-reveal style="--d:120ms">Плеер, который я хотел бы открыть сам — без компромиссов между красотой и практичностью.</p>
+
+    <div class="philo-quote" data-reveal>
+      <svg class="q-mark" aria-hidden="true"><use href="#i-quote"/></svg>
+      <p>Playly — это моё видение того, каким должен быть аудиоплеер в 2026 году. Классические программы вроде Aimp или KMPlayer решали свою задачу годами, но их дизайн устарел, а навигация перегружена. Поэтому я выбрал путь <b>офлайн-плеера</b>: когда интернет нестабилен, скачанная музыка под рукой — гораздо практичнее. Playly — для тех, кто ценит независимость от сети.</p>
+      <div class="philo-author">
+        <svg class="author-logo" aria-hidden="true"><use href="#logo"/></svg>
+        <div><b>Aurum2347</b><span>автор и разработчик Playly</span></div>
+      </div>
+    </div>
+
+    <div class="philo-cards">
+      <article class="p-card" data-reveal>
+        <div class="b-icon"><svg class="ic"><use href="#i-sparkles"/></svg></div>
+        <h3>Дизайн 2026 года</h3>
+        <p>Строгий монохром, тёмная и светлая темы, плавные анимации и аккуратные детали. Навигация простая настолько, насколько это возможно — и не проще.</p>
+      </article>
+      <article class="p-card" data-reveal style="--d:80ms">
+        <div class="b-icon"><svg class="ic"><use href="#i-wifi-off"/></svg></div>
+        <h3>Независимость от сети</h3>
+        <p>Никаких онлайн-аккаунтов, подписок и буферизации. Интернет пригодится только чтобы скачать музыку и последний релиз Playly.</p>
+      </article>
+    </div>
+
+    <div class="link-cards">
+      <a class="link-card" href="https://t.me/aurums2347" target="_blank" rel="noreferrer" data-reveal>
+        <div class="lc-icon"><svg class="ic"><use href="#i-telegram"/></svg></div>
+        <div class="lc-info"><b>Основной телеграм-канал</b><span>Видосы, рендеры, новости разработки — и релизы Playly тоже</span></div>
+        <span class="arrow"><svg class="ic"><use href="#i-arrow"/></svg></span>
+      </a>
+      <a class="link-card" href="https://t.me/thermodynamicprogrammer" target="_blank" rel="noreferrer" data-reveal style="--d:80ms">
+        <div class="lc-icon"><svg class="ic"><use href="#i-telegram"/></svg></div>
+        <div class="lc-info"><b>Канал о программировании</b><span>Разработка Playly изнутри</span></div>
+        <span class="arrow"><svg class="ic"><use href="#i-arrow"/></svg></span>
+      </a>
+      <a class="link-card" href="https://github.com/Aurum2347/playly" target="_blank" rel="noreferrer" data-reveal style="--d:160ms">
+        <div class="lc-icon"><svg class="ic"><use href="#i-github"/></svg></div>
+        <div class="lc-info"><b>Playly на GitHub</b><span>Исходный код и релизы проекта</span></div>
+        <span class="arrow"><svg class="ic"><use href="#i-arrow"/></svg></span>
+      </a>
+    </div>
+  </section>
+
+  <!-- ===== СКАЧАТЬ ===== -->
+  <section class="section container" id="download">
+    <div class="cta-card" data-reveal>
+      <svg class="cta-logo" aria-hidden="true"><use href="#logo"/></svg>
+      <h2>Готов к плееру нового поколения?</h2>
+      <p class="cta-sub">Скачай Playly, перетащи свою музыку — и больше не возвращайся к плеерам из прошлого.</p>
+      <div class="cta-actions">
+        <a class="btn btn-primary" href="https://github.com/Aurum2347/playly/releases/latest" target="_blank" rel="noreferrer"><svg class="ic"><use href="#i-download"/></svg>Скачать последний релиз</a>
+        <a class="btn btn-ghost" href="https://t.me/thermodynamicprogrammer" target="_blank" rel="noreferrer"><svg class="ic"><use href="#i-telegram"/></svg>Следить за обновлениями</a>
+      </div>
+      <p class="cta-note">
+  Playly работает на <b>Windows 10 / 11</b>. Никакой установки — просто скачайте один <b>exe-файл</b> и запускайте.
+</p>
+      <div class="cta-info-grid">
+        <div class="cta-info">
+          <b><svg class="ic"><use href="#i-box"/></svg>Портативность</b>
+          <span>Положи <code>Playly.exe</code> куда угодно — на флешку или в любую папку — и запускай двойным кликом. Установка и права администратора не нужны.</span>
+        </div>
+        <div class="cta-info">
+          <b><svg class="ic"><use href="#i-folder"/></svg>Где хранятся данные</b>
+          <span>Вся библиотека, плейлисты, настройки и профиль лежат только на твоём ПК, в папке <code>%AppData%\playly</code>. Хочешь начать с чистого листа — просто удали её.</span>
+        </div>
+      </div>
+      <p class="cta-alt">Релизы и анонсы выходят в основном канале — <a href="https://t.me/aurums2347" target="_blank" rel="noreferrer">t.me/aurums2347</a></p>
+      <div class="cta-meta">
+        <span class="meta-chip"><svg class="ic"><use href="#i-monitor"/></svg>Windows 10 / 11</span>
+        <span class="meta-chip"><svg class="ic"><use href="#i-sparkles"/></svg>Бесплатно</span>
+        <span class="meta-chip"><svg class="ic"><use href="#i-github"/></svg>Открытый исходный код</span>
+        <span class="meta-chip"><svg class="ic"><use href="#i-box"/></svg>Портативная версия</span>
+      </div>
+    </div>
+  </section>
+</main>
+
+<!-- ===== ФУТЕР ===== -->
+<footer class="site-footer">
+  <div class="container footer-inner">
+    <div class="footer-brand">
+      <svg class="brand-logo" aria-hidden="true"><use href="#logo"/></svg>
+      <span>Playly · © 2026 Aurum2347 · сделано с любовью к музыке</span>
+    </div>
+    <nav class="footer-nav" aria-label="Навигация в футере">
+      <a href="#features">Возможности</a>
+      <a href="#screenshots">Скриншоты</a>
+      <a href="#roadmap">Планы</a>
+      <a href="#philosophy">Философия</a>
+      <a href="#download">Скачать</a>
+    </nav>
+    <div class="footer-social">
+      <a class="icon-btn" href="https://t.me/aurums2347" target="_blank" rel="noreferrer" title="Основной канал" aria-label="Основной телеграм-канал"><svg class="ic"><use href="#i-telegram"/></svg></a>
+      <a class="icon-btn" href="https://t.me/thermodynamicprogrammer" target="_blank" rel="noreferrer" title="Канал о программировании" aria-label="Телеграм-канал о программировании"><svg class="ic"><use href="#i-telegram"/></svg></a>
+      <a class="icon-btn" href="https://github.com/Aurum2347/playly" target="_blank" rel="noreferrer" title="GitHub" aria-label="GitHub"><svg class="ic"><use href="#i-github"/></svg></a>
+    </div>
+  </div>
+</footer>
+
+<!-- ===== ЛАЙТБОКС ===== -->
+<div class="lightbox" id="lightbox" role="dialog" aria-modal="true" aria-label="Просмотр изображения">
+  <button class="lb-close" id="lbClose" aria-label="Закрыть"><svg class="ic"><use href="#i-close"/></svg></button>
+  <img id="lbImg" src="" alt="">
+  <span class="lb-hint">Esc или клик по фону — закрыть</span>
+</div>
+
+<script>
+(function () {
+  'use strict';
+  var reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  /* ===== Запрет выделения: Ctrl+A и перетаскивание ===== */
+  document.addEventListener('keydown', function (e) {
+    if ((e.ctrlKey || e.metaKey) && (e.key === 'a' || e.key === 'A' || e.code === 'KeyA')) e.preventDefault();
+  });
+  document.addEventListener('dragstart', function (e) { e.preventDefault(); });
+
+  /* ===== Пылинки на фоне ===== */
+  var dust = document.getElementById('dust');
+  if (dust && !reduceMotion) {
+    for (var i = 0; i < 26; i++) {
+      var s = document.createElement('span');
+      var size = (Math.random() * 3 + 1).toFixed(1);
+      s.style.width = size + 'px'; s.style.height = size + 'px';
+      s.style.left = (Math.random() * 100) + '%';
+      s.style.top = (Math.random() * 100) + '%';
+      s.style.opacity = (Math.random() * 0.10 + 0.04).toFixed(2);
+      s.style.animationDuration = (Math.random() * 30 + 20) + 's';
+      s.style.animationDelay = '-' + (Math.random() * 40).toFixed(1) + 's';
+      dust.appendChild(s);
+    }
+  }
+
+  /* ===== Шапка при скролле ===== */
+  var header = document.getElementById('siteHeader');
+  var onScroll = function () { header.classList.toggle('scrolled', window.scrollY > 8); };
+  window.addEventListener('scroll', onScroll, { passive: true });
+  onScroll();
+
+  /* ===== Бургер ===== */
+  var burger = document.getElementById('burgerBtn');
+  var mmenu = document.getElementById('mobileMenu');
+  var closeMenu = function () { mmenu.classList.remove('open'); burger.classList.remove('open'); burger.setAttribute('aria-expanded', 'false'); };
+  burger.addEventListener('click', function () {
+    var open = mmenu.classList.toggle('open');
+    burger.classList.toggle('open', open);
+    burger.setAttribute('aria-expanded', open ? 'true' : 'false');
+  });
+  mmenu.querySelectorAll('a').forEach(function (a) { a.addEventListener('click', closeMenu); });
+  window.addEventListener('resize', function () { if (window.innerWidth > 960) closeMenu(); });
+  document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeMenu(); });
+
+  /* ===== Плавное колесо (только ПК) ===== */
+  var lbOpen = false;
+  var finePointer = window.matchMedia('(pointer: fine)').matches;
+  var target = window.scrollY, current = window.scrollY, running = false;
+  function maxScroll() { return document.documentElement.scrollHeight - window.innerHeight; }
+  function step() {
+    current += (target - current) * 0.12;
+    if (Math.abs(target - current) < 0.5) { current = target; window.scrollTo(0, current); running = false; return; }
+    window.scrollTo(0, current);
+    window.requestAnimationFrame(step);
+  }
+  function ensure() { if (!running) { running = true; window.requestAnimationFrame(step); } }
+  if (finePointer && !reduceMotion) {
+    window.addEventListener('wheel', function (e) {
+      if (e.ctrlKey) return;
+      e.preventDefault();
+      if (lbOpen) return;
+      target = Math.max(0, Math.min(maxScroll(), target + e.deltaY));
+      ensure();
+    }, { passive: false });
+    window.addEventListener('scroll', function () { if (!running) { target = current = window.scrollY; } }, { passive: true });
+  }
+  /* Якоря — тоже плавно */
+  document.querySelectorAll('a[href^="#"]').forEach(function (a) {
+    a.addEventListener('click', function (e) {
+      var id = a.getAttribute('href');
+      var el = id && id.length > 1 ? document.querySelector(id) : null;
+      if (!el) return;
+      e.preventDefault();
+      var y = Math.max(0, Math.min(maxScroll(), el.getBoundingClientRect().top + window.scrollY - 84));
+      if (finePointer && !reduceMotion) { target = y; ensure(); } else { window.scrollTo({ top: y, behavior: 'smooth' }); }
+      history.replaceState(null, '', id);
+    });
+  });
+
+  /* ===== Reveal ===== */
+  var revealEls = document.querySelectorAll('[data-reveal]');
+  if ('IntersectionObserver' in window && !reduceMotion) {
+    var io = new IntersectionObserver(function (entries) {
+      entries.forEach(function (en) { if (en.isIntersecting) { en.target.classList.add('in'); io.unobserve(en.target); } });
+    }, { threshold: 0.12, rootMargin: '0px 0px -40px 0px' });
+    revealEls.forEach(function (el) { io.observe(el); });
+  } else { revealEls.forEach(function (el) { el.classList.add('in'); }); }
+
+  /* ===== Лайтбокс ===== */
+  var lb = document.getElementById('lightbox');
+  var lbImg = document.getElementById('lbImg');
+  var lbClose = document.getElementById('lbClose');
+  function openLb(src, alt) { lbImg.src = src; lbImg.alt = alt || ''; lb.classList.add('open'); lbOpen = true; }
+  function closeLb() { lb.classList.remove('open'); lbOpen = false; }
+  document.querySelectorAll('[data-lightbox]').forEach(function (el) {
+    el.addEventListener('click', function () { openLb(el.getAttribute('data-lightbox'), el.querySelector('img') ? el.querySelector('img').alt : ''); });
+    el.addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openLb(el.getAttribute('data-lightbox'), ''); } });
+  });
+  var shotImg = document.getElementById('shotImg');
+  shotImg.addEventListener('click', function () { openLb(shotImg.src, shotImg.alt); });
+  lbClose.addEventListener('click', closeLb);
+  lb.addEventListener('click', function (e) { if (e.target === lb) closeLb(); });
+  document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && lbOpen) closeLb(); });
+
+  /* ===== Эквалайзер: живые пресеты ===== */
+  var EQ_PROFILES = {
+    flat:    [55,55,58,55,52,55,58,55,52,55,58,55,52,55,58,55],
+    rock:    [62,84,48,92,58,74,40,88,66,95,52,78,44,82,60,70],
+    pop:     [48,62,74,84,80,72,62,56,60,70,76,70,62,54,48,44],
+    bass:    [95,90,84,76,66,56,48,42,38,34,30,28,26,24,22,20],
+    classic: [60,50,65,55,70,60,75,65,80,70,75,65,70,60,65,55]
+  };
+  var eqBars = document.querySelectorAll('#eqVisual .eq-bar');
+  var eqTag = document.getElementById('eqTag');
+  document.querySelectorAll('#eqPresets .eq-preset').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      document.querySelectorAll('#eqPresets .eq-preset').forEach(function (b) { b.classList.toggle('active', b === btn); });
+      var key = btn.getAttribute('data-eq');
+      var prof = EQ_PROFILES[key] || EQ_PROFILES.flat;
+      eqBars.forEach(function (bar, i) { bar.style.setProperty('--h', prof[i % prof.length] + '%'); });
+      eqTag.textContent = 'preset: ' + key;
+    });
+  });
+
+  /* ===== Офлайн-демо ===== */
+  var offDemo = document.getElementById('offDemo');
+  var offBtn = document.getElementById('offBtn');
+  offBtn.addEventListener('click', function () {
+    var on = offDemo.classList.toggle('on');
+    offBtn.classList.toggle('active', on);
+    offBtn.textContent = on ? 'Интернет отключён ✓' : 'Отключить интернет';
+  });
+
+  /* ===== Библиотека: лайки и «прослушивание» ===== */
+  document.querySelectorAll('.mini-like').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      btn.classList.toggle('liked');
+      btn.classList.remove('pop'); void btn.offsetWidth; btn.classList.add('pop');
+    });
+  });
+  document.querySelectorAll('.mini-cover').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      var row = btn.closest('.mini-row');
+      row.classList.toggle('playing');
+    });
+  });
+
+  /* ===== Чипы: радио-поведение + пульс ===== */
+  document.querySelectorAll('.v-row').forEach(function (row) {
+    var radio = row.hasAttribute('data-radio');
+    row.querySelectorAll('button.v-chip').forEach(function (chip) {
+      chip.addEventListener('click', function () {
+        if (radio) {
+          row.querySelectorAll('button.v-chip').forEach(function (c) { c.classList.toggle('active', c === chip); });
+          if (row.id === 'speedRow') speedAuto = false;
+        } else {
+          chip.classList.remove('pulse'); void chip.offsetWidth; chip.classList.add('pulse');
+        }
+      });
+    });
+  });
+
+  /* ===== Скорость: авто-переключение, пока не тронули ===== */
+  var speedAuto = true;
+  var speedChips = document.querySelectorAll('#speedRow .v-chip');
+  if (speedChips.length && !reduceMotion) {
+    var idx = 2;
+    window.setInterval(function () {
+      if (!speedAuto) return;
+      speedChips[idx].classList.remove('active');
+      idx = (idx + 1) % speedChips.length;
+      speedChips[idx].classList.add('active');
+    }, 1800);
+  }
+
+  /* ===== Dropzone и sync: отклик на клик ===== */
+  var dz = document.getElementById('dropzone');
+  dz.addEventListener('click', function () { dz.classList.remove('boing'); void dz.offsetWidth; dz.classList.add('boing'); });
+  var syncBadge = document.getElementById('syncBadge');
+  syncBadge.addEventListener('click', function () {
+    syncBadge.classList.add('fast');
+    window.setTimeout(function () { syncBadge.classList.remove('fast'); }, 1200);
+  });
+
+  /* ===== Скриншоты: вкладки ===== */
+  var SHOTS = {
+    home:     { src: 'img/main.png',      alt: 'Playly — главный экран' },
+    tracks:   { src: 'img/alltracks.png', alt: 'Playly — все треки' },
+    liked:    { src: 'img/liked.png',     alt: 'Playly — понравившиеся' },
+    settings: { src: 'img/settings.png',  alt: 'Playly — настройки и эквалайзер' }
+  };
+  Object.keys(SHOTS).forEach(function (k) { var im = new Image(); im.src = SHOTS[k].src; });
+  var stage = document.getElementById('shotStage');
+  var tabs = document.querySelectorAll('.shot-tab');
+  tabs.forEach(function (tab) {
+    tab.addEventListener('click', function () {
+      var key = tab.getAttribute('data-shot');
+      if (!key || !SHOTS[key] || tab.classList.contains('active')) return;
+      tabs.forEach(function (t) { t.classList.toggle('active', t === tab); t.setAttribute('aria-selected', t === tab ? 'true' : 'false'); });
+      stage.classList.add('fading');
+      window.setTimeout(function () {
+        shotImg.src = SHOTS[key].src;
+        shotImg.alt = SHOTS[key].alt;
+        var done = function () { stage.classList.remove('fading'); shotImg.removeEventListener('load', done); };
+        shotImg.addEventListener('load', done);
+        window.setTimeout(function () { stage.classList.remove('fading'); }, 400);
+      }, reduceMotion ? 0 : 220);
+    });
+  });
+})();
+</script>
 </body>
 </html>
