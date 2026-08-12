@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Playly</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><path fill='%23f0f0f0' d='M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z'/></svg>" />
+    <script>
+      (function () {
+        var theme = 'dark'
+        try {
+          theme = localStorage.getItem('playly-theme-cache') || 'dark'
+        } catch (e) {}
+
+        var light = false
+        if (theme === 'light') {
+          light = true
+        } else if (theme === 'system') {
+          light = !!(window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches)
+        }
+
+        document.documentElement.dataset.theme = light ? 'light' : 'dark'
+        document.documentElement.style.backgroundColor = light ? '#f2f2f5' : '#0a0a0c'
+      })()
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

@@ -1,0 +1,21 @@
+
+.playlist-view .hero {
+  background: linear-gradient(135deg, var(--element-strong) 0%, var(--panel) 60%);
+}
+
+.playlist-view .hero-icon {
+  background: linear-gradient(135deg, var(--text-faint) 0%, var(--text-muted) 100%);
+  box-shadow: 0 10px 30px var(--shadow);
+}
+
+.playlist-view .hero-label { color: var(--text-muted); }
+.playlist-view .hero-icon svg { color: var(--text-faint); }
+
+.playlist-view .hero-cover-img {
+  width: 96px;
+  height: 96px;
+  border-radius: 16px;
+  object-fit: cover;
+  box-shadow: 0 10px 30px var(--shadow);
+  flex-shrink: 0;
+}
