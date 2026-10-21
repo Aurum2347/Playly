@@ -1,10 +1,11 @@
 import { useState, useRef, useEffect, useMemo } from 'react'
-import type { CSSProperties } from 'react'
 import { createPortal } from 'react-dom'
 import type { Track, Playlist } from '../../App'
 import TrackEditModal from './TrackEditModal'
 import type { TrackUpdates } from './TrackEditModal'
 import { useI18n } from '../../i18n'
+import TrackDetailsModal from './TrackDetailsModal'
+import { cx, inlineInput, inlineRow, parseDuration, useContextMenu } from './shared'
 import styles from './TracksView.module.css'
 
 type SortOption = 'name-az' | 'name-za' | 'dur-desc' | 'dur-asc' | 'date-new' | 'date-old'
@@ -20,57 +21,48 @@ interface TracksViewProps {
   onCreatePlaylist?: (name: string) => number | void
   onEditTrack?: (trackId: number, updates: TrackUpdates) => void
   onAddTracks?: () => void
+  onCopyTitle?: (trackId: number) => void
+  onCopyArtist?: (trackId: number) => void
+  onCopyPath?: (trackId: number) => void
+  onRevealInDir?: (trackId: number) => void
 }
-
-const cx = (...parts: Array<string | false | null | undefined>) => parts.filter(Boolean).join(' ')
 
 const PAGE_SIZE = 100
-
-const parseDuration = (dur: string) => {
-  const [m, s] = dur.split(':').map(Number)
-  return (m || 0) * 60 + (s || 0)
-}
-
-const inlineRow: CSSProperties = { display: 'flex', gap: 8, marginBottom: 16 }
-const inlineInput: CSSProperties = {
-  flex: 1, minWidth: 0, padding: '9px 12px',
-  background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)',
-  borderRadius: 10, color: '#f0f0f0', fontSize: 13, fontFamily: 'inherit', outline: 'none',
-}
 
 export default function TracksView({
   tracks, playlists, onSelectTrack, playingTrackId = null,
   onToggleLike, onDeleteTracks, onAddToPlaylist, onCreatePlaylist, onEditTrack, onAddTracks,
+  onCopyTitle, onCopyArtist, onCopyPath, onRevealInDir,
 }: TracksViewProps) {
   const { t } = useI18n()
-  const [likedOverrides, setLikedOverrides] = useState<Record<number, boolean>>({})
-  const [deletedIds, setDeletedIds] = useState<Set<number>>(new Set())
   const [selectionMode, setSelectionMode] = useState(false)
   const [selectedTrackIds, setSelectedTrackIds] = useState<Set<number>>(new Set())
   const [currentSort, setCurrentSort] = useState<SortOption>('date-new')
   const [isSortMenuOpen, setIsSortMenuOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [currentPage, setCurrentPage] = useState(1)
-  const [isContextMenuOpen, setIsContextMenuOpen] = useState(false)
-  const [contextMenuPos, setContextMenuPos] = useState({ x: 0, y: 0 })
-  const [contextTrackId, setContextTrackId] = useState<number | null>(null)
   const [isPlaylistModalOpen, setIsPlaylistModalOpen] = useState(false)
   const [selectedPlaylistId, setSelectedPlaylistId] = useState<number | null>(null)
   const [playlistTargetIds, setPlaylistTargetIds] = useState<number[]>([])
   const [newPlaylistName, setNewPlaylistName] = useState('')
+  const [playlistScrollPos, setPlaylistScrollPos] = useState<'top' | 'middle' | 'bottom'>('top')
+  const handlePlaylistScroll = (e: React.UIEvent<HTMLDivElement>) => {
+    const el = e.currentTarget
+    const atTop = el.scrollTop <= 0
+    const atBottom = el.scrollTop + el.clientHeight >= el.scrollHeight - 1
+    setPlaylistScrollPos(atTop ? 'top' : atBottom ? 'bottom' : 'middle')
+  }
   const [animatingLikeId, setAnimatingLikeId] = useState<number | null>(null)
   const [animatingCheckboxId, setAnimatingCheckboxId] = useState<number | null>(null)
   const [editingTrack, setEditingTrack] = useState<Track | null>(null)
+  const [detailsTrackId, setDetailsTrackId] = useState<number | null>(null)
   const [flashingTrackId, setFlashingTrackId] = useState<number | null>(null)
 
-  const contextMenuRef = useRef<HTMLDivElement>(null)
+  const contextMenu = useContextMenu<number>()
   const sortMenuRef = useRef<HTMLDivElement>(null)
 
-  const visibleTracks = tracks.filter((t) => !deletedIds.has(t.id))
-  const isLiked = (t: Track) => likedOverrides[t.id] ?? Boolean(t.liked)
-
   const sortedTracks = useMemo(() => {
-    const arr = [...visibleTracks]
+    const arr = [...tracks]
     switch (currentSort) {
       case 'name-az': arr.sort((a, b) => a.title.localeCompare(b.title)); break
       case 'name-za': arr.sort((a, b) => b.title.localeCompare(a.title)); break
@@ -80,7 +72,7 @@ export default function TracksView({
       case 'date-old': arr.sort((a, b) => (a.fileModifiedAt || 0) - (b.fileModifiedAt || 0)); break
     }
     return arr
-  }, [visibleTracks, currentSort])
+  }, [tracks, currentSort])
 
   const filteredTracks = useMemo(() => {
     const q = searchQuery.trim().toLowerCase()
@@ -88,11 +80,9 @@ export default function TracksView({
     return sortedTracks.filter((t) => t.title.toLowerCase().includes(q) || t.artist.toLowerCase().includes(q))
   }, [sortedTracks, searchQuery])
 
-  useEffect(() => { setCurrentPage(1) }, [searchQuery])
-
   const totalPages = Math.max(1, Math.ceil(filteredTracks.length / PAGE_SIZE))
+  /* Если треков стало меньше (удаление, поиск) — не уходим за последнюю страницу */
   const safePage = Math.min(currentPage, totalPages)
-  useEffect(() => { if (currentPage !== safePage) setCurrentPage(safePage) }, [safePage, currentPage])
 
   const pageTracks = useMemo(() => {
     const start = (safePage - 1) * PAGE_SIZE
@@ -100,25 +90,24 @@ export default function TracksView({
   }, [filteredTracks, safePage])
 
   const selectedCount = selectedTrackIds.size
+  const contextTrack = contextMenu.target !== null ? tracks.find((t) => t.id === contextMenu.target) ?? null : null
+  /* Берём актуальную версию трека из props, чтобы после редактирования/лайка детали не устаревали */
+  const detailsTrack = detailsTrackId !== null ? tracks.find((t) => t.id === detailsTrackId) ?? null : null
 
   const toggleLike = (trackId: number) => {
     const track = tracks.find((t) => t.id === trackId)
     if (!track) return
-    const next = !(likedOverrides[trackId] ?? Boolean(track.liked))
-    setLikedOverrides((prev) => ({ ...prev, [trackId]: next }))
     setAnimatingLikeId(trackId)
     window.setTimeout(() => setAnimatingLikeId((cur) => (cur === trackId ? null : cur)), 320)
-    onToggleLike?.(trackId, next)
+    onToggleLike?.(trackId, !track.liked)
   }
 
   const toggleSelection = (trackId: number) => {
-    setSelectedTrackIds((prev) => {
-      const next = new Set(prev)
-      if (next.has(trackId)) next.delete(trackId)
-      else next.add(trackId)
-      if (selectionMode && next.size === 0) setSelectionMode(false)
-      return next
-    })
+    const next = new Set(selectedTrackIds)
+    if (next.has(trackId)) next.delete(trackId)
+    else next.add(trackId)
+    setSelectedTrackIds(next)
+    if (next.size === 0) setSelectionMode(false)
     setAnimatingCheckboxId(trackId)
     window.setTimeout(() => setAnimatingCheckboxId((cur) => (cur === trackId ? null : cur)), 240)
   }
@@ -128,8 +117,10 @@ export default function TracksView({
 
   const deleteTracks = (ids: number[]) => {
     if (ids.length === 0) return
-    setDeletedIds((prev) => { const n = new Set(prev); ids.forEach((id) => n.add(id)); return n })
-    setSelectedTrackIds((prev) => { const n = new Set(prev); ids.forEach((id) => n.delete(id)); return n })
+    const idSet = new Set(ids)
+    const rest = new Set([...selectedTrackIds].filter((id) => !idSet.has(id)))
+    setSelectedTrackIds(rest)
+    if (rest.size === 0) setSelectionMode(false)
     onDeleteTracks?.(ids)
   }
 
@@ -141,13 +132,22 @@ export default function TracksView({
     }
   }
 
-  const openContextMenu = (e: React.MouseEvent, trackId: number) => {
-    e.preventDefault(); e.stopPropagation(); setIsSortMenuOpen(false)
-    setContextTrackId(trackId)
-    setContextMenuPos({ x: Math.min(e.clientX, window.innerWidth - 220), y: Math.min(e.clientY, window.innerHeight - 230) })
-    setIsContextMenuOpen(true)
+  const handleSearchChange = (value: string) => {
+    setSearchQuery(value)
+    setCurrentPage(1)
   }
-  const closeContextMenu = () => { setIsContextMenuOpen(false); setContextTrackId(null) }
+
+  const handleSortChange = (sort: SortOption) => {
+    setCurrentSort(sort)
+    setIsSortMenuOpen(false)
+    setCurrentPage(1)
+  }
+
+  const openContextMenu = (e: React.MouseEvent, trackId: number) => {
+    setIsSortMenuOpen(false)
+    contextMenu.open(e, trackId)
+  }
+  const closeContextMenu = contextMenu.close
 
   const handleEditSave = (trackId: number, updates: TrackUpdates) => {
     if (Object.keys(updates).length === 0) return
@@ -156,15 +156,29 @@ export default function TracksView({
     window.setTimeout(() => setFlashingTrackId((cur) => (cur === trackId ? null : cur)), 750)
   }
 
-  const handleContextAction = (action: 'select' | 'edit' | 'playlist' | 'delete') => {
-    const id = contextTrackId
+  const handleContextAction = (action: 'select' | 'edit' | 'playlist' | 'delete' | 'details' | 'like') => {
+    const id = contextMenu.target
     closeContextMenu()
     if (id === null) return
     switch (action) {
-      case 'select': enterSelectionMode(id); break
-      case 'edit': setEditingTrack(tracks.find((t) => t.id === id) ?? null); break
-      case 'playlist': openPlaylistModal([id]); break
-      case 'delete': if (window.confirm(t('views.tracks.confirmDeleteOne'))) deleteTracks([id]); break
+      case 'select':
+        enterSelectionMode(id)
+        break
+      case 'edit':
+        setEditingTrack(tracks.find((t) => t.id === id) ?? null)
+        break
+      case 'playlist':
+        openPlaylistModal([id])
+        break
+      case 'delete':
+        if (window.confirm(t('views.tracks.confirmDeleteOne'))) deleteTracks([id])
+        break
+      case 'details':
+        setDetailsTrackId(id)
+        break
+      case 'like':
+        toggleLike(id)
+        break
     }
   }
 
@@ -173,6 +187,7 @@ export default function TracksView({
     setPlaylistTargetIds(ids)
     setSelectedPlaylistId(null)
     setNewPlaylistName('')
+    setPlaylistScrollPos('top')
     setIsPlaylistModalOpen(true)
   }
   const closePlaylistModal = () => setIsPlaylistModalOpen(false)
@@ -192,6 +207,7 @@ export default function TracksView({
     if (selectionMode) exitSelectionMode()
   }
 
+  const { ref: contextMenuRef, isOpen: isContextMenuOpen } = contextMenu
   useEffect(() => {
     const onMouseDown = (e: MouseEvent) => {
       const target = e.target as Node
@@ -200,10 +216,10 @@ export default function TracksView({
     }
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key !== 'Escape') return
-      if (isPlaylistModalOpen) closePlaylistModal()
+      if (isPlaylistModalOpen) setIsPlaylistModalOpen(false)
       else if (isContextMenuOpen) closeContextMenu()
       else if (isSortMenuOpen) setIsSortMenuOpen(false)
-      else if (selectionMode) exitSelectionMode()
+      else if (selectionMode || selectedCount > 0) { setSelectionMode(false); setSelectedTrackIds(new Set()) }
     }
     document.addEventListener('mousedown', onMouseDown)
     document.addEventListener('keydown', onKeyDown)
@@ -211,7 +227,7 @@ export default function TracksView({
       document.removeEventListener('mousedown', onMouseDown)
       document.removeEventListener('keydown', onKeyDown)
     }
-  }, [isPlaylistModalOpen, isContextMenuOpen, isSortMenuOpen, selectionMode])
+  }, [isPlaylistModalOpen, isContextMenuOpen, isSortMenuOpen, selectionMode, selectedCount, closeContextMenu, contextMenuRef])
 
   const paginationItems = useMemo(() => {
     const items: Array<number | 'ellipsis'> = []
@@ -263,41 +279,43 @@ export default function TracksView({
               {t('views.tracks.sort')}
             </button>
             <div className={cx(styles.dropdownMenu, isSortMenuOpen && styles.open)}>
-              <button className={cx(styles.dropdownItem, currentSort === 'name-az' && styles.active)} onClick={() => { setCurrentSort('name-az'); setIsSortMenuOpen(false); setCurrentPage(1) }}>
+              <button className={cx(styles.dropdownItem, currentSort === 'name-az' && styles.active)} onClick={() => handleSortChange('name-az')}>
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 6h13M3 12h9M3 18h5" /></svg>
                 {t('sort.nameAz')}
               </button>
-              <button className={cx(styles.dropdownItem, currentSort === 'name-za' && styles.active)} onClick={() => { setCurrentSort('name-za'); setIsSortMenuOpen(false); setCurrentPage(1) }}>
+              <button className={cx(styles.dropdownItem, currentSort === 'name-za' && styles.active)} onClick={() => handleSortChange('name-za')}>
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 6H8M21 12h-9M21 18h-5" /></svg>
                 {t('sort.nameZa')}
               </button>
               <div className={styles.dropdownDivider} />
-              <button className={cx(styles.dropdownItem, currentSort === 'dur-desc' && styles.active)} onClick={() => { setCurrentSort('dur-desc'); setIsSortMenuOpen(false); setCurrentPage(1) }}>
+              <button className={cx(styles.dropdownItem, currentSort === 'dur-desc' && styles.active)} onClick={() => handleSortChange('dur-desc')}>
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" /></svg>
                 {t('sort.durDesc')}
               </button>
-              <button className={cx(styles.dropdownItem, currentSort === 'dur-asc' && styles.active)} onClick={() => { setCurrentSort('dur-asc'); setIsSortMenuOpen(false); setCurrentPage(1) }}>
+              <button className={cx(styles.dropdownItem, currentSort === 'dur-asc' && styles.active)} onClick={() => handleSortChange('dur-asc')}>
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" /></svg>
                 {t('sort.durAsc')}
               </button>
               <div className={styles.dropdownDivider} />
-              <button className={cx(styles.dropdownItem, currentSort === 'date-new' && styles.active)} onClick={() => { setCurrentSort('date-new'); setIsSortMenuOpen(false); setCurrentPage(1) }}>
+              <button className={cx(styles.dropdownItem, currentSort === 'date-new' && styles.active)} onClick={() => handleSortChange('date-new')}>
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="4" width="18" height="18" rx="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" /></svg>
                 {t('sort.dateNew')}
               </button>
-              <button className={cx(styles.dropdownItem, currentSort === 'date-old' && styles.active)} onClick={() => { setCurrentSort('date-old'); setIsSortMenuOpen(false); setCurrentPage(1) }}>
+              <button className={cx(styles.dropdownItem, currentSort === 'date-old' && styles.active)} onClick={() => handleSortChange('date-old')}>
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="4" width="18" height="18" rx="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" /></svg>
                 {t('sort.dateOld')}
               </button>
             </div>
           </div>
 
-          <button className={cx(styles.btn, styles.btnPrimary)} onClick={() => { if (onAddTracks) onAddTracks(); else alert('Открытие диалога добавления трека...') }}>
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
-              <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
-            </svg>
-            {t('views.tracks.addTrack')}
-          </button>
+          {onAddTracks && (
+            <button className={cx(styles.btn, styles.btnPrimary)} onClick={onAddTracks}>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+                <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
+              </svg>
+              {t('views.tracks.addTrack')}
+            </button>
+          )}
         </div>
       </div>
 
@@ -310,12 +328,12 @@ export default function TracksView({
           type="text"
           placeholder={t('views.tracks.searchPlaceholder')}
           value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
+          onChange={(e) => handleSearchChange(e.target.value)}
         />
         {searchQuery && (
           <>
             <span key={filteredTracks.length} className={styles.searchCount}>{filteredTracks.length}</span>
-            <button className={styles.searchClear} onClick={() => setSearchQuery('')} title={t('common.clear')}>
+            <button className={styles.searchClear} onClick={() => handleSearchChange('')} title={t('common.clear')}>
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
                 <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
               </svg>
@@ -368,8 +386,8 @@ export default function TracksView({
                   {speed !== 1 && <span className={styles.speedBadge}>{String(Math.round(speed * 100) / 100)}×</span>}
                   {track.duration}
                 </span>
-                <button className={cx(styles.trLikeBtn, isLiked(track) && styles.liked, animatingLikeId === track.id && styles.pop)} onClick={(e) => { e.stopPropagation(); toggleLike(track.id) }} title={isLiked(track) ? t('views.tracks.likeRemove') : t('views.tracks.likeAdd')}>
-                  {isLiked(track) ? (
+                <button className={cx(styles.trLikeBtn, track.liked && styles.liked, animatingLikeId === track.id && styles.pop)} onClick={(e) => { e.stopPropagation(); toggleLike(track.id) }} title={track.liked ? t('views.tracks.likeRemove') : t('views.tracks.likeAdd')}>
+                  {track.liked ? (
                     <svg viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round"><path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z" /></svg>
                   ) : (
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z" /></svg>
@@ -386,7 +404,7 @@ export default function TracksView({
 
       {totalPages > 1 && (
         <div className={styles.pagination}>
-          <button className={styles.pageBtn} disabled={safePage === 1} onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}>
+          <button className={styles.pageBtn} disabled={safePage === 1} onClick={() => setCurrentPage(Math.max(1, safePage - 1))}>
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6" /></svg>
           </button>
           {paginationItems.map((item, i) =>
@@ -396,7 +414,7 @@ export default function TracksView({
               <button key={item} className={cx(styles.pageBtn, safePage === item && styles.pageBtnActive)} onClick={() => setCurrentPage(item)}>{item}</button>
             )
           )}
-          <button className={styles.pageBtn} disabled={safePage === totalPages} onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}>
+          <button className={styles.pageBtn} disabled={safePage === totalPages} onClick={() => setCurrentPage(Math.min(totalPages, safePage + 1))}>
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6" /></svg>
           </button>
           <div className={styles.pageInfo}>
@@ -407,8 +425,12 @@ export default function TracksView({
         </div>
       )}
 
-      {isContextMenuOpen && createPortal(
-        <div ref={contextMenuRef} className={cx(styles.contextMenu, styles.open)} style={{ left: contextMenuPos.x, top: contextMenuPos.y }}>
+      {createPortal(
+        <div 
+          ref={contextMenuRef} 
+          className={cx(styles.contextMenu, isContextMenuOpen && styles.open, contextMenu.isMeasuring && styles.measuring)}
+          style={{ left: contextMenu.pos.x, top: contextMenu.pos.y }}
+        >
           <button className={styles.contextItem} onClick={() => handleContextAction('select')}>
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><polyline points="9 11 12 14 22 4" /><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11" /></svg>
             {t('views.tracks.ctxSelect')}
@@ -422,6 +444,20 @@ export default function TracksView({
             {t('views.tracks.addToPlaylist')}
           </button>
           <div className={styles.dropdownDivider} />
+          <button className={styles.contextItem} onClick={() => handleContextAction('details')}>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><circle cx="12" cy="12" r="10" /><line x1="12" y1="16" x2="12" y2="12" /><line x1="12" y1="8" x2="12.01" y2="8" /></svg>
+            {t('common.details')}
+          </button>
+          <div className={styles.dropdownDivider} />
+          <button className={styles.contextItem} onClick={() => handleContextAction('like')}>
+            {contextTrack?.liked ? (
+              <svg viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round"><path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z" /></svg>
+            ) : (
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z" /></svg>
+            )}
+            {contextTrack?.liked ? t('views.tracks.likeRemove') : t('views.tracks.likeAdd')}
+          </button>
+          <div className={styles.dropdownDivider} />
           <button className={cx(styles.contextItem, styles.danger)} onClick={() => handleContextAction('delete')}>
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><polyline points="3 6 5 6 21 6" /><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2" /><line x1="10" y1="11" x2="10" y2="17" /><line x1="14" y1="11" x2="14" y2="17" /></svg>
             {t('common.delete')}
@@ -430,12 +466,14 @@ export default function TracksView({
         document.body
       )}
 
-      {isPlaylistModalOpen && createPortal(
-        <div className={cx(styles.modalOverlay, styles.open)} onClick={(e) => e.target === e.currentTarget && closePlaylistModal()}>
-          <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
-            <div className={styles.modalTitle}>{t('views.tracks.playlistModalTitle')}</div>
-            <div className={styles.modalSubtitle}>{t('views.tracks.playlistModalSubtitle')}</div>
-            <div className={styles.playlistList}>
+    {isPlaylistModalOpen && createPortal(
+      <div className={cx(styles.modalOverlay, styles.open)} onClick={(e) => e.target === e.currentTarget && closePlaylistModal()}>
+        <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
+          <div className={styles.modalTitle}>{t('views.tracks.playlistModalTitle')}</div>
+          <div className={styles.modalSubtitle}>{t('views.tracks.playlistModalSubtitle')}</div>
+          <div className={`${styles.playlistListWrapper} ${playlistScrollPos === 'top' ? styles.scrolledTop : ''} ${playlistScrollPos === 'bottom' ? styles.scrolledBottom : ''}`}>
+            <div className={styles.playlistListFadeTop} />
+            <div className={styles.playlistList} style={{ position: 'relative' }} onScroll={handlePlaylistScroll}>
               {playlists.length === 0 ? (
                 <div className={styles['empty-state']}>{t('views.tracks.noPlaylists')}</div>
               ) : (
@@ -452,34 +490,45 @@ export default function TracksView({
                 ))
               )}
             </div>
-            {onCreatePlaylist && (
-              <div style={inlineRow}>
-                <input
-                  style={inlineInput}
-                  placeholder={t('views.tracks.newPlaylist')}
-                  value={newPlaylistName}
-                  onChange={(e) => setNewPlaylistName(e.target.value)}
-                  onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); createAndSelect() } }}
-                />
-                <button className={styles.btn} onClick={createAndSelect} disabled={!newPlaylistName.trim()}>{t('common.create')}</button>
-              </div>
-            )}
-            <div className={styles.modalActions}>
-              <button className={styles.btn} onClick={closePlaylistModal}>{t('common.cancel')}</button>
-              <button
-                className={cx(styles.btn, styles.btnPrimary)}
-                onClick={handlePlaylistConfirm}
-                disabled={playlists.length === 0 || selectedPlaylistId === null}
-              >
-                {t('common.add')}
-              </button>
-            </div>
+            <div className={styles.playlistListFadeBottom} />
           </div>
-        </div>,
-        document.body
-      )}
+          {onCreatePlaylist && (
+            <div style={inlineRow}>
+              <input
+                style={inlineInput}
+                placeholder={t('views.tracks.newPlaylist')}
+                value={newPlaylistName}
+                onChange={(e) => setNewPlaylistName(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); createAndSelect() } }}
+              />
+              <button className={styles.btn} onClick={createAndSelect} disabled={!newPlaylistName.trim()}>{t('common.create')}</button>
+            </div>
+          )}
+          <div className={styles.modalActions}>
+            <button className={styles.btn} onClick={closePlaylistModal}>{t('common.cancel')}</button>
+            <button
+              className={cx(styles.btn, styles.btnPrimary)}
+              onClick={handlePlaylistConfirm}
+              disabled={playlists.length === 0 || selectedPlaylistId === null}
+            >
+              {t('common.add')}
+            </button>
+          </div>
+        </div>
+      </div>,
+      document.body
+    )}
 
       <TrackEditModal track={editingTrack} onClose={() => setEditingTrack(null)} onSave={handleEditSave} />
+      
+      <TrackDetailsModal 
+        track={detailsTrack} 
+        onClose={() => setDetailsTrackId(null)}
+        onCopyTitle={onCopyTitle}
+        onCopyArtist={onCopyArtist}
+        onCopyPath={onCopyPath}
+        onRevealInDir={onRevealInDir}
+      />
     </div>
   )
 }

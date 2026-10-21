@@ -1,10 +1,11 @@
 import { useState, useRef, useEffect, useMemo } from 'react'
-import type { CSSProperties } from 'react'
 import { createPortal } from 'react-dom'
 import type { Track, Playlist } from '../../App'
 import TrackEditModal from './TrackEditModal'
+import TrackDetailsModal from './TrackDetailsModal'
 import type { TrackUpdates } from './TrackEditModal'
 import { useI18n } from '../../i18n'
+import { cx, inlineButton, inlineInput, inlineRow, parseDuration, shuffled, useContextMenu } from './shared'
 import './LikedView.css'
 
 interface LikedViewProps {
@@ -17,48 +18,50 @@ interface LikedViewProps {
   onAddToPlaylist?: (trackIds: number[], playlistId: number) => void
   onCreatePlaylist?: (name: string) => number | void
   onEditTrack?: (trackId: number, updates: TrackUpdates) => void
+  onCopyTitle?: (trackId: number) => void
+  onCopyArtist?: (trackId: number) => void
+  onCopyPath?: (trackId: number) => void
+  onRevealInDir?: (trackId: number) => void
 }
 
-const cx = (...parts: Array<string | false | null | undefined>) => parts.filter(Boolean).join(' ')
-
-const inlineRow: CSSProperties = { display: 'flex', gap: 8, marginBottom: 16 }
-const inlineInput: CSSProperties = {
-  flex: 1, minWidth: 0, padding: '9px 12px',
-  background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)',
-  borderRadius: 10, color: '#f0f0f0', fontSize: 13, fontFamily: 'inherit', outline: 'none',
-}
+type SortOption = 'name-az' | 'name-za' | 'dur-desc' | 'dur-asc' | 'date-new' | 'date-old'
 
 export default function LikedView({
   tracks, playlists, onSelectTrack, playingTrackId = null,
   onToggleLike, onDeleteTracks, onAddToPlaylist, onCreatePlaylist, onEditTrack,
+  onCopyTitle, onCopyArtist, onCopyPath, onRevealInDir,
 }: LikedViewProps) {
   const { t, lang } = useI18n()
 
-  const [deletedIds, setDeletedIds] = useState<Set<number>>(new Set())
   const [removingIds, setRemovingIds] = useState<Set<number>>(new Set())
   const [selectedTrackIds, setSelectedTrackIds] = useState<Set<number>>(new Set())
   const [selectionMode, setSelectionMode] = useState(false)
-  const [currentSort, setCurrentSort] = useState('date-new')
-  const [shuffleActive, setShuffleActive] = useState(false)
+  const [currentSort, setCurrentSort] = useState<SortOption>('date-new')
+  /* Порядок id при перемешивании. Фиксируется в момент нажатия кнопки, а не пересчитывается на каждом рендере */
+  const [shuffleOrder, setShuffleOrder] = useState<number[] | null>(null)
+  const shuffleActive = shuffleOrder !== null
   const [isSortMenuOpen, setIsSortMenuOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
-  const [contextMenu, setContextMenu] = useState<{ x: number; y: number; trackId: number | null }>({ x: 0, y: 0, trackId: null })
-  const [isContextMenuOpen, setIsContextMenuOpen] = useState(false)
   const [isPlaylistModalOpen, setIsPlaylistModalOpen] = useState(false)
   const [selectedPlaylistId, setSelectedPlaylistId] = useState<number | null>(null)
   const [playlistTargetIds, setPlaylistTargetIds] = useState<number[]>([])
   const [newPlaylistName, setNewPlaylistName] = useState('')
+  const [playlistScrollPos, setPlaylistScrollPos] = useState<'top' | 'middle' | 'bottom'>('top')
+
+  const handlePlaylistScroll = (e: React.UIEvent<HTMLDivElement>) => {
+    const el = e.currentTarget
+    const atTop = el.scrollTop <= 0
+    const atBottom = el.scrollTop + el.clientHeight >= el.scrollHeight - 1
+    setPlaylistScrollPos(atTop ? 'top' : atBottom ? 'bottom' : 'middle')
+  }
+
   const [animatingLikeId, setAnimatingLikeId] = useState<number | null>(null)
   const [editingTrack, setEditingTrack] = useState<Track | null>(null)
+  const [detailsTrackId, setDetailsTrackId] = useState<number | null>(null)
   const [flashingTrackId, setFlashingTrackId] = useState<number | null>(null)
 
   const sortMenuRef = useRef<HTMLDivElement>(null)
-  const contextMenuRef = useRef<HTMLDivElement>(null)
-
-  const parseDuration = (dur: string) => {
-    const parts = dur.split(':')
-    return parseInt(parts[0]) * 60 + parseInt(parts[1])
-  }
+  const contextMenu = useContextMenu<number>()
 
   const formatTotalDuration = (seconds: number) => {
     const h = Math.floor(seconds / 3600)
@@ -78,22 +81,20 @@ export default function LikedView({
     return d.toLocaleDateString(lang === 'ru' ? 'ru-RU' : 'en-US', { day: 'numeric', month: 'short' })
   }
 
-  const likedTracks = tracks.filter((t) => !deletedIds.has(t.id))
-  const totalSec = likedTracks.reduce((sum, t) => sum + parseDuration(t.duration), 0)
-  const latest = likedTracks.length
-    ? likedTracks.reduce((max, t) => ((t.likedAt || 0) > (max.likedAt || 0) ? t : max))
-    : null
+  const likedTracks = tracks
+  const totalSec = useMemo(() => likedTracks.reduce((sum, t) => sum + parseDuration(t.duration), 0), [likedTracks])
+  const latest = useMemo(
+    () => (likedTracks.length ? likedTracks.reduce((max, t) => ((t.likedAt || 0) > (max.likedAt || 0) ? t : max)) : null),
+    [likedTracks]
+  )
 
- 
   const sortedTracks = useMemo(() => {
-    const arr = [...likedTracks]
-    if (shuffleActive) {
-      for (let i = arr.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1))
-        ;[arr[i], arr[j]] = [arr[j], arr[i]]
-      }
-      return arr
+    if (shuffleOrder) {
+      const rank = new Map(shuffleOrder.map((id, i) => [id, i]))
+      /* Треки, лайкнутые уже после перемешивания, идут в конец */
+      return [...likedTracks].sort((a, b) => (rank.get(a.id) ?? Infinity) - (rank.get(b.id) ?? Infinity))
     }
+    const arr = [...likedTracks]
     switch (currentSort) {
       case 'name-az': arr.sort((a, b) => a.title.localeCompare(b.title)); break
       case 'name-za': arr.sort((a, b) => b.title.localeCompare(a.title)); break
@@ -103,13 +104,15 @@ export default function LikedView({
       case 'date-old': arr.sort((a, b) => (a.likedAt || 0) - (b.likedAt || 0)); break
     }
     return arr
-    
-  }, [likedTracks, shuffleActive, currentSort])
+  }, [likedTracks, shuffleOrder, currentSort])
 
   const q = searchQuery.trim().toLowerCase()
-  const filteredTracks = q
-    ? sortedTracks.filter((t) => t.title.toLowerCase().includes(q) || t.artist.toLowerCase().includes(q))
-    : sortedTracks
+  const filteredTracks = useMemo(
+    () => (q ? sortedTracks.filter((t) => t.title.toLowerCase().includes(q) || t.artist.toLowerCase().includes(q)) : sortedTracks),
+    [sortedTracks, q]
+  )
+
+  const detailsTrack = detailsTrackId !== null ? tracks.find((t) => t.id === detailsTrackId) ?? null : null
 
   const applyLike = (trackId: number, next: boolean) => {
     setAnimatingLikeId(trackId)
@@ -127,13 +130,11 @@ export default function LikedView({
   }
 
   const toggleSelection = (trackId: number) => {
-    setSelectedTrackIds((prev) => {
-      const next = new Set(prev)
-      if (next.has(trackId)) next.delete(trackId)
-      else next.add(trackId)
-      if (selectionMode && next.size === 0) setSelectionMode(false)
-      return next
-    })
+    const next = new Set(selectedTrackIds)
+    if (next.has(trackId)) next.delete(trackId)
+    else next.add(trackId)
+    setSelectedTrackIds(next)
+    if (next.size === 0) setSelectionMode(false)
   }
 
   const enterSelectionMode = (trackId: number) => { setSelectionMode(true); setSelectedTrackIds(new Set([trackId])) }
@@ -147,22 +148,34 @@ export default function LikedView({
 
   const deleteTracks = (ids: number[]) => {
     if (ids.length === 0) return
-    setDeletedIds((prev) => { const n = new Set(prev); ids.forEach((id) => n.add(id)); return n })
+    const idSet = new Set(ids)
+    const rest = new Set([...selectedTrackIds].filter((id) => !idSet.has(id)))
+    setSelectedTrackIds(rest)
+    if (rest.size === 0) setSelectionMode(false)
     onDeleteTracks?.(ids)
   }
 
-  const handleSort = (sort: string) => { setCurrentSort(sort); setShuffleActive(false); setIsSortMenuOpen(false) }
-  const handleShuffle = () => { setShuffleActive(!shuffleActive); setCurrentSort(!shuffleActive ? 'shuffle' : 'date-new') }
+  const handleSort = (sort: SortOption) => { setCurrentSort(sort); setShuffleOrder(null); setIsSortMenuOpen(false) }
+  const handleShuffle = () => {
+    if (shuffleActive) {
+      setShuffleOrder(null)
+      setCurrentSort('date-new')
+    } else {
+      setShuffleOrder(shuffled(likedTracks.map((t) => t.id)))
+    }
+  }
 
   const openContextMenu = (e: React.MouseEvent, trackId: number) => {
-    e.preventDefault()
-    e.stopPropagation()
-    const x = Math.min(e.clientX, window.innerWidth - 220)
-    const y = Math.min(e.clientY, window.innerHeight - 240)
-    setContextMenu({ x, y, trackId })
-    setIsContextMenuOpen(true)
+    setIsSortMenuOpen(false)
+    contextMenu.open(e, trackId)
   }
-  const closeContextMenu = () => { setIsContextMenuOpen(false); setContextMenu({ x: 0, y: 0, trackId: null }) }
+  const closeContextMenu = contextMenu.close
+
+  const runContextAction = (action: (id: number) => void) => {
+    const id = contextMenu.target
+    closeContextMenu()
+    if (id !== null) action(id)
+  }
 
   const handleEditSave = (trackId: number, updates: TrackUpdates) => {
     if (Object.keys(updates).length === 0) return
@@ -176,6 +189,7 @@ export default function LikedView({
     setPlaylistTargetIds(ids)
     setSelectedPlaylistId(null)
     setNewPlaylistName('')
+    setPlaylistScrollPos('top')
     setIsPlaylistModalOpen(true)
   }
   const closePlaylistModal = () => setIsPlaylistModalOpen(false)
@@ -195,6 +209,8 @@ export default function LikedView({
     if (selectionMode) exitSelectionMode()
   }
 
+  const { ref: contextMenuRef, isOpen: isContextMenuOpen } = contextMenu
+  const selectedCount = selectedTrackIds.size
   useEffect(() => {
     const onMouseDown = (e: MouseEvent) => {
       const target = e.target as Node
@@ -203,10 +219,10 @@ export default function LikedView({
     }
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key !== 'Escape') return
-      if (isPlaylistModalOpen) closePlaylistModal()
+      if (isPlaylistModalOpen) setIsPlaylistModalOpen(false)
       else if (isContextMenuOpen) closeContextMenu()
       else if (isSortMenuOpen) setIsSortMenuOpen(false)
-      else if (selectionMode) exitSelectionMode()
+      else if (selectionMode || selectedCount > 0) { setSelectionMode(false); setSelectedTrackIds(new Set()) }
     }
     document.addEventListener('mousedown', onMouseDown)
     document.addEventListener('keydown', onKeyDown)
@@ -214,7 +230,7 @@ export default function LikedView({
       document.removeEventListener('mousedown', onMouseDown)
       document.removeEventListener('keydown', onKeyDown)
     }
-  }, [isPlaylistModalOpen, isContextMenuOpen, isSortMenuOpen, selectionMode])
+  }, [isPlaylistModalOpen, isContextMenuOpen, isSortMenuOpen, selectionMode, selectedCount, closeContextMenu, contextMenuRef])
 
   const heartFilledSVG = (
     <svg viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round">
@@ -273,8 +289,7 @@ export default function LikedView({
 
       <div className="view-header">
         <div className="header-actions">
-          {selectedTrackIds.size > 0 && (
-            <div className="selection-actions visible">
+            <div className={`selection-actions ${selectedTrackIds.size > 0 ? 'visible' : ''}`}>
               <button className="btn btn-danger" onClick={handleUnlikeSelected}>
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z" />
@@ -288,7 +303,6 @@ export default function LikedView({
                 {t('views.liked.toPlaylist')}
               </button>
             </div>
-          )}
           <div className="dropdown" ref={sortMenuRef}>
             <button className="btn" onClick={() => setIsSortMenuOpen(!isSortMenuOpen)}>
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
@@ -302,25 +316,25 @@ export default function LikedView({
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="4" width="18" height="18" rx="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" /></svg>
                   {t('sort.addedNew')}
                 </button>
-                <button className={`dropdown-item ${currentSort === 'date-old' ? 'active' : ''}`} onClick={() => handleSort('date-old')}>
+                <button className={`dropdown-item ${!shuffleActive && currentSort === 'date-old' ? 'active' : ''}`} onClick={() => handleSort('date-old')}>
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="4" width="18" height="18" rx="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" /></svg>
                   {t('sort.addedOld')}
                 </button>
                 <div className="dropdown-divider"></div>
-                <button className={`dropdown-item ${currentSort === 'name-az' ? 'active' : ''}`} onClick={() => handleSort('name-az')}>
+                <button className={`dropdown-item ${!shuffleActive && currentSort === 'name-az' ? 'active' : ''}`} onClick={() => handleSort('name-az')}>
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 6h13M3 12h9M3 18h5" /></svg>
                   {t('sort.nameAz')}
                 </button>
-                <button className={`dropdown-item ${currentSort === 'name-za' ? 'active' : ''}`} onClick={() => handleSort('name-za')}>
+                <button className={`dropdown-item ${!shuffleActive && currentSort === 'name-za' ? 'active' : ''}`} onClick={() => handleSort('name-za')}>
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 6H8M21 12h-9M21 18h-5" /></svg>
                   {t('sort.nameZa')}
                 </button>
                 <div className="dropdown-divider"></div>
-                <button className={`dropdown-item ${currentSort === 'dur-desc' ? 'active' : ''}`} onClick={() => handleSort('dur-desc')}>
+                <button className={`dropdown-item ${!shuffleActive && currentSort === 'dur-desc' ? 'active' : ''}`} onClick={() => handleSort('dur-desc')}>
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" /></svg>
                   {t('sort.durDesc')}
                 </button>
-                <button className={`dropdown-item ${currentSort === 'dur-asc' ? 'active' : ''}`} onClick={() => handleSort('dur-asc')}>
+                <button className={`dropdown-item ${!shuffleActive && currentSort === 'dur-asc' ? 'active' : ''}`} onClick={() => handleSort('dur-asc')}>
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" /></svg>
                   {t('sort.durAsc')}
                 </button>
@@ -411,28 +425,42 @@ export default function LikedView({
           })
         )}
       </div>
-
-      {isContextMenuOpen && createPortal(
-        <div ref={contextMenuRef} className="context-menu open" style={{ left: contextMenu.x, top: contextMenu.y }}>
-          <button className="context-item" onClick={() => { enterSelectionMode(contextMenu.trackId!); closeContextMenu() }}>
+      
+      {createPortal(
+        <div 
+          ref={contextMenuRef} 
+          className={cx('context-menu', isContextMenuOpen && 'open', contextMenu.isMeasuring && 'measuring')} 
+          style={{ left: contextMenu.pos.x, top: contextMenu.pos.y }}
+        >
+          <button className="context-item" onClick={() => runContextAction(enterSelectionMode)}>
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><polyline points="9 11 12 14 22 4" /><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11" /></svg>
             {t('views.liked.ctxSelect')}
           </button>
-          <button className="context-item" onClick={() => { const id = contextMenu.trackId; closeContextMenu(); if (id !== null) setEditingTrack(tracks.find((t) => t.id === id) ?? null) }}>
+          <button className="context-item" onClick={() => runContextAction((id) => setEditingTrack(tracks.find((t) => t.id === id) ?? null))}>
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9" /><path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z" /></svg>
             {t('common.edit')}
           </button>
-          <button className="context-item" onClick={() => { openPlaylistModal([contextMenu.trackId!]); closeContextMenu() }}>
+          <button className="context-item" onClick={() => runContextAction((id) => openPlaylistModal([id]))}>
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z" /></svg>
             {t('views.tracks.addToPlaylist')}
           </button>
           <div className="dropdown-divider"></div>
-          <button className="context-item" onClick={() => { unlikeAnimated(contextMenu.trackId!); closeContextMenu() }}>
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z" /></svg>
+          
+          {/* ЕДИНСТВЕННАЯ КНОПКА "ПОДРОБНЕЕ" */}
+          <button className="context-item" onClick={() => runContextAction(setDetailsTrackId)}>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><circle cx="12" cy="12" r="10" /><line x1="12" y1="16" x2="12" y2="12" /><line x1="12" y1="8" x2="12.01" y2="8" /></svg>
+            {t('common.details')}
+          </button>
+          
+          <div className="dropdown-divider"></div>
+          <button className="context-item" onClick={() => runContextAction(unlikeAnimated)}>
+            <svg viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" style={{ color: 'var(--danger)' }}>
+              <path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z" />
+            </svg>
             {t('views.liked.ctxUnlike')}
           </button>
           <div className="dropdown-divider"></div>
-          <button className="context-item danger" onClick={() => { if (window.confirm(t('views.tracks.confirmDeleteOne'))) deleteTracks([contextMenu.trackId!]); closeContextMenu() }}>
+          <button className="context-item danger" onClick={() => runContextAction((id) => { if (window.confirm(t('views.tracks.confirmDeleteOne'))) deleteTracks([id]) })}>
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><polyline points="3 6 5 6 21 6" /><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2" /><line x1="10" y1="11" x2="10" y2="17" /><line x1="14" y1="11" x2="14" y2="17" /></svg>
             {t('common.delete')}
           </button>
@@ -445,20 +473,24 @@ export default function LikedView({
           <div className="modal" onClick={(e) => e.stopPropagation()}>
             <div className="modal-title">{t('views.tracks.playlistModalTitle')}</div>
             <div className="modal-subtitle">{t('views.tracks.playlistModalSubtitle')}</div>
-            <div className="playlist-list">
-              {playlists.length === 0 ? (
-                <div className="empty-state">{t('views.tracks.noPlaylists')}</div>
-              ) : (
-                playlists.map((pl) => (
-                  <div key={pl.id} className={`playlist-item ${selectedPlaylistId === pl.id ? 'selected' : ''}`} onClick={() => setSelectedPlaylistId(pl.id)}>
-                    <div className="playlist-cover">{pl.cover ? <img src={pl.cover} alt="" /> : musicIconSVG}</div>
-                    <div className="playlist-info">
-                      <div className="playlist-name">{pl.name}</div>
-                      <div className="playlist-count">{t('views.tracks.totalTracks', { n: pl.trackIds.length })}</div>
+            <div className={`playlist-list-wrapper ${playlistScrollPos === 'top' ? 'scrolled-top' : ''} ${playlistScrollPos === 'bottom' ? 'scrolled-bottom' : ''}`}>
+              <div className="playlist-list-fade-top" />
+              <div className="playlist-list" style={{ position: 'relative' }} onScroll={handlePlaylistScroll}>
+                {playlists.length === 0 ? (
+                  <div className="empty-state">{t('views.tracks.noPlaylists')}</div>
+                ) : (
+                  playlists.map((pl) => (
+                    <div key={pl.id} className={`playlist-item ${selectedPlaylistId === pl.id ? 'selected' : ''}`} onClick={() => setSelectedPlaylistId(pl.id)}>
+                      <div className="playlist-cover">{pl.cover ? <img src={pl.cover} alt="" /> : musicIconSVG}</div>
+                      <div className="playlist-info">
+                        <div className="playlist-name">{pl.name}</div>
+                        <div className="playlist-count">{t('views.tracks.totalTracks', { n: pl.trackIds.length })}</div>
+                      </div>
                     </div>
-                  </div>
-                ))
-              )}
+                  ))
+                )}
+              </div>
+              <div className="playlist-list-fade-bottom" />
             </div>
             {onCreatePlaylist && (
               <div style={inlineRow}>
@@ -469,7 +501,13 @@ export default function LikedView({
                   onChange={(e) => setNewPlaylistName(e.target.value)}
                   onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); createAndSelect() } }}
                 />
-                <button className="btn" onClick={createAndSelect} disabled={!newPlaylistName.trim()}>{t('common.create')}</button>
+                <button
+                  style={inlineButton}
+                  onClick={createAndSelect}
+                  disabled={!newPlaylistName.trim()}
+                >
+                  {t('common.create')}
+                </button>
               </div>
             )}
             <div className="modal-actions">
@@ -488,6 +526,15 @@ export default function LikedView({
       )}
 
       <TrackEditModal track={editingTrack} onClose={() => setEditingTrack(null)} onSave={handleEditSave} />
+      
+      <TrackDetailsModal 
+        track={detailsTrack} 
+        onClose={() => setDetailsTrackId(null)}
+        onCopyTitle={onCopyTitle}
+        onCopyArtist={onCopyArtist}
+        onCopyPath={onCopyPath}
+        onRevealInDir={onRevealInDir}
+      />
     </div>
   )
 }

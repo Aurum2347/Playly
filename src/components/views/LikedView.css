@@ -132,7 +132,23 @@
 }
 
 .header-actions { display: flex; align-items: center; gap: 10px; }
-.selection-actions { display: flex; align-items: center; gap: 10px; }
+.selection-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  opacity: 0;
+  transform: translateX(8px);
+  pointer-events: none;
+  max-width: 0;
+  overflow: hidden;
+  transition: opacity 0.2s ease, transform 0.2s ease, max-width 0.2s ease;
+}
+.selection-actions.visible {
+  opacity: 1;
+  transform: translateX(0);
+  pointer-events: auto;
+  max-width: 500px;
+}
 
 .btn {
   display: inline-flex;
@@ -279,7 +295,10 @@
 
 .track-row:last-child { margin-bottom: 0; }
 .track-row:hover { background: var(--hover); }
-.track-row.selected { background: var(--element-strong); }
+.track-row.selected {
+  background: var(--element-strong);
+  transition: background 0.2s ease;
+}
 .track-row.playing .tr-title { color: var(--text); }
 .track-row.removing { opacity: 0; transform: translateX(16px) scale(0.98); }
 
@@ -419,24 +438,21 @@
   justify-content: center;
   opacity: 0;
   pointer-events: none;
-  transition: border-color 0.15s ease, background 0.15s ease;
+  transition: opacity 0.2s ease, border-color 0.15s ease, background 0.15s ease, transform 0.2s ease;
 }
-
 .track-list-container.selecting .tr-checkbox {
   opacity: 1;
   pointer-events: auto;
 }
-
 .tr-checkbox:hover {
   border-color: var(--accent);
   background: var(--element);
 }
-
 .tr-checkbox.checked {
   background: var(--accent);
   border-color: var(--accent);
+  transform: translateY(-50%) scale(1.1);
 }
-
 .tr-checkbox svg {
   width: 13px;
   height: 13px;
@@ -445,7 +461,6 @@
   transform: scale(0.6);
   transition: opacity 0.12s ease, transform 0.12s ease;
 }
-
 .tr-checkbox.checked svg {
   opacity: 1;
   transform: scale(1);
@@ -460,7 +475,33 @@
   min-width: 200px;
   box-shadow: 0 12px 32px var(--shadow);
   z-index: 100;
-  animation: menuIn 0.12s ease;
+  opacity: 0;
+  transform: scale(0.95);
+  pointer-events: none;
+  /* УБРАЛИ transition */
+}
+
+.context-menu.measuring {
+  visibility: hidden !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
+
+.context-menu.open {
+  opacity: 1;
+  transform: scale(1);
+  pointer-events: auto;
+  /* Добавляем transition только для ЗАКРЫТИЯ */
+  transition: opacity 0.15s ease, transform 0.15s ease;
+}
+
+.context-menu.positioned {
+  transition: opacity 0.15s ease, transform 0.15s ease;
+}
+
+/* Добавь padding внутрь */
+.context-menu-inner {
+  padding: 6px;
 }
 
 .context-item {
@@ -550,12 +591,16 @@
 }
 
 .playlist-list {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  max-height: 320px;
-  overflow-y: auto;
-  margin-bottom: 20px;
+display: flex;
+flex-direction: column;
+gap: 6px;
+max-height: 320px;
+overflow-y: auto;
+overflow-x: hidden;
+padding: 2px 8px 2px 0;
+margin-bottom: 20px;
+box-sizing: border-box;
+position: relative;
 }
 
 .playlist-list::-webkit-scrollbar { width: 5px; }
@@ -574,9 +619,8 @@
 }
 
 .playlist-item:hover {
-  background: var(--hover);
-  border-color: var(--border);
-  transform: translateX(2px);
+background: var(--hover);
+border-color: var(--border);
 }
 
 .playlist-item.selected {
@@ -818,4 +862,37 @@
 @keyframes flashFade {
   from { opacity: 1; }
   to { opacity: 0; }
+}
+
+
+.playlist-list-wrapper {
+  position: relative;
+  margin-bottom: 20px;
+}
+.playlist-list-fade-top,
+.playlist-list-fade-bottom {
+  position: absolute;
+  left: 0;
+  right: 8px;
+  height: 24px;
+  pointer-events: none;
+  z-index: 1;
+}
+.playlist-list-fade-top {
+  top: 0;
+  background: linear-gradient(to bottom, var(--panel) 0%, transparent 100%);
+}
+.playlist-list-fade-bottom {
+  bottom: 0;
+  background: linear-gradient(to top, var(--panel) 0%, transparent 100%);
+}
+
+
+
+
+.playlist-list-wrapper.scrolled-top .playlist-list-fade-top { opacity: 0; }
+.playlist-list-wrapper.scrolled-bottom .playlist-list-fade-bottom { opacity: 0; }
+.playlist-list-fade-top,
+.playlist-list-fade-bottom {
+  transition: opacity 0.2s ease;
 }

@@ -34,7 +34,6 @@ export default function AppearanceSection({ theme, onChangeTheme }: AppearanceSe
 
   useEffect(() => {
     if (theme !== undefined) {
-      setLocalTheme(theme)
       applyTheme(theme)
       return
     }
@@ -52,7 +51,7 @@ export default function AppearanceSection({ theme, onChangeTheme }: AppearanceSe
     }
   }, [theme])
 
-  const currentTheme: ThemeMode = localTheme
+  const currentTheme: ThemeMode = theme ?? localTheme
 
   useEffect(() => {
     if (currentTheme !== 'system') return
@@ -115,7 +114,7 @@ export default function AppearanceSection({ theme, onChangeTheme }: AppearanceSe
       await writeFontSetting({ file: fileName, name: originalName })
     } catch (e) {
       console.error('Ошибка установки шрифта:', e)
-      alert('Не удалось установить шрифт. Проверьте, что файл не повреждён.')
+      alert(t('settings.appearance.fontError'))
     } finally {
       setIsFontLoading(false)
     }

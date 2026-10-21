@@ -1,5 +1,24 @@
+import { Fragment } from 'react'
+import { open } from '@tauri-apps/plugin-shell'
 import Logo from '../../Logo'
 import { useI18n } from '../../../i18n'
+
+/**
+ * Переводы могут прийти из пользовательских файлов языков, поэтому HTML не вставляем как есть:
+ * поддерживается только <strong>…</strong>, всё остальное выводится как обычный текст.
+ */
+function renderBold(text: string) {
+  return text.split(/(<strong>[\s\S]*?<\/strong>)/g).map((part, i) => {
+    const m = part.match(/^<strong>([\s\S]*)<\/strong>$/)
+    return m ? <strong key={i}>{m[1]}</strong> : <Fragment key={i}>{part}</Fragment>
+  })
+}
+
+/* В окне Tauri ссылки с target="_blank" не открываются — отдаём их системному браузеру */
+const openExternal = (e: React.MouseEvent<HTMLAnchorElement>) => {
+  e.preventDefault()
+  open(e.currentTarget.href).catch((err) => console.error('Не удалось открыть ссылку:', err))
+}
 
 export default function AboutSection() {
   const { t } = useI18n()
@@ -24,14 +43,14 @@ export default function AboutSection() {
       <div className="about-version">{t('settings.about.version')}</div>
 
       <div className="about-text">
-        <p dangerouslySetInnerHTML={{ __html: t('settings.about.p1') }} />
-        <p dangerouslySetInnerHTML={{ __html: t('settings.about.p2') }} />
+        <p>{renderBold(t('settings.about.p1'))}</p>
+        <p>{renderBold(t('settings.about.p2'))}</p>
       </div>
 
       <div className="about-links">
         <a
           href="https://t.me/aurums2347"
-          target="_blank"
+          onClick={openExternal}
           rel="noreferrer"
           className="about-link-card"
         >
@@ -55,7 +74,7 @@ export default function AboutSection() {
 
         <a
           href="https://t.me/thermodynamicprogrammer"
-          target="_blank"
+          onClick={openExternal}
           rel="noreferrer"
           className="about-link-card"
         >
@@ -80,7 +99,7 @@ export default function AboutSection() {
         <div className="about-links-row">
           <a
             href="https://github.com/aurum2347"
-            target="_blank"
+            onClick={openExternal}
             rel="noreferrer"
             className="about-link-card"
           >
@@ -98,7 +117,7 @@ export default function AboutSection() {
 
           <a
             href="https://github.com/aurum2347/playly"
-            target="_blank"
+            onClick={openExternal}
             rel="noreferrer"
             className="about-link-card"
           >

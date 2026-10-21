@@ -1178,6 +1178,9 @@ function AppInner() {
     }
   }, [handlePlayPause, handleNext, handlePrev, handleSeek, handleVolumeChange, handleMuteToggle, handleToggleLike])
   
+  /* Стабильная ссылка: иначе memo(LikedView) перерисовывается на каждом тике плеера */
+  const likedTracks = useMemo(() => tracks.filter((t) => t.liked), [tracks])
+
   const renderView = () => {
     switch (currentView) {
       case 'home':
@@ -1226,12 +1229,17 @@ function AppInner() {
             onAddToPlaylist={handleAddToPlaylist}
             onCreatePlaylist={handleCreatePlaylist}
             onEditTrack={handleEditTrack}
+            // Новые пропсы для контекстного меню
+            onCopyTitle={handleCopyTitle}
+            onCopyArtist={handleCopyArtist}
+            onCopyPath={handleCopyPath}
+            onRevealInDir={handleRevealInDir}
           />
         )
       case 'liked':
         return (
           <LikedViewM
-            tracks={tracks.filter((t) => t.liked)}
+            tracks={likedTracks}
             playlists={playlists}
             onSelectTrack={handleTrackSelect}
             playingTrackId={selectedTrack?.id ?? null}
@@ -1239,22 +1247,33 @@ function AppInner() {
             onDeleteTracks={handleDeleteTracks}
             onAddToPlaylist={handleAddToPlaylist}
             onCreatePlaylist={handleCreatePlaylist}
+            onEditTrack={handleEditTrack}
+            // Новые пропсы для контекстного меню
+            onCopyTitle={handleCopyTitle}
+            onCopyArtist={handleCopyArtist}
+            onCopyPath={handleCopyPath}
+            onRevealInDir={handleRevealInDir}
           />
         )
       case 'playlist':
         return (
           <PlaylistViewM
+            key={activePlaylist?.id ?? 'none'}
             playlist={activePlaylist}
+            playlists={playlists}
             tracks={tracks}
             onSelectTrack={handleTrackSelect}
             playingTrackId={selectedTrack?.id ?? null}
             onToggleLike={handleToggleLike}
             onRemoveFromPlaylist={handleRemoveFromPlaylist}
+            onEditTrack={handleEditTrack}
             onCopyTitle={handleCopyTitle}
             onCopyArtist={handleCopyArtist}
             onCopyPath={handleCopyPath}
             onRevealInDir={handleRevealInDir}
             onCopyTitleArtist={handleCopyTitleArtist}
+            onCreatePlaylist={handleCreatePlaylist}
+            onAddToPlaylist={handleAddToPlaylist}
           />
         )
       default:
@@ -1301,7 +1320,7 @@ function AppInner() {
                 Playly
               </span>
             </div>
-            <div className="subtitle">Version 2.0</div>
+            <div className="subtitle">Version 2.0.5</div>
             <div className="loading-bar-container">
               <div
                 className="loading-bar-fill"

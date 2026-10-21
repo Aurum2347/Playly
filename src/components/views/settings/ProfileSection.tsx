@@ -30,9 +30,12 @@ export default function ProfileSection({ currentNickname, onSaveNickname }: Prof
   const profileDirRef = useRef<string | null>(null)
   const avatarUrlRef = useRef<string | null>(null)
 
-  useEffect(() => {
+  /* Ник поменялся снаружи — подтягиваем его в поле ввода */
+  const [prevNickname, setPrevNickname] = useState(currentNickname)
+  if (currentNickname !== prevNickname) {
+    setPrevNickname(currentNickname)
     setNickname(currentNickname)
-  }, [currentNickname])
+  }
 
   const getProfileDir = async () => {
     if (profileDirRef.current) return profileDirRef.current
@@ -131,7 +134,6 @@ export default function ProfileSection({ currentNickname, onSaveNickname }: Prof
     return () => {
       cancelled = true
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   useEffect(() => {

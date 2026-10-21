@@ -375,36 +375,31 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: border-color 0.15s ease, background 0.15s ease;
+  transition: opacity 0.2s ease, border-color 0.15s ease, background 0.15s ease, transform 0.2s ease;
   opacity: 0;
   pointer-events: none;
 }
-
 .trackListContainer.selecting .trCheckbox {
   opacity: 1;
   pointer-events: auto;
 }
-
 .trCheckbox:hover {
   border-color: var(--accent);
   background: var(--element);
 }
-
 .trCheckbox.checked {
   background: var(--accent);
   border-color: var(--accent);
+  transform: translateY(-50%) scale(1.1);
 }
-
 .trCheckbox.pop {
   animation: checkboxPop 0.22s cubic-bezier(0.34, 1.4, 0.64, 1);
 }
-
 @keyframes checkboxPop {
   0%   { transform: translateY(-50%) scale(1); }
   40%  { transform: translateY(-50%) scale(1.12); }
   100% { transform: translateY(-50%) scale(1); }
 }
-
 .trCheckbox svg {
   width: 13px;
   height: 13px;
@@ -413,32 +408,43 @@
   transform: scale(0.6);
   transition: opacity 0.12s ease, transform 0.12s ease;
 }
-
 .trCheckbox.checked svg {
   opacity: 1;
   transform: scale(1);
+  
+.playlistList {
+display: flex;
+flex-direction: column;
+gap: 6px;
+max-height: 320px;
+overflow-y: auto;
+overflow-x: hidden;
+padding: 2px 8px 2px 0;
+margin-bottom: 20px;
+box-sizing: border-box;
+position: relative;
+}
 }
 
 
 .contextMenu {
-  position: fixed;
-  background: var(--menu);
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  padding: 6px;
-  min-width: 200px;
-  box-shadow: 0 12px 32px var(--shadow);
-  z-index: 100;
-  opacity: 0;
-  transform: scale(0.95);
-  pointer-events: none;
-  transition: opacity 0.12s ease, transform 0.12s ease;
+position: fixed;
+background: var(--menu);
+border: 1px solid var(--border);
+border-radius: 12px;
+padding: 6px;
+min-width: 200px;
+box-shadow: 0 12px 32px var(--shadow);
+z-index: 100;
+opacity: 0;
+transform: scale(0.95) translateY(-4px);
+pointer-events: none;
+transition: opacity 0.15s ease, transform 0.15s ease;
 }
-
 .contextMenu.open {
-  opacity: 1;
-  transform: scale(1);
-  pointer-events: auto;
+opacity: 1;
+transform: scale(1) translateY(0);
+pointer-events: auto;
 }
 
 .contextItem {
@@ -543,12 +549,16 @@
 }
 
 .playlistList {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  max-height: 320px;
-  overflow-y: auto;
-  margin-bottom: 20px;
+display: flex;
+flex-direction: column;
+gap: 6px;
+max-height: 320px;
+overflow-y: auto;
+overflow-x: hidden;
+padding: 2px 8px 2px 0;
+margin-bottom: 20px;
+box-sizing: border-box;
+position: relative;
 }
 
 .playlistList::-webkit-scrollbar { width: 5px; }
@@ -570,9 +580,8 @@
 }
 
 .playlistItem:hover {
-  background: var(--hover);
-  border-color: var(--border);
-  transform: translateX(2px);
+background: var(--hover);
+border-color: var(--border);
 }
 
 .playlistItem.selected {
@@ -1098,4 +1107,44 @@
 @keyframes flashFade {
   from { opacity: 1; }
   to   { opacity: 0; }
+}
+
+.playlistListWrapper {
+  position: relative;
+  margin-bottom: 20px;
+}
+.playlistListFadeTop,
+.playlistListFadeBottom {
+  position: absolute;
+  left: 0;
+  right: 8px;
+  height: 24px;
+  pointer-events: none;
+  z-index: 1;
+}
+.playlistListFadeTop {
+  top: 0;
+  background: linear-gradient(to bottom, var(--panel) 0%, transparent 100%);
+}
+.playlistListFadeBottom {
+  bottom: 0;
+  background: linear-gradient(to top, var(--panel) 0%, transparent 100%);
+}
+
+
+
+.playlistListWrapper.scrolledTop .playlistListFadeTop { opacity: 0; }
+.playlistListWrapper.scrolledBottom .playlistListFadeBottom { opacity: 0; }
+.playlistListFadeTop,
+.playlistListFadeBottom {
+  transition: opacity 0.2s ease;
+}
+
+
+.contextMenu.measuring {
+  visibility: hidden !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+  transition: none !important;
+  transform: scale(0.95) !important; /* Фиксируем, чтобы не было дергания */
 }

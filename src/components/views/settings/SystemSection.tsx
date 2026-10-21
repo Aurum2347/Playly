@@ -32,10 +32,6 @@ export default function SystemSection({
   const [isLangModalOpen, setIsLangModalOpen] = useState(false)
   const [autostart, setAutostart] = useState(false)
 
-  useEffect(() => {
-    setTempLang(lang)
-  }, [lang])
-
   /* Читаем текущее состояние автозапуска из системы */
   useEffect(() => {
     isAutostartEnabled()
@@ -58,6 +54,10 @@ export default function SystemSection({
       }
     } catch (e) {
       console.error('Не удалось изменить автозапуск:', e)
+      /* Возвращаем переключатель к реальному состоянию системы */
+      isAutostartEnabled()
+        .then((actual) => setAutostart(actual))
+        .catch(() => setAutostart(!v))
     }
   }
 

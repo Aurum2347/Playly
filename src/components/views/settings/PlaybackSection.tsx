@@ -95,8 +95,9 @@ export default function PlaybackSection({
           setDefaultDeviceName(name)
           setOutputDevices(
             outputs
-              .filter((d) => !d.label.startsWith('По умолчанию') && !d.label.startsWith('Связь'))
-              .map((d, i) => ({ id: d.deviceId, label: d.label || `Устройство ${i + 1}` }))
+              /* 'default' и 'communications' — псевдоустройства Windows, дублирующие реальные */
+              .filter((d) => d.deviceId !== 'default' && d.deviceId !== 'communications')
+              .map((d) => ({ id: d.deviceId, label: d.label }))
           )
         }
       } catch {
@@ -239,7 +240,7 @@ export default function PlaybackSection({
                   >
                     <span>{defaultLabel}</span>
                   </button>
-                  {outputDevices.map((d) => (
+                  {outputDevices.map((d, i) => (
                     <button
                       key={d.id}
                       className={`dropdown-option ${outputDeviceValue === d.id ? 'active' : ''}`}
@@ -248,7 +249,7 @@ export default function PlaybackSection({
                         setOpenDropdown(null)
                       }}
                     >
-                      <span>{d.label}</span>
+                      <span>{d.label || t('settings.playback.deviceN', { n: i + 1 })}</span>
                     </button>
                   ))}
                 </div>
