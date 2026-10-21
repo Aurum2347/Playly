@@ -1,4 +1,4 @@
-import { useCallback, useLayoutEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { CSSProperties } from 'react'
 
 export const cx = (...parts: Array<string | false | null | undefined>) => parts.filter(Boolean).join(' ')
@@ -30,6 +30,20 @@ export const inlineButton: CSSProperties = {
   padding: '9px 14px', borderRadius: 10, border: '1px solid rgba(255,255,255,0.08)',
   background: 'rgba(255,255,255,0.06)', color: '#e0e0e0', fontSize: 13, fontWeight: 500,
   fontFamily: 'inherit', cursor: 'pointer', whiteSpace: 'nowrap', transition: 'all 0.15s ease',
+}
+
+/* Держит элемент смонтированным ещё ms после закрытия, чтобы успела проиграться анимация исчезновения */
+export function usePresence(open: boolean, ms = 150) {
+  const [mounted, setMounted] = useState(open)
+  if (open && !mounted) setMounted(true)
+
+  useEffect(() => {
+    if (open) return
+    const timer = setTimeout(() => setMounted(false), ms)
+    return () => clearTimeout(timer)
+  }, [open, ms])
+
+  return { mounted: open || mounted, closing: !open && mounted }
 }
 
 const MENU_PADDING = 8

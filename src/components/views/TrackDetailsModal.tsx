@@ -1,8 +1,9 @@
-import { useState, useRef, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { createPortal } from 'react-dom'
 import type { Track } from '../../App'
 import { useI18n } from '../../i18n'
-import { computeMenuPosition } from './shared'
+import CoverMenu from '../CoverMenu'
+import type { CoverMenuTarget } from '../CoverMenu'
 import styles from './TrackDetailsModal.module.css'
 
 interface TrackDetailsModalProps {
@@ -18,9 +19,6 @@ type Tab = 'file' | 'metadata' | 'stats'
 
 const TABS: Tab[] = ['file', 'metadata', 'stats']
 const CLOSE_ANIMATION_MS = 250
-/* Примерный размер меню обложки — нужен только чтобы не вылезти за окно */
-const COVER_MENU_W = 240
-const COVER_MENU_H = 96
 
 const isTypingTarget = (target: EventTarget | null) => {
   const el = target as HTMLElement | null
@@ -37,9 +35,9 @@ export default function TrackDetailsModal({
 }: TrackDetailsModalProps) {
   const { t, lang } = useI18n()
   const [activeTab, setActiveTab] = useState<Tab>('file')
-  const [isCoverMenuOpen, setIsCoverMenuOpen] = useState(false)
-  const [coverMenuPos, setCoverMenuPos] = useState({ x: 0, y: 0 })
-  const coverMenuRef = useRef<HTMLDivElement>(null)
+  const [coverMenu, setCoverMenu] = useState<CoverMenuTarget | null>(null)
+  const isCoverMenuOpen = coverMenu !== null
+  const closeCoverMenu = useCallback(() => setCoverMenu(null), [])
 
   /*
    * displayTrack — последний показанный трек. Он остаётся на экране, пока
@@ -53,7 +51,7 @@ export default function TrackDetailsModal({
       if (track.id !== displayTrack?.id) setActiveTab('file')
       setDisplayTrack(track)
     } else {
-      setIsCoverMenuOpen(false)
+      setCoverMenu(null)
     }
   }
 
@@ -69,73 +67,9 @@ export default function TrackDetailsModal({
   const handleCoverContextMenu = useCallback((e: React.MouseEvent) => {
     e.preventDefault()
     e.stopPropagation()
-    setCoverMenuPos(computeMenuPosition(e.clientX, e.clientY, COVER_MENU_W, COVER_MENU_H))
-    setIsCoverMenuOpen(true)
-  }, [])
-
-  const handleCopyCover = async () => {
-    const cover = displayTrack?.cover
-    setIsCoverMenuOpen(false)
-    if (!cover) return
-    try {
-      const response = await fetch(cover)
-      if (!response.ok) throw new Error(`HTTP ${response.status}`)
-      const blob = await response.blob()
-      /* Буфер обмена надёжно принимает только PNG — остальные форматы перекодируем */
-      const png = blob.type === 'image/png' ? blob : await toPngBlob(blob)
-      await navigator.clipboard.write([new ClipboardItem({ 'image/png': png })])
-    } catch (err) {
-      console.warn('Не удалось скопировать изображение, копируем ссылку:', err)
-      try {
-        await navigator.clipboard.writeText(cover)
-      } catch (fallbackErr) {
-        console.error('Не удалось скопировать ссылку на обложку:', fallbackErr)
-      }
-    }
-  }
-
-  const handleSaveCover = async () => {
-    const current = displayTrack
-    setIsCoverMenuOpen(false)
-    if (!current?.cover) return
-    let objectUrl: string | null = null
-    try {
-      /* download у asset://-ссылок не срабатывает — скачиваем через blob */
-      const blob = await (await fetch(current.cover)).blob()
-      objectUrl = URL.createObjectURL(blob)
-      const ext = blob.type.split('/')[1]?.replace('jpeg', 'jpg') || 'jpg'
-      const a = document.createElement('a')
-      a.href = objectUrl
-      a.download = `cover_${current.id}.${ext}`
-      document.body.appendChild(a)
-      a.click()
-      document.body.removeChild(a)
-    } catch (e) {
-      console.error('Не удалось сохранить обложку:', e)
-    } finally {
-      if (objectUrl) {
-        const url = objectUrl
-        setTimeout(() => URL.revokeObjectURL(url), 1000)
-      }
-    }
-  }
-
-  /* Закрываем меню обложки при клике (ЛКМ или ПКМ) вне его */
-  useEffect(() => {
-    if (!isCoverMenuOpen) return
-    const handleInteraction = (e: MouseEvent) => {
-      if (coverMenuRef.current && !coverMenuRef.current.contains(e.target as Node)) {
-        setIsCoverMenuOpen(false)
-        if (e.type === 'contextmenu') e.preventDefault()
-      }
-    }
-    document.addEventListener('mousedown', handleInteraction)
-    document.addEventListener('contextmenu', handleInteraction)
-    return () => {
-      document.removeEventListener('mousedown', handleInteraction)
-      document.removeEventListener('contextmenu', handleInteraction)
-    }
-  }, [isCoverMenuOpen])
+    if (!displayTrack?.cover) return
+    setCoverMenu({ x: e.clientX, y: e.clientY, cover: displayTrack.cover, name: `${displayTrack.artist} - ${displayTrack.title}` })
+  }, [displayTrack])
 
   /* Горячие клавиши — только пока модалка открыта. Слушаем в capture-фазе на window,
      чтобы Escape не долетал до обработчиков списка (выход из режима выделения и т.п.) */
@@ -145,7 +79,7 @@ export default function TrackDetailsModal({
       if (e.key === 'Escape') {
         e.preventDefault()
         e.stopPropagation()
-        if (isCoverMenuOpen) setIsCoverMenuOpen(false)
+        if (isCoverMenuOpen) setCoverMenu(null)
         else onClose()
         return
       }
@@ -329,40 +263,8 @@ export default function TrackDetailsModal({
         </div>
       </div>
 
-      {isCoverMenuOpen && displayTrack.cover && createPortal(
-        <div
-          ref={coverMenuRef}
-          className={styles.coverContextMenu}
-          style={{ left: coverMenuPos.x, top: coverMenuPos.y }}
-          onMouseDown={(e) => e.stopPropagation()}
-        >
-          <button className={styles.coverMenuItem} onClick={handleCopyCover}>
-            {copyIconSVG} {t('views.details.copyCover')}
-          </button>
-          <button className={styles.coverMenuItem} onClick={handleSaveCover}>
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-              <polyline points="7 10 12 15 17 10" />
-              <line x1="12" y1="15" x2="12" y2="3" />
-            </svg>
-            {t('views.details.saveCover')}
-          </button>
-        </div>,
-        document.body
-      )}
+      <CoverMenu target={coverMenu} onClose={closeCoverMenu} />
     </div>,
     document.body
-  )
-}
-
-async function toPngBlob(blob: Blob): Promise<Blob> {
-  const bitmap = await createImageBitmap(blob)
-  const canvas = document.createElement('canvas')
-  canvas.width = bitmap.width
-  canvas.height = bitmap.height
-  canvas.getContext('2d')?.drawImage(bitmap, 0, 0)
-  bitmap.close()
-  return await new Promise<Blob>((resolve, reject) =>
-    canvas.toBlob((b) => (b ? resolve(b) : reject(new Error('toBlob failed'))), 'image/png')
   )
 }

@@ -314,6 +314,13 @@ export default function useLibrary({
     [navigate]
   )
 
+  const handleUpdatePlaylist = useCallback(
+    (id: number, patch: Partial<Pick<Playlist, 'cover' | 'coverFile' | 'color'>>) => {
+      setPlaylists((prev) => prev.map((pl) => (pl.id === id ? { ...pl, ...patch } : pl)))
+    },
+    []
+  )
+
   const handleChangePlaylistCover = useCallback(async (id: number) => {
     try {
       const selected = await open({
@@ -414,6 +421,7 @@ export default function useLibrary({
     handleDeleteTracks,
     handleCreatePlaylist,
     handleRenamePlaylist,
+    handleUpdatePlaylist,
     handleDeletePlaylist,
     handleChangePlaylistCover,
     handlePickImage,

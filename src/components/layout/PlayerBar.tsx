@@ -2,6 +2,9 @@ import { useState, useRef, useEffect, useCallback } from 'react'
 import { createPortal } from 'react-dom'
 import type { Track } from '../../App'
 import { useI18n } from '../../i18n'
+import CoverMenu from '../CoverMenu'
+import type { CoverMenuTarget } from '../CoverMenu'
+import { usePresence } from '../views/shared'
 import './PlayerBar.css'
 
 interface PlayerBarProps {
@@ -60,6 +63,12 @@ export default function PlayerBar({
 }: PlayerBarProps) {
   const { t } = useI18n()
   const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number } | null>(null)
+  /* Последняя позиция меню остаётся, пока проигрывается анимация закрытия */
+  const [ctxShown, setCtxShown] = useState(ctxMenu)
+  if (ctxMenu && ctxMenu !== ctxShown) setCtxShown(ctxMenu)
+  const ctxPresence = usePresence(ctxMenu !== null)
+  const [coverMenu, setCoverMenu] = useState<CoverMenuTarget | null>(null)
+  const closeCoverMenu = useCallback(() => setCoverMenu(null), [])
   const ctxRef = useRef<HTMLDivElement>(null)
   const progressWrapRef = useRef<HTMLDivElement>(null)
   const volWrapRef = useRef<HTMLDivElement>(null)
@@ -114,9 +123,19 @@ export default function PlayerBar({
 
   const openCtx = (e: React.MouseEvent) => {
     const target = e.target as HTMLElement
-    if (!target.classList.contains('p-name') && !target.classList.contains('p-artist')) return
+    /* В поле громкости оставляем системное меню (вставка и т.п.) */
+    if (target.tagName === 'INPUT') return
     e.preventDefault()
     e.stopPropagation()
+    if (target.closest('.p-cover')) {
+      setCtxMenu(null)
+      if (shownTrack?.cover) {
+        setCoverMenu({ x: e.clientX, y: e.clientY, cover: shownTrack.cover, name: `${shownTrack.artist} - ${shownTrack.title}` })
+      }
+      return
+    }
+    if (!target.classList.contains('p-name') && !target.classList.contains('p-artist')) return
+    setCoverMenu(null)
     setCtxMenu({
       x: Math.min(e.clientX, window.innerWidth - 240),
       y: Math.min(e.clientY, window.innerHeight - 140),
@@ -427,12 +446,13 @@ export default function PlayerBar({
           />
         </div>
       </div>
-      {ctxMenu &&
+      <CoverMenu target={coverMenu} onClose={closeCoverMenu} />
+      {ctxPresence.mounted && ctxShown &&
         createPortal(
           <div
             ref={ctxRef}
-            className="player-context-menu"
-            style={{ left: ctxMenu.x, top: ctxMenu.y }}
+            className={`player-context-menu ${ctxPresence.closing ? 'closing' : ''}`}
+            style={{ left: ctxShown.x, top: ctxShown.y }}
           >
             <button
               className="player-context-item"

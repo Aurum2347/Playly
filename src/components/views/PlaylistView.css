@@ -26,6 +26,15 @@
   gap: 12px;
   flex-wrap: wrap;
 }
+.playlist-view .hero {
+  transition: background 0.3s ease;
+}
+.playlist-view .hero-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-left: auto;
+}
 .playlist-view .selection-actions {
   display: flex;
   align-items: center;

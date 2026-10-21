@@ -50,6 +50,8 @@ export interface Playlist {
   name: string
   cover?: string | null
   coverFile?: string | null
+  /* Цвет фона шапки плейлиста (#rrggbb), null — стандартный */
+  color?: string | null
   trackIds: number[]
 }
 
@@ -176,6 +178,7 @@ function AppInner() {
     handleDeleteTracks,
     handleCreatePlaylist,
     handleRenamePlaylist,
+    handleUpdatePlaylist,
     handleDeletePlaylist,
     handleChangePlaylistCover,
     handlePickImage,
@@ -1320,7 +1323,7 @@ function AppInner() {
                 Playly
               </span>
             </div>
-            <div className="subtitle">Version 2.0.5</div>
+            <div className="subtitle">Version 2.0.2</div>
             <div className="loading-bar-container">
               <div
                 className="loading-bar-fill"
@@ -1471,6 +1474,8 @@ function AppInner() {
         avatarShape={avatarShape}
         onCreatePlaylist={handleCreatePlaylist}
         onRenamePlaylist={handleRenamePlaylist}
+        onUpdatePlaylist={handleUpdatePlaylist}
+        tracks={tracks}
         onDeletePlaylist={handleDeletePlaylist}
         onChangePlaylistCover={handleChangePlaylistCover}
         onPickImage={handlePickImage}

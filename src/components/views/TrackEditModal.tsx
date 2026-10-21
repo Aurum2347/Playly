@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { open } from '@tauri-apps/plugin-dialog'
-import { saveCoverFromFile } from '../../lib/trackLoader'
+import { copyCover, saveCoverFromFile } from '../../lib/trackLoader'
+import CoverPicker from '../CoverPicker'
 import type { Track } from '../../App'
 import { useI18n } from '../../i18n'
 import './TrackEditModal.css'
@@ -18,6 +19,8 @@ interface TrackEditModalProps {
   track: Track | null
   onClose: () => void
   onSave: (trackId: number, updates: TrackUpdates) => void
+  /* Библиотека — чтобы можно было взять обложку у другого трека */
+  tracks?: Track[]
 }
 
 const fmtSpeed = (v: number) => String(Math.round(v * 100) / 100) + '×'
@@ -27,13 +30,13 @@ const MusicIcon = () => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M9 18V5l12-2v13" /><circle cx="6" cy="18" r="3" /><circle cx="18" cy="16" r="3" /></svg>
 )
 
-export default function TrackEditModal({ track, onClose, onSave }: TrackEditModalProps) {
+export default function TrackEditModal({ track, onClose, onSave, tracks }: TrackEditModalProps) {
   if (!track) return null
   /* key сбрасывает форму при открытии другого трека — состояние инициализируется сразу, без мигания */
-  return <TrackEditForm key={track.id} track={track} onClose={onClose} onSave={onSave} />
+  return <TrackEditForm key={track.id} track={track} onClose={onClose} onSave={onSave} tracks={tracks} />
 }
 
-function TrackEditForm({ track, onClose, onSave }: TrackEditModalProps & { track: Track }) {
+function TrackEditForm({ track, onClose, onSave, tracks }: TrackEditModalProps & { track: Track }) {
   const { t } = useI18n()
   const [title, setTitle] = useState(track.title)
   const [artist, setArtist] = useState(track.artist)
@@ -41,6 +44,7 @@ function TrackEditForm({ track, onClose, onSave }: TrackEditModalProps & { track
   const [coverFile, setCoverFile] = useState<string | null>(track.coverFile ?? null)
   const [speed, setSpeed] = useState(track.playbackRate ?? 1)
   const [isPickingCover, setIsPickingCover] = useState(false)
+  const [isBorrowOpen, setIsBorrowOpen] = useState(false)
   const mountedRef = useRef(true)
 
   useEffect(() => {
@@ -51,14 +55,14 @@ function TrackEditForm({ track, onClose, onSave }: TrackEditModalProps & { track
   /* Capture-фаза на window: Escape закрывает только модалку и не доходит до списка треков */
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key !== 'Escape') return
+      if (e.key !== 'Escape' || isBorrowOpen) return
       e.preventDefault()
       e.stopPropagation()
       onClose()
     }
     window.addEventListener('keydown', onKey, true)
     return () => window.removeEventListener('keydown', onKey, true)
-  }, [onClose])
+  }, [onClose, isBorrowOpen])
 
   const pickCover = async () => {
     if (isPickingCover) return
@@ -76,6 +80,13 @@ function TrackEditForm({ track, onClose, onSave }: TrackEditModalProps & { track
     } finally {
       if (mountedRef.current) setIsPickingCover(false)
     }
+  }
+
+  const borrowCover = async (source: Track) => {
+    setIsBorrowOpen(false)
+    if (!source.coverFile) return
+    const copied = await copyCover(`tr-${track.id}`, source.coverFile)
+    if (copied && mountedRef.current) { setCover(copied.coverUrl); setCoverFile(copied.coverFile) }
   }
 
   const handleSave = () => {
@@ -115,6 +126,12 @@ function TrackEditForm({ track, onClose, onSave }: TrackEditModalProps & { track
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" /><circle cx="8.5" cy="8.5" r="1.5" /><polyline points="21 15 16 10 5 21" /></svg>
               {t('views.trackEdit.chooseCover')}
             </button>
+            {tracks && (
+              <button className="tem-btn" onClick={() => setIsBorrowOpen(true)}>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 18V5l12-2v13" /><circle cx="6" cy="18" r="3" /><circle cx="18" cy="16" r="3" /></svg>
+                {t('coverPicker.fromTrack')}
+              </button>
+            )}
             <button className="tem-btn" onClick={() => { setCover(null); setCoverFile(null) }} disabled={!cover}>
               {t('views.trackEdit.removeCover')}
             </button>
@@ -162,6 +179,15 @@ function TrackEditForm({ track, onClose, onSave }: TrackEditModalProps & { track
           <button className="tem-btn tem-btn-primary" onClick={handleSave} disabled={!title.trim()}>{t('common.save')}</button>
         </div>
       </div>
+      {tracks && (
+        <CoverPicker
+          open={isBorrowOpen}
+          tracks={tracks}
+          excludeId={track.id}
+          onPick={borrowCover}
+          onClose={() => setIsBorrowOpen(false)}
+        />
+      )}
     </div>,
     document.body
   )

@@ -28,6 +28,13 @@ export const en = {
     dateOld: 'By date created (oldest)',
     addedNew: 'By date added (newest)',
     addedOld: 'By date added (oldest)',
+    playlistOrder: 'Playlist order',
+  },
+  coverPicker: {
+    title: 'Cover from a track',
+    search: 'Search by title or artist',
+    empty: 'No tracks with covers found',
+    fromTrack: 'From a track',
   },
   splash: {
     loading: 'Loading...',
@@ -78,6 +85,8 @@ export const en = {
       editTitle: 'Edit playlist',
       chooseCover: 'Choose cover',
       changeCover: 'Change cover',
+      bgColor: 'Header background color',
+      resetColor: 'Reset',
       namePlaceholder: 'Playlist name',
       namePlaceholderShort: 'Name',
       deleteTitle: 'Delete playlist “{name}”?',
@@ -339,7 +348,7 @@ export const en = {
       imagesFilter: 'Images',
     },
     about: {
-      version: 'Version: 2.1',
+      version: 'Version: 2.0.2',
       p1: 'Playly is my vision of what an audio player should be like in 2026. Among classic programs I know, such as <strong>Aimp</strong> or <strong>KMPlayer</strong>, I often noticed the same thing: their design no longer meets modern requirements, and navigation often seems too complex and overloaded.',
       p2: 'I consciously chose the path of an <strong>offline player</strong> rather than another streaming service. When internet access is not always stable, it is much more practical to have downloaded music at hand. Playly will be a great solution for everyone who values independence from the network.',
       link1: 'My main Telegram channel',

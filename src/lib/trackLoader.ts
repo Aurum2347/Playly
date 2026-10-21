@@ -101,6 +101,16 @@ async function persistCover(
   }
 }
 
+/** Скопировать уже сохранённую обложку (например, другого трека) под новым именем */
+export async function copyCover(
+  key: string,
+  coverFile: string
+): Promise<{ coverFile: string; coverUrl: string } | null> {
+  const source = await join(await ensureCoversDir(), coverFile)
+  /* Уникальное имя: иначе смена обложки у источника перезапишет и копию */
+  return saveCoverFromFile(`${key}-${Date.now()}`, source)
+}
+
 /** Сохранить обложку из выбранного файла (key = id трека или 'pl-<id>' плейлиста) */
 export async function saveCoverFromFile(
   key: string,
@@ -215,6 +225,7 @@ export interface PlaylistData {
   name: string
   cover?: string | null
   coverFile?: string | null
+  color?: string | null
   trackIds: number[]
 }
 

@@ -519,7 +519,7 @@ export default function TracksView({
       document.body
     )}
 
-      <TrackEditModal track={editingTrack} onClose={() => setEditingTrack(null)} onSave={handleEditSave} />
+      <TrackEditModal track={editingTrack} onClose={() => setEditingTrack(null)} onSave={handleEditSave} tracks={tracks} />
       
       <TrackDetailsModal 
         track={detailsTrack} 

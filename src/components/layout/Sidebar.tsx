@@ -2,7 +2,10 @@ import { useState, useRef, useEffect } from 'react'
 import { createPortal, flushSync } from 'react-dom'
 import { appDataDir, join } from '@tauri-apps/api/path'
 import { exists, readFile, readTextFile } from '@tauri-apps/plugin-fs'
-import type { ViewType, Playlist, CoverPick } from '../../App'
+import type { ViewType, Playlist, CoverPick, Track } from '../../App'
+import { copyCover } from '../../lib/trackLoader'
+import CoverPicker from '../CoverPicker'
+import { usePresence } from '../views/shared'
 import { useI18n } from '../../i18n'
 import './Sidebar.css'
 
@@ -17,6 +20,8 @@ interface SidebarProps {
   avatarShape?: AvatarShape
   onCreatePlaylist: (name: string, cover?: CoverPick | null) => number
   onRenamePlaylist: (id: number, name: string) => void
+  onUpdatePlaylist: (id: number, patch: Partial<Pick<Playlist, 'cover' | 'coverFile' | 'color'>>) => void
+  tracks: Track[]
   onDeletePlaylist: (id: number) => void
   onChangePlaylistCover: (id: number) => void
   onPickImage: () => Promise<CoverPick | null>
@@ -82,6 +87,8 @@ export default function Sidebar({
   avatarShape,
   onCreatePlaylist,
   onRenamePlaylist,
+  onUpdatePlaylist,
+  tracks,
   onDeletePlaylist,
   onChangePlaylistCover,
   onPickImage,
@@ -93,7 +100,13 @@ export default function Sidebar({
   const [createName, setCreateName] = useState('')
   const [createCover, setCreateCover] = useState<CoverPick | null>(null)
   const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number; id: number } | null>(null)
-  const [editState, setEditState] = useState<{ id: number; name: string } | null>(null)
+  const [editState, setEditState] = useState<{ id: number; name: string; color: string | null } | null>(null)
+  /* Куда отдать обложку, выбранную из трека: в форму создания или в редактируемый плейлист */
+  const [borrowFor, setBorrowFor] = useState<'create' | 'edit' | null>(null)
+  /* Последняя позиция меню остаётся, пока проигрывается анимация закрытия */
+  const [ctxShown, setCtxShown] = useState(ctxMenu)
+  if (ctxMenu && ctxMenu !== ctxShown) setCtxShown(ctxMenu)
+  const ctxPresence = usePresence(ctxMenu !== null)
   const [deleteTarget, setDeleteTarget] = useState<Playlist | null>(null)
 
   const [localAvatarUrl, setLocalAvatarUrl] = useState<string | null>(null)
@@ -235,7 +248,19 @@ export default function Sidebar({
     if (!name) return
 
     onRenamePlaylist(editState.id, name)
+    onUpdatePlaylist(editState.id, { color: editState.color })
     setEditState(null)
+  }
+
+  const handleBorrowCover = async (source: Track) => {
+    const target = borrowFor
+    const editId = editState?.id
+    setBorrowFor(null)
+    if (!source.coverFile) return
+    const copied = await copyCover(target === 'edit' && editId ? `pl-${editId}` : 'pl-new', source.coverFile)
+    if (!copied) return
+    if (target === 'create') setCreateCover(copied)
+    else if (target === 'edit' && editId) onUpdatePlaylist(editId, { cover: copied.coverUrl, coverFile: copied.coverFile })
   }
 
   const requestDelete = (pl: Playlist) => {
@@ -556,13 +581,13 @@ export default function Sidebar({
         </div>
       </aside>
 
-      {ctxMenu &&
+      {ctxPresence.mounted && ctxShown &&
         createPortal(
-          <div ref={ctxRef} className="sb-context-menu" style={{ left: ctxMenu.x, top: ctxMenu.y }}>
+          <div ref={ctxRef} className={`sb-context-menu ${ctxPresence.closing ? 'closing' : ''}`} style={{ left: ctxShown.x, top: ctxShown.y }}>
             <button
               className="sb-context-item"
               onClick={() => {
-                setEditState({ id: ctxMenu.id, name: ctxPlaylist?.name ?? '' })
+                setEditState({ id: ctxShown.id, name: ctxPlaylist?.name ?? '', color: ctxPlaylist?.color ?? null })
                 setCtxMenu(null)
               }}
             >
@@ -638,6 +663,9 @@ export default function Sidebar({
                   >
                     {t('layout.sidebar.chooseCover')}
                   </button>
+                  <button className="sb-modal-btn sb-modal-btn-cancel" onClick={() => setBorrowFor('create')}>
+                    {t('coverPicker.fromTrack')}
+                  </button>
                 </div>
 
                 <input
@@ -709,6 +737,27 @@ export default function Sidebar({
                   >
                     {t('layout.sidebar.changeCover')}
                   </button>
+                  <button className="sb-modal-btn sb-modal-btn-cancel" onClick={() => setBorrowFor('edit')}>
+                    {t('coverPicker.fromTrack')}
+                  </button>
+                </div>
+
+                <div className="sb-color-row">
+                  <span className="sb-color-label">{t('layout.sidebar.bgColor')}</span>
+                  <label className="sb-color-swatch" style={{ background: editState.color ?? 'var(--element-strong)' }}>
+                    <input
+                      type="color"
+                      value={editState.color ?? '#808080'}
+                      onChange={(e) => setEditState({ ...editState, color: e.target.value })}
+                    />
+                  </label>
+                  <button
+                    className="sb-modal-btn sb-modal-btn-cancel"
+                    onClick={() => setEditState({ ...editState, color: null })}
+                    disabled={!editState.color}
+                  >
+                    {t('layout.sidebar.resetColor')}
+                  </button>
                 </div>
 
                 <input
@@ -743,6 +792,13 @@ export default function Sidebar({
           </div>,
           document.body
         )}
+
+      <CoverPicker
+        open={borrowFor !== null}
+        tracks={tracks}
+        onPick={handleBorrowCover}
+        onClose={() => setBorrowFor(null)}
+      />
 
       {deleteTarget &&
         createPortal(

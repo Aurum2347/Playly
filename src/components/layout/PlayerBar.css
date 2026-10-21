@@ -331,6 +331,16 @@
   animation: playerMenuIn 0.12s ease;
 }
 
+.player-context-menu.closing {
+  animation: playerMenuOut 0.15s ease forwards;
+  pointer-events: none;
+}
+
+@keyframes playerMenuOut {
+  from { opacity: 1; transform: none; }
+  to   { opacity: 0; transform: translateY(-4px) scale(0.98); }
+}
+
 @keyframes playerMenuIn {
   from { opacity: 0; transform: translateY(-4px) scale(0.98); }
   to   { opacity: 1; transform: none; }
