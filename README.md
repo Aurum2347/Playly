@@ -1,75 +1,60 @@
-# React + TypeScript + Vite
+<div align="center">
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+# 🎧 Playly
 
-Currently, two official plugins are available:
+Современный, быстрый и полностью офлайн аудиоплеер для Windows.  
+Никаких аккаунтов, подписок и стриминга.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+[⬇️ Скачать последний релиз](https://github.com/Aurum2347/Playly/releases/latest) • [🌐 Подробнее о проекте]([ССЫЛКА_НА_ПОДРОБНОСТИ]) • [💬 Telegram-канал](https://t.me/aurums2347)
 
-## React Compiler
+</div>
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+---
 
-## Expanding the ESLint configuration
+## 🖥 Интерфейс
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+<table>
+  <tr>
+    <td align="center"><b>Главная</b><br>Быстрый доступ к последнему треку</td>
+    <td align="center"><b>Все треки</b><br>Полный контроль, сортировки и поиск</td>
+  </tr>
+  <tr>
+    <td><img src="https://github.com/user-attachments/assets/fe4d96d6-bc29-4ab2-b94b-80ba66a0ea75" alt="Главная страница Playly" width="100%"></td>
+    <td><img src="https://github.com/user-attachments/assets/1785d8f5-b737-4be6-8237-bf5f0c4843ac" alt="Все треки Playly" width="100%"></td>
+  </tr>
+  <tr>
+    <td align="center" colspan="2"><b>Понравившиеся</b><br>Твои избранные треки со статистикой</td>
+  </tr>
+  <tr>
+    <td colspan="2"><img src="https://github.com/user-attachments/assets/24215edd-c68a-47b3-b014-ca721bea9932" alt="Понравившиеся треки Playly" width="100%"></td>
+  </tr>
+</table>
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+---
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
+## 📂 Приватность и данные
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+Playly уважает твою приватность. Вся библиотека, плейлисты, настройки и профиль лежат **только на твоём ПК**.
 
-```
+> **Путь к данным:** `%AppData%\playly`
+> 
+> Хочешь начать с чистого листа или удалить все следы? Просто удали эту папку.
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+---
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+## 🚀 Как запустить
 
-```
+1. Перейди в раздел [Releases](https://github.com/Aurum2347/Playly/releases/latest).
+2. Скачай `Playly.exe`.
+3. Запусти двойным кликом. Готово!
+
+*(Требуется Windows 10 или 11. WebView2 обычно уже встроен в систему).*
+
+---
+
+<div align="center">
+
+[![Telegram](https://img.shields.io/badge/Telegram-2CA5E0?style=for-the-badge&logo=telegram&logoColor=white)](https://t.me/aurums2347) 
+
+</div>
