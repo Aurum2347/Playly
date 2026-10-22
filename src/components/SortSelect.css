@@ -1,0 +1,194 @@
+/* ===== Выбор сортировки: подпись сверху, под ней поле-селект и список ===== */
+.sort-select {
+  position: relative;
+  display: inline-flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 232px;
+}
+
+.sort-select-label {
+  padding-left: 2px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+  transition: color 0.15s ease;
+}
+
+.sort-select.open .sort-select-label,
+.sort-select:hover .sort-select-label { color: var(--text-muted); }
+
+.sort-select-trigger {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  height: 38px;
+  padding: 0 10px 0 12px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.035), transparent),
+    var(--panel);
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-weight: 500;
+  font-family: inherit;
+  cursor: pointer;
+  text-align: left;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03), 0 1px 2px rgba(0, 0, 0, 0.12);
+  transition: border-color 0.15s ease, background-color 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.sort-select-trigger:hover {
+  border-color: var(--dashed);
+  color: var(--text);
+}
+
+.sort-select.open .sort-select-trigger {
+  border-color: var(--dashed);
+  color: var(--text);
+  box-shadow: 0 0 0 3px var(--glow), inset 0 1px 0 rgba(255, 255, 255, 0.03);
+}
+
+.sort-select-trigger:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--selection);
+}
+
+.sort-select-icon {
+  display: flex;
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+.sort-select-icon svg { width: 15px; height: 15px; }
+
+.sort-select-value {
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sort-select-value.placeholder { color: var(--text-muted); font-style: italic; }
+
+.sort-select-chevron {
+  width: 15px;
+  height: 15px;
+  color: var(--text-faint);
+  flex-shrink: 0;
+  transition: transform 0.22s cubic-bezier(0.34, 1.4, 0.64, 1), color 0.15s ease;
+}
+
+.sort-select.open .sort-select-chevron { transform: rotate(180deg); color: var(--text-secondary); }
+
+/* ===== Список ===== */
+.sort-select-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  min-width: 100%;
+  max-height: min(380px, 60vh);
+  overflow-y: auto;
+  padding: 6px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: var(--menu);
+  box-shadow: 0 16px 40px var(--shadow), 0 2px 6px rgba(0, 0, 0, 0.2);
+  z-index: 60;
+  transform-origin: top center;
+  animation: sortMenuIn 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.sort-select-menu.closing {
+  animation: sortMenuOut 0.16s ease forwards;
+  pointer-events: none;
+}
+
+@keyframes sortMenuIn {
+  from { opacity: 0; transform: translateY(-6px) scaleY(0.96); }
+  to   { opacity: 1; transform: none; }
+}
+
+@keyframes sortMenuOut {
+  from { opacity: 1; transform: none; }
+  to   { opacity: 0; transform: translateY(-4px) scaleY(0.97); }
+}
+
+.sort-select-menu::-webkit-scrollbar { width: 4px; }
+.sort-select-menu::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+.sort-select-group {
+  padding: 8px 10px 4px;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+
+.sort-select-group.divided {
+  margin-top: 4px;
+  border-top: 1px solid var(--border-soft);
+  padding-top: 10px;
+}
+
+.sort-select-option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 10px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-weight: 500;
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background-color 0.12s ease, color 0.12s ease;
+}
+
+.sort-select-option:hover,
+.sort-select-option:focus-visible {
+  outline: none;
+  background: var(--hover);
+  color: var(--text);
+}
+
+.sort-select-option.active {
+  background: var(--hover-strong);
+  color: var(--text);
+}
+
+.sort-select-option-icon { display: flex; color: var(--text-faint); flex-shrink: 0; }
+.sort-select-option-icon svg { width: 15px; height: 15px; }
+.sort-select-option.active .sort-select-option-icon,
+.sort-select-option:hover .sort-select-option-icon { color: var(--text-secondary); }
+
+.sort-select-option-label {
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sort-select-check {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+  color: var(--text);
+  opacity: 0;
+  transform: scale(0.6);
+  transition: opacity 0.15s ease, transform 0.2s cubic-bezier(0.34, 1.4, 0.64, 1);
+}
+
+.sort-select-option.active .sort-select-check { opacity: 1; transform: none; }

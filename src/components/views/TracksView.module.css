@@ -20,9 +20,9 @@
 .viewHeader {
   flex-shrink: 0;
   display: flex;
-  align-items: center;
+  align-items: flex-end;
   justify-content: space-between;
-  margin-bottom: 24px;
+  margin-bottom: 20px;
   gap: 16px;
 }
 
@@ -31,11 +31,13 @@
   font-weight: 700;
   letter-spacing: -0.02em;
   color: var(--text);
+  line-height: 38px;
 }
 
+/* Сортировка с подписью сверху — кнопки выравниваем по нижнему краю поля */
 .headerActions {
   display: flex;
-  align-items: center;
+  align-items: flex-end;
   gap: 10px;
 }
 
@@ -55,56 +57,75 @@
   pointer-events: auto;
 }
 
-
+/* Тот же вид, что у глобальной .btn (src/styles/buttons.css) */
 .btn {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 8px;
-  padding: 9px 14px;
-  border-radius: 10px;
-  border: 1px solid var(--border-soft);
-  background: var(--panel);
+  height: var(--btn-h, 36px);
+  padding: 0 14px;
+  border-radius: var(--btn-radius, 10px);
+  border: 1px solid var(--btn-border, var(--border));
+  background: linear-gradient(180deg, var(--btn-shine), transparent 70%), var(--btn-bg);
   color: var(--text-secondary);
   font-size: 13px;
-  font-weight: 500;
+  font-weight: 550;
   font-family: inherit;
+  line-height: 1;
   cursor: pointer;
-  transition: all 0.15s ease;
   white-space: nowrap;
   user-select: none;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.14), inset 0 1px 0 var(--btn-shine);
+  transition:
+    background-color 0.16s ease,
+    border-color 0.16s ease,
+    color 0.16s ease,
+    box-shadow 0.16s ease,
+    transform 0.16s ease,
+    opacity 0.16s ease;
 }
 
-.btn:hover {
-  background: var(--menu);
-  border-color: var(--border);
+.btn:hover:not(:disabled) {
+  background: linear-gradient(180deg, var(--btn-shine), transparent 70%), var(--btn-bg-hover);
+  border-color: var(--btn-border-hover, var(--dashed));
   color: var(--text);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.18), inset 0 1px 0 var(--btn-shine);
+  transform: translateY(-1px);
 }
 
-.btn:active { transform: scale(0.97); }
+.btn:active:not(:disabled) { transform: scale(0.97); }
+.btn:focus-visible { box-shadow: 0 0 0 3px var(--selection); }
+.btn:disabled { opacity: 0.45; cursor: not-allowed; }
 .btn svg { width: 15px; height: 15px; flex-shrink: 0; }
 
 .btnPrimary {
-  background: var(--accent);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.18), transparent 60%), var(--accent);
+  border-color: transparent;
   color: var(--accent-text);
-  border-color: var(--accent);
-  font-weight: 600;
+  font-weight: 650;
+  box-shadow: 0 4px 14px var(--logo-shadow), inset 0 1px 0 rgba(255, 255, 255, 0.25);
 }
 
-.btnPrimary:hover {
-  background: var(--accent-hover);
+.btnPrimary:hover:not(:disabled) {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.22), transparent 60%), var(--accent-hover);
+  border-color: transparent;
   color: var(--accent-text);
-  border-color: var(--accent-hover);
+  box-shadow: 0 8px 22px var(--logo-shadow), inset 0 1px 0 rgba(255, 255, 255, 0.3);
 }
 
 .btnDanger {
-  color: var(--danger);
-  border-color: var(--danger-border);
-}
-
-.btnDanger:hover {
   background: var(--danger-hover);
   border-color: var(--danger-border);
   color: var(--danger);
+  box-shadow: none;
+}
+
+.btnDanger:hover:not(:disabled) {
+  background: var(--danger-soft);
+  border-color: var(--danger);
+  color: var(--danger);
+  box-shadow: 0 6px 16px var(--danger-glow);
 }
 
 

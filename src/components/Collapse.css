@@ -1,0 +1,20 @@
+/* Не «.collapse»: это имя занято утилитой Tailwind (visibility: collapse) и прятало содержимое */
+.smooth-collapse {
+  display: grid;
+  grid-template-rows: 0fr;
+  opacity: 0;
+  transform: translateY(-4px);
+  transition:
+    grid-template-rows 0.34s cubic-bezier(0.2, 0.8, 0.2, 1),
+    opacity 0.24s ease,
+    transform 0.34s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.smooth-collapse.open {
+  grid-template-rows: 1fr;
+  opacity: 1;
+  transform: none;
+}
+
+.smooth-collapse-inner { min-height: 0; }
+.smooth-collapse.clip > .smooth-collapse-inner { overflow: hidden; }

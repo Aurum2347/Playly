@@ -1,31 +1,81 @@
 import { useEffect, useRef, useState, type CSSProperties } from 'react'
 import { readSettingsRaw, sliderPercent, useOutsideClose, writeSettingsRaw } from './helpers'
 import { useI18n } from '../../../i18n'
+import Collapse from '../../Collapse'
+import EqCurve from '../../EqCurve'
+import EqEditorModal, { type EqEditTarget } from '../../EqEditorModal'
+import { BUILTIN_EQ_PRESETS, EQ_BANDS, bandLabel, isBuiltinPreset, presetGains, type EqPreset } from '../../../lib/equalizer'
+import '../../Equalizer.css'
+
+type CurveKind = 'equal' | 'linear' | 'smooth'
+
+const CURVES: CurveKind[] = ['equal', 'smooth', 'linear']
+
+const CURVE_LABEL_KEYS: Record<CurveKind, string> = {
+  equal: 'settings.playback.curveEqual',
+  smooth: 'settings.playback.curveSmooth',
+  linear: 'settings.playback.curveLinear',
+}
+
+function curveValue(kind: CurveKind, p: number) {
+  if (kind === 'linear') return p
+  if (kind === 'smooth') return p * p * (3 - 2 * p)
+  return Math.sin((p * Math.PI) / 2)
+}
+
+/* Мини-график: как затухает старый трек и нарастает новый */
+function CurvePreview({ kind }: { kind: CurveKind }) {
+  const pts = (fn: (p: number) => number) =>
+    Array.from({ length: 33 }, (_, i) => {
+      const p = i / 32
+      return `${(p * 100).toFixed(1)},${(37 - fn(p) * 34).toFixed(1)}`
+    }).join(' ')
+  return (
+    <svg className="xfade-preview" viewBox="0 0 100 40" preserveAspectRatio="none" aria-hidden="true">
+      <polyline className="xfade-out" points={pts((p) => curveValue(kind, 1 - p))} />
+      <polyline className="xfade-in" points={pts((p) => curveValue(kind, p))} />
+    </svg>
+  )
+}
 
 interface PlaybackSectionProps {
   crossfade?: number
   onChangeCrossfade?: (sec: number) => void
+  manualCrossfade?: boolean
+  onChangeManualCrossfade?: (v: boolean) => void
+  crossfadeCurve?: CurveKind
+  onChangeCrossfadeCurve?: (c: CurveKind) => void
   outputDevice?: string
   onChangeOutputDevice?: (id: string) => void
+  eqEnabled?: boolean
+  eqPresetId?: string
+  eqCustomPresets?: EqPreset[]
+  onChangeEqEnabled?: (v: boolean) => void
+  onChangeEqPreset?: (id: string) => void
+  onSaveEqPreset?: (p: EqPreset) => void
+  onDeleteEqPreset?: (id: string) => void
+  onPreviewEq?: (gains: number[] | null) => void
 }
 
-type EqPreset = 'flat' | 'rock' | 'pop' | 'bass' | 'classic'
-
-const EQ_KEYS: EqPreset[] = ['flat', 'rock', 'pop', 'bass', 'classic']
-
-const EQ_LABEL_KEYS: Record<EqPreset, string> = {
-  flat: 'settings.playback.presetFlat',
-  rock: 'settings.playback.presetRock',
-  pop: 'settings.playback.presetPop',
-  bass: 'settings.playback.presetBass',
-  classic: 'settings.playback.presetClassic',
-}
+const noopPreview = () => {}
 
 export default function PlaybackSection({
   crossfade,
   onChangeCrossfade,
+  manualCrossfade = false,
+  onChangeManualCrossfade,
+  crossfadeCurve = 'equal',
+  onChangeCrossfadeCurve,
   outputDevice,
   onChangeOutputDevice,
+  eqEnabled = false,
+  eqPresetId = 'flat',
+  eqCustomPresets = [],
+  onChangeEqEnabled,
+  onChangeEqPreset,
+  onSaveEqPreset,
+  onDeleteEqPreset,
+  onPreviewEq = noopPreview,
 }: PlaybackSectionProps) {
   const { t } = useI18n()
   const [localCrossfade, setLocalCrossfade] = useState(0)
@@ -33,12 +83,14 @@ export default function PlaybackSection({
   const [outputDevices, setOutputDevices] = useState<{ id: string; label: string }[]>([])
   const [defaultDeviceName, setDefaultDeviceName] = useState('')
   const [normalization, setNormalization] = useState(true)
-  const [eqEnabled, setEqEnabled] = useState(false)
-  const [eqPreset, setEqPreset] = useState<EqPreset>('flat')
-  const [openDropdown, setOpenDropdown] = useState<'presets' | 'output' | null>(null)
-  const dropdownRef = useRef<HTMLDivElement>(null)
+  const [eqEdit, setEqEdit] = useState<EqEditTarget | null>(null)
+  const [openDropdown, setOpenDropdown] = useState<'output' | 'curve' | null>(null)
+  const outputDropdownRef = useRef<HTMLDivElement>(null)
+  const curveDropdownRef = useRef<HTMLDivElement>(null)
 
-  useOutsideClose(dropdownRef, () => setOpenDropdown(null))
+  /* Закрываем список при клике мимо именно открытого списка (раньше считался «внутри» весь раздел) */
+  const activeDropdownRef = openDropdown === 'output' ? outputDropdownRef : curveDropdownRef
+  useOutsideClose(activeDropdownRef, () => setOpenDropdown(null))
 
   /* ===== Читаем сохранённые значения из settings.json ===== */
   useEffect(() => {
@@ -53,10 +105,6 @@ export default function PlaybackSection({
         setLocalOutputDevice(data.outputDevice)
       }
       if (typeof data.normalization === 'boolean') setNormalization(data.normalization)
-      if (typeof data.eqEnabled === 'boolean') setEqEnabled(data.eqEnabled)
-      if (typeof data.eq === 'string' && (EQ_KEYS as string[]).includes(data.eq)) {
-        setEqPreset(data.eq as EqPreset)
-      }
     })()
     return () => {
       cancelled = true
@@ -146,20 +194,28 @@ export default function PlaybackSection({
     window.dispatchEvent(new CustomEvent('playly-normalization', { detail: v }))
   }
 
-  const handleEqToggle = (v: boolean) => {
-    setEqEnabled(v)
-    writeSettingsRaw({ eqEnabled: v })
-    window.dispatchEvent(new CustomEvent('playly-eq', { detail: { enabled: v, preset: eqPreset } }))
+  /* ===== Эквалайзер ===== */
+  const presetName = (id: string) =>
+    eqCustomPresets.find((p) => p.id === id)?.name ?? t(`eq.preset_${id}`)
+
+  /* Встроенный пресет не меняем — редактирование создаёт свою копию */
+  const editCurrentPreset = () => {
+    const custom = eqCustomPresets.find((p) => p.id === eqPresetId)
+    if (custom) {
+      setEqEdit({ id: custom.id, name: custom.name, gains: custom.gains })
+    } else {
+      setEqEdit({
+        id: null,
+        name: t('eq.copyName', { name: presetName(eqPresetId) }),
+        gains: presetGains(eqPresetId, eqCustomPresets),
+      })
+    }
   }
 
-  const handlePresetChange = (v: EqPreset) => {
-    setEqPreset(v)
-    writeSettingsRaw({ eq: v })
-    window.dispatchEvent(new CustomEvent('playly-eq', { detail: { enabled: eqEnabled, preset: v } }))
-  }
+  const createPreset = () => setEqEdit({ id: null, name: t('eq.newName'), gains: presetGains('flat', []) })
 
   return (
-    <div ref={dropdownRef}>
+    <div>
       <h1 className="page-title">{t('settings.playback.title')}</h1>
       <p className="page-subtitle">{t('settings.playback.subtitle')}</p>
       <div className="settings-section">
@@ -186,6 +242,64 @@ export default function PlaybackSection({
             </div>
           </div>
         </div>
+        {/* ===== Кроссфейд: детали (видны, только если он включён) ===== */}
+        <Collapse open={crossfadeValue > 0}>
+          <div className="xfade-panel">
+            <div className="xfade-panel-row">
+              <div>
+                <div className="eq-panel-title">{t('settings.playback.curve')}</div>
+                <div className="eq-panel-desc">{t('settings.playback.curveDesc')}</div>
+              </div>
+              <div className="xfade-panel-controls">
+                <CurvePreview kind={crossfadeCurve} />
+                <div className="dropdown" ref={curveDropdownRef}>
+                  <button
+                    className={`select-btn ${openDropdown === 'curve' ? 'open' : ''}`}
+                    onClick={() => setOpenDropdown(openDropdown === 'curve' ? null : 'curve')}
+                  >
+                    <span className="btn-label">{t(CURVE_LABEL_KEYS[crossfadeCurve])}</span>
+                    <svg className="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <polyline points="6 9 12 15 18 9" />
+                    </svg>
+                  </button>
+                  {openDropdown === 'curve' && (
+                    <div className="dropdown-menu open">
+                      {CURVES.map((c) => (
+                        <button
+                          key={c}
+                          className={`dropdown-option ${crossfadeCurve === c ? 'active' : ''}`}
+                          onClick={() => {
+                            onChangeCrossfadeCurve?.(c)
+                            setOpenDropdown(null)
+                          }}
+                        >
+                          <span>{t(CURVE_LABEL_KEYS[c])}</span>
+                          <svg className="check" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                            <polyline points="20 6 9 17 4 12" />
+                          </svg>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+            <div className="xfade-panel-row">
+              <div>
+                <div className="eq-panel-title">{t('settings.playback.manualCrossfade')}</div>
+                <div className="eq-panel-desc">{t('settings.playback.manualCrossfadeDesc')}</div>
+              </div>
+              <label className="toggle">
+                <input
+                  type="checkbox"
+                  checked={manualCrossfade}
+                  onChange={(e) => onChangeManualCrossfade?.(e.target.checked)}
+                />
+                <span className="toggle-slider"></span>
+              </label>
+            </div>
+          </div>
+        </Collapse>
         {/* ===== Нормализация ===== */}
         <div className="setting-row">
           <div className="setting-info">
@@ -210,7 +324,7 @@ export default function PlaybackSection({
             <div className="setting-desc">{t('settings.playback.outputDeviceDesc')}</div>
           </div>
           <div className="setting-control">
-            <div className="dropdown">
+            <div className="dropdown" ref={outputDropdownRef}>
               <button
                 className={`select-btn ${openDropdown === 'output' ? 'open' : ''}`}
                 onClick={() => setOpenDropdown(openDropdown === 'output' ? null : 'output')}
@@ -257,7 +371,7 @@ export default function PlaybackSection({
             </div>
           </div>
         </div>
-        {/* ===== Эквалайзер: переключатель ===== */}
+        {/* ===== Эквалайзер ===== */}
         <div className="setting-row">
           <div className="setting-info">
             <div className="setting-name">{t('settings.playback.equalizer')}</div>
@@ -268,63 +382,84 @@ export default function PlaybackSection({
               <input
                 type="checkbox"
                 checked={eqEnabled}
-                onChange={(e) => handleEqToggle(e.target.checked)}
+                onChange={(e) => onChangeEqEnabled?.(e.target.checked)}
               />
               <span className="toggle-slider"></span>
             </label>
           </div>
         </div>
-        {/* ===== Панель пресетов (недоступна, если эквалайзер выключен) ===== */}
-        <div className={`eq-panel ${eqEnabled ? '' : 'disabled'}`}>
-          <div>
-            <div className="eq-panel-title">{t('settings.playback.presets')}</div>
-            <div className="eq-panel-desc">{t('settings.playback.presetsDesc')}</div>
-          </div>
-          <div className="dropdown">
-            <button
-              className={`select-btn ${openDropdown === 'presets' ? 'open' : ''}`}
-              onClick={() => setOpenDropdown(openDropdown === 'presets' ? null : 'presets')}
-            >
-              <span className="btn-label">{t(EQ_LABEL_KEYS[eqPreset])}</span>
-              <svg
-                className="chevron"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-              >
-                <polyline points="6 9 12 15 18 9" />
-              </svg>
-            </button>
-            {openDropdown === 'presets' && (
-              <div className="dropdown-menu open">
-                {EQ_KEYS.map((val) => (
-                  <button
-                    key={val}
-                    className={`dropdown-option ${eqPreset === val ? 'active' : ''}`}
-                    onClick={() => {
-                      handlePresetChange(val)
-                      setOpenDropdown(null)
+        {/* Панель видна только при включённом эквалайзере и раскрывается плавно */}
+        <Collapse open={eqEnabled}>
+          <div className="eq-card">
+            <div className="eq-card-preview">
+              <EqCurve gains={presetGains(eqPresetId, eqCustomPresets)} alignToColumns />
+              <div className="eq-card-freqs" aria-hidden="true">
+                {EQ_BANDS.map((f) => <span key={f}>{bandLabel(f)}</span>)}
+              </div>
+            </div>
+
+            <div className="eq-card-head">
+              <span className="eq-card-title">{t('settings.playback.presets')}</span>
+              <div className="eq-card-actions">
+                <button className="btn" onClick={editCurrentPreset}>
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><line x1="4" y1="21" x2="4" y2="14" /><line x1="4" y1="10" x2="4" y2="3" /><line x1="12" y1="21" x2="12" y2="12" /><line x1="12" y1="8" x2="12" y2="3" /><line x1="20" y1="21" x2="20" y2="16" /><line x1="20" y1="12" x2="20" y2="3" /><line x1="1" y1="14" x2="7" y2="14" /><line x1="9" y1="8" x2="15" y2="8" /><line x1="17" y1="16" x2="23" y2="16" /></svg>
+                  {t('eq.tune')}
+                </button>
+                <button className="btn btn-primary" onClick={createPreset}>
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
+                  {t('eq.new')}
+                </button>
+              </div>
+            </div>
+
+            <div className="eq-chips">
+              {BUILTIN_EQ_PRESETS.map((p) => (
+                <button
+                  key={p.id}
+                  className={`eq-chip ${eqPresetId === p.id ? 'active' : ''}`}
+                  onClick={() => onChangeEqPreset?.(p.id)}
+                >
+                  {t(`eq.preset_${p.id}`)}
+                </button>
+              ))}
+              {eqCustomPresets.map((p) => (
+                <button
+                  key={p.id}
+                  className={`eq-chip custom ${eqPresetId === p.id ? 'active' : ''}`}
+                  onClick={() => onChangeEqPreset?.(p.id)}
+                  onDoubleClick={() => setEqEdit({ id: p.id, name: p.name, gains: p.gains })}
+                  title={t('eq.customHint')}
+                >
+                  {p.name}
+                  <span
+                    className="eq-chip-edit"
+                    role="button"
+                    aria-label={t('common.edit')}
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      setEqEdit({ id: p.id, name: p.name, gains: p.gains })
                     }}
                   >
-                    <span>{t(EQ_LABEL_KEYS[val])}</span>
-                    <svg
-                      className="check"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2.5"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    >
-                      <polyline points="20 6 9 17 4 12" />
-                    </svg>
-                  </button>
-                ))}
-              </div>
-            )}
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9" /><path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z" /></svg>
+                  </span>
+                </button>
+              ))}
+            </div>
           </div>
-        </div>
+        </Collapse>
+
+        <EqEditorModal
+          target={eqEdit}
+          onCancel={() => setEqEdit(null)}
+          onSave={(p) => {
+            onSaveEqPreset?.(p)
+            setEqEdit(null)
+          }}
+          onDelete={(id) => {
+            if (!isBuiltinPreset(id)) onDeleteEqPreset?.(id)
+          }}
+          onPreview={onPreviewEq}
+        />
       </div>
     </div>
   )

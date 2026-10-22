@@ -869,131 +869,6 @@ border-radius: 3px;
 }
 
 
-.about-container {
-  max-width: 640px;
-  margin: 0 auto;
-  text-align: center;
-}
-
-.about-logo {
-  font-size: 48px;
-  font-weight: 800;
-  letter-spacing: -0.03em;
-  background: linear-gradient(135deg, var(--text) 0%, var(--text-muted) 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-  margin-bottom: 8px;
-  animation: logoIn 0.6s ease backwards;
-}
-
-@keyframes logoIn {
-  from { opacity: 0; transform: translateY(-10px); letter-spacing: 0.1em; }
-  to   { opacity: 1; transform: translateY(0); letter-spacing: -0.03em; }
-}
-
-.about-version {
-  font-size: 13px;
-  color: var(--text-faint);
-  font-weight: 500;
-  margin-bottom: 32px;
-  animation: fadeIn 0.5s ease 0.1s backwards;
-}
-
-@keyframes fadeIn {
-  from { opacity: 0; }
-  to   { opacity: 1; }
-}
-
-.about-text {
-  font-size: 14px;
-  color: var(--text-secondary);
-  line-height: 1.7;
-  text-align: left;
-  margin-bottom: 32px;
-  animation: fadeIn 0.5s ease 0.2s backwards;
-}
-
-.about-text p { margin-bottom: 14px; }
-.about-text strong { color: var(--text); font-weight: 600; }
-
-.about-links {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  animation: fadeIn 0.5s ease 0.3s backwards;
-}
-
-.about-link-card {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  padding: 14px 16px;
-  background: var(--panel);
-  border: 1px solid var(--border-soft);
-  border-radius: 12px;
-  cursor: pointer;
-  text-decoration: none;
-  transition: all 0.2s ease;
-  text-align: left;
-}
-
-.about-link-card:hover {
-  background: var(--menu);
-  border-color: var(--border);
-  transform: translateY(-2px);
-  box-shadow: 0 8px 24px var(--shadow);
-}
-
-.about-link-card:active { transform: translateY(0); }
-
-.about-link-icon {
-  width: 44px;
-  height: 44px;
-  border-radius: 10px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-}
-
-.about-link-icon.telegram { background: linear-gradient(135deg, #2AABEE 0%, #229ED9 100%); }
-.about-link-icon.github { background: linear-gradient(135deg, #333 0%, #24292e 100%); }
-.about-link-icon svg { width: 22px; height: 22px; color: #fff; }
-
-.about-link-info { flex: 1; min-width: 0; }
-
-.about-link-title {
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--text);
-  margin-bottom: 2px;
-}
-
-.about-link-sub {
-  font-size: 12px;
-  color: var(--text-faint);
-}
-
-.about-link-arrow {
-  color: var(--text-faint);
-  transition: transform 0.2s ease, color 0.2s ease;
-}
-
-.about-link-card:hover .about-link-arrow {
-  transform: translateX(3px);
-  color: var(--text-secondary);
-}
-
-.about-link-arrow svg { width: 16px; height: 16px; }
-
-.about-links-row {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 12px;
-}
-
-
 .avatar img {
   width: 100%;
   height: 100%;
@@ -1045,8 +920,56 @@ border-radius: 3px;
   pointer-events: none;
 }
 
-.eq-panel-title { font-size: 13px; font-weight: 600; color: #c8c8ce; }
-.eq-panel-desc { font-size: 12px; color: #6a6a72; margin-top: 2px; }
+.eq-panel-title { font-size: 13px; font-weight: 600; color: var(--text-secondary); }
+.eq-panel-desc { font-size: 12px; color: var(--text-faint); margin-top: 2px; }
+.eq-panel { background: var(--element); border-color: var(--border-soft); }
+
+/* ===== Кроссфейд: кривая и ручное переключение ===== */
+.xfade-panel {
+  display: flex;
+  flex-direction: column;
+  margin: 2px 0 14px;
+  padding: 4px 16px;
+  background: var(--element);
+  border: 1px solid var(--border-soft);
+  border-radius: 12px;
+}
+
+.xfade-panel-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 10px 0;
+}
+
+.xfade-panel-row + .xfade-panel-row { border-top: 1px solid var(--border-faint); }
+
+.xfade-panel-controls { display: flex; align-items: center; gap: 12px; }
+
+.xfade-preview {
+  width: 84px;
+  height: 34px;
+  padding: 3px;
+  border-radius: 8px;
+  background: var(--panel);
+  border: 1px solid var(--border-soft);
+}
+
+.xfade-preview polyline {
+  fill: none;
+  stroke-width: 2.2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
+}
+
+.xfade-preview .xfade-out { stroke: var(--text-faint); }
+.xfade-preview .xfade-in { stroke: var(--text); }
+
+/* ===== Масштаб ===== */
+.scale-wrap { min-width: 320px; }
+.scale-wrap .slider-value { min-width: 58px; }
 
 
 .setting-row { animation: settingRowIn 0.35s ease backwards; }

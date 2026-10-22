@@ -118,17 +118,23 @@ export default function useLibrary({
     savePlayHistory(next)
   }, [])
 
-  const addTracksFromPaths = useCallback(async (paths: string[]) => {
+  /* Возвращает id треков из выбранных файлов: и новых, и уже лежавших в библиотеке */
+  const addTracksFromPaths = useCallback(async (paths: string[]): Promise<number[]> => {
     cancelUploadRef.current = false
     const names = paths.map((p) => ({ name: p.split(/[\\/]/).pop() || p }))
     setUpload({ files: names, total: paths.length, current: 0, fileName: '', finished: false })
     const existing = new Set(tracksRef.current.map((t) => t.filePath))
+    const byPath = new Map(tracksRef.current.map((t) => [t.filePath, t.id]))
+    const ids = paths.map((p) => byPath.get(p)).filter((id): id is number => id !== undefined)
     await parseAudioFiles(paths, {
       existingPaths: existing,
       shouldStop: () => cancelUploadRef.current,
       onProgress: (p) =>
         setUpload((u) => (u ? { ...u, current: p.current, fileName: p.fileName } : u)),
-      onTrack: (track) => setTracks((prev) => [...prev, track]),
+      onTrack: (track) => {
+        ids.push(track.id)
+        setTracks((prev) => [...prev, track])
+      },
     })
     if (cancelUploadRef.current) {
       setUpload(null)
@@ -136,9 +142,10 @@ export default function useLibrary({
       setUpload((u) => (u ? { ...u, finished: true, current: u.total } : u))
       setTimeout(() => setUpload(null), 700)
     }
+    return ids
   }, [])
 
-  const handleAddTracks = useCallback(async () => {
+  const handleAddTracks = useCallback(async (): Promise<number[]> => {
     try {
       const selected = await open({
         multiple: true,
@@ -149,10 +156,11 @@ export default function useLibrary({
           },
         ],
       })
-      if (!selected) return
-      await addTracksFromPaths(Array.isArray(selected) ? selected : [selected])
+      if (!selected) return []
+      return await addTracksFromPaths(Array.isArray(selected) ? selected : [selected])
     } catch (e) {
       console.error('Ошибка диалога:', e)
+      return []
     }
   }, [addTracksFromPaths])
 
@@ -315,7 +323,7 @@ export default function useLibrary({
   )
 
   const handleUpdatePlaylist = useCallback(
-    (id: number, patch: Partial<Pick<Playlist, 'cover' | 'coverFile' | 'color'>>) => {
+    (id: number, patch: Partial<Pick<Playlist, 'cover' | 'coverFile' | 'color' | 'banner'>>) => {
       setPlaylists((prev) => prev.map((pl) => (pl.id === id ? { ...pl, ...patch } : pl)))
     },
     []
@@ -351,6 +359,21 @@ export default function useLibrary({
       return await saveCoverFromFile(`pl-${Date.now()}`, selected)
     } catch (e) {
       console.error('Ошибка выбора изображения:', e)
+      return null
+    }
+  }, [])
+
+  /* Картинка для баннера: GIF тоже подходит, поэтому лимит размера выше, чем у обложек */
+  const handlePickBanner = useCallback(async (): Promise<CoverPick | null> => {
+    try {
+      const selected = await open({
+        multiple: false,
+        filters: [{ name: 'Изображения', extensions: ['png', 'jpg', 'jpeg', 'webp', 'gif', 'bmp'] }],
+      })
+      if (!selected || Array.isArray(selected)) return null
+      return await saveCoverFromFile(`plb-${Date.now()}`, selected, 25 * 1024 * 1024)
+    } catch (e) {
+      console.error('Ошибка выбора баннера:', e)
       return null
     }
   }, [])
@@ -425,6 +448,7 @@ export default function useLibrary({
     handleDeletePlaylist,
     handleChangePlaylistCover,
     handlePickImage,
+    handlePickBanner,
     handleAddToPlaylist,
     handleRemoveFromPlaylist,
     handleReorderPlaylists,

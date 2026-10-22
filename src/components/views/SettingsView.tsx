@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import { DEBUG_DIAGNOSTICS_SCREEN, type ThemeMode } from './settings/helpers'
 import { useI18n } from '../../i18n'
+import type { CrossfadeCurve } from '../../lib/audioEngine'
+import type { EqPreset } from '../../lib/equalizer'
 import AppearanceSection from './settings/AppearanceSection'
 import PlaybackSection from './settings/PlaybackSection'
 import LibrarySection from './settings/LibrarySection'
@@ -9,15 +11,31 @@ import ProfileSection from './settings/ProfileSection'
 import AboutSection from './settings/AboutSection'
 import './SettingsView.css'
 
-type Section = 'appearance' | 'playback' | 'library' | 'system' | 'profile' | 'about'
+export type SettingsSection = 'appearance' | 'playback' | 'library' | 'system' | 'profile' | 'about'
+type Section = SettingsSection
 
 interface SettingsViewProps {
+  /* Открытый раздел (управляется снаружи, чтобы можно было сразу открыть, например, «Профиль») */
+  section?: SettingsSection
+  onSectionChange?: (s: SettingsSection) => void
   currentNickname: string
   onSaveNickname: (nickname: string) => void
   theme?: ThemeMode
   onChangeTheme?: (theme: ThemeMode) => void
   crossfade?: number
   onChangeCrossfade?: (sec: number) => void
+  manualCrossfade?: boolean
+  onChangeManualCrossfade?: (v: boolean) => void
+  crossfadeCurve?: CrossfadeCurve
+  onChangeCrossfadeCurve?: (c: CrossfadeCurve) => void
+  eqEnabled?: boolean
+  eqPresetId?: string
+  eqCustomPresets?: EqPreset[]
+  onChangeEqEnabled?: (v: boolean) => void
+  onChangeEqPreset?: (id: string) => void
+  onSaveEqPreset?: (p: EqPreset) => void
+  onDeleteEqPreset?: (id: string) => void
+  onPreviewEq?: (gains: number[] | null) => void
   outputDevice?: string
   onChangeOutputDevice?: (id: string) => void
   libraryFolder?: string
@@ -68,12 +86,26 @@ const NAV_LABEL_KEYS: Record<Section, string> = {
 }
 
 export default function SettingsView({
+  section,
+  onSectionChange,
   currentNickname,
   onSaveNickname,
   theme,
   onChangeTheme,
   crossfade,
   onChangeCrossfade,
+  manualCrossfade,
+  onChangeManualCrossfade,
+  crossfadeCurve,
+  onChangeCrossfadeCurve,
+  eqEnabled,
+  eqPresetId,
+  eqCustomPresets,
+  onChangeEqEnabled,
+  onChangeEqPreset,
+  onSaveEqPreset,
+  onDeleteEqPreset,
+  onPreviewEq,
   outputDevice,
   onChangeOutputDevice,
   libraryFolder,
@@ -87,7 +119,12 @@ export default function SettingsView({
   onChangeDiscordRpc,
 }: SettingsViewProps) {
   const { t } = useI18n()
-  const [activeSection, setActiveSection] = useState<Section>('appearance')
+  const [localSection, setLocalSection] = useState<Section>('appearance')
+  const activeSection = section ?? localSection
+  const setActiveSection = (s: Section) => {
+    setLocalSection(s)
+    onSectionChange?.(s)
+  }
 
   return (
     <div className="settings-content">
@@ -148,6 +185,18 @@ export default function SettingsView({
             <PlaybackSection
               crossfade={crossfade}
               onChangeCrossfade={onChangeCrossfade}
+              manualCrossfade={manualCrossfade}
+              onChangeManualCrossfade={onChangeManualCrossfade}
+              crossfadeCurve={crossfadeCurve}
+              onChangeCrossfadeCurve={onChangeCrossfadeCurve}
+              eqEnabled={eqEnabled}
+              eqPresetId={eqPresetId}
+              eqCustomPresets={eqCustomPresets}
+              onChangeEqEnabled={onChangeEqEnabled}
+              onChangeEqPreset={onChangeEqPreset}
+              onSaveEqPreset={onSaveEqPreset}
+              onDeleteEqPreset={onDeleteEqPreset}
+              onPreviewEq={onPreviewEq}
               outputDevice={outputDevice}
               onChangeOutputDevice={onChangeOutputDevice}
             />

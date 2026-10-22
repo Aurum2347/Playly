@@ -1,0 +1,327 @@
+/* ===== Окно «Добавить треки» в плейлист ===== */
+.atm-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 10002;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(8px);
+  animation: atmFade 0.2s ease both;
+}
+
+.atm-overlay.closing { animation: atmFadeOut 0.22s ease forwards; pointer-events: none; }
+
+@keyframes atmFade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes atmFadeOut { from { opacity: 1; } to { opacity: 0; } }
+
+.atm-modal {
+  width: 100%;
+  max-width: 620px;
+  height: min(720px, calc(100vh - 48px));
+  /* В совсем невысоком окне прокручивается всё окно, а не сплющивается содержимое */
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 22px;
+  border-radius: 22px;
+  border: 1px solid var(--border);
+  background: linear-gradient(160deg, var(--panel-solid), var(--panel));
+  box-shadow: 0 30px 80px var(--shadow);
+  animation: atmIn 0.32s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.atm-overlay.closing .atm-modal { animation: atmOut 0.22s ease forwards; }
+
+@keyframes atmIn {
+  from { opacity: 0; transform: translateY(14px) scale(0.97); }
+  to   { opacity: 1; transform: none; }
+}
+
+@keyframes atmOut {
+  to { opacity: 0; transform: translateY(8px) scale(0.98); }
+}
+
+.atm-head { display: flex; align-items: flex-start; gap: 12px; }
+.atm-head-text { flex: 1; min-width: 0; }
+.atm-title { font-size: 19px; font-weight: 800; letter-spacing: -0.02em; line-height: 1.3; color: var(--text); }
+
+.atm-sub {
+  margin-top: 2px;
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.atm-close {
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--element);
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: background-color 0.15s ease, color 0.15s ease, transform 0.15s ease;
+}
+
+.atm-close:hover { background: var(--hover-strong); color: var(--text); }
+.atm-close:active { transform: scale(0.92); }
+.atm-close svg { width: 15px; height: 15px; }
+
+/* Всё, кроме списка, сохраняет свою высоту — иначе в невысоком окне заголовки сплющивались */
+.atm-head,
+.atm-import,
+.atm-library-head,
+.atm-pages,
+.atm-foot { flex-shrink: 0; }
+
+/* Импорт новых файлов: на узкой ширине кнопка уходит на отдельную строку, текст не сжимается */
+.atm-import {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px 16px;
+  padding: 16px 18px;
+  border-radius: 16px;
+  border: 1.5px dashed var(--dashed);
+  background:
+    radial-gradient(120% 140% at 0% 0%, rgba(255, 255, 255, 0.04), transparent 60%),
+    var(--element);
+  transition: border-color 0.2s ease, background-color 0.2s ease;
+}
+
+.atm-import:hover { border-color: var(--text-muted); }
+
+.atm-import-main {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex: 1 1 240px;
+  min-width: 0;
+}
+
+.atm-import-icon {
+  width: 44px;
+  height: 44px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 13px;
+  background: var(--panel-solid);
+  border: 1px solid var(--border-soft);
+  color: var(--text-secondary);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.18);
+}
+
+.atm-import-icon svg { width: 20px; height: 20px; }
+
+.atm-import-text {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  flex: 1;
+  min-width: 0;
+}
+
+.atm-import-title {
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.3;
+  color: var(--text);
+}
+
+.atm-import-sub {
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--text-muted);
+}
+
+.atm-import-sub.done { color: var(--success); font-weight: 600; }
+
+.atm-import .btn { flex-shrink: 0; margin-left: auto; }
+
+/* Поиск + выбрать всё */
+.atm-library-head { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
+
+.atm-search {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 38px;
+  padding: 0 12px;
+  border-radius: 11px;
+  border: 1px solid var(--border);
+  background: var(--panel);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.atm-search:focus-within { border-color: var(--dashed); box-shadow: 0 0 0 3px var(--glow); }
+.atm-search svg { width: 15px; height: 15px; color: var(--text-faint); flex-shrink: 0; }
+
+.atm-search input {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  outline: none;
+  background: transparent;
+  color: var(--text);
+  font-family: inherit;
+  font-size: 13px;
+}
+
+.atm-search input::placeholder { color: var(--text-faint); }
+
+/* Список */
+.atm-list {
+  flex: 1;
+  min-height: 180px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0 -8px;
+  padding: 0 8px;
+}
+
+.atm-list::-webkit-scrollbar { width: 6px; }
+.atm-list::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+.atm-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 7px 10px;
+  border: 1px solid transparent;
+  border-radius: 12px;
+  background: transparent;
+  color: inherit;
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background-color 0.12s ease, border-color 0.12s ease;
+  animation: atmRowIn 0.3s ease backwards;
+}
+
+@keyframes atmRowIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: none; }
+}
+
+.atm-row:hover:not(:disabled) { background: var(--hover); }
+.atm-row.checked:not(.already) { background: var(--element-strong); border-color: var(--border); }
+.atm-row.already { cursor: default; opacity: 0.55; }
+
+.atm-check {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  border: 1.5px solid var(--dashed);
+  color: var(--accent-text);
+  transition: background-color 0.15s ease, border-color 0.15s ease, transform 0.2s cubic-bezier(0.34, 1.4, 0.64, 1);
+}
+
+.atm-check svg { width: 12px; height: 12px; opacity: 0; transform: scale(0.5); transition: opacity 0.15s ease, transform 0.2s cubic-bezier(0.34, 1.4, 0.64, 1); }
+.atm-row.checked .atm-check { background: var(--accent); border-color: var(--accent); }
+.atm-row.checked .atm-check svg { opacity: 1; transform: none; }
+.atm-row:active:not(:disabled) .atm-check { transform: scale(0.9); }
+
+.atm-cover {
+  width: 38px;
+  height: 38px;
+  flex-shrink: 0;
+  border-radius: 8px;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--element-strong);
+}
+
+.atm-cover img { width: 100%; height: 100%; object-fit: cover; }
+.atm-cover svg { width: 16px; height: 16px; color: var(--text-faint); }
+
+.atm-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+
+.atm-row-title,
+.atm-row-artist {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.atm-row-title { font-size: 13px; font-weight: 600; color: var(--text); }
+.atm-row-artist { font-size: 12px; color: var(--text-muted); }
+
+.atm-dur {
+  font-size: 12px;
+  color: var(--text-faint);
+  font-variant-numeric: tabular-nums;
+}
+
+.atm-badge {
+  padding: 3px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  border: 1px solid var(--border);
+}
+
+.atm-empty {
+  margin: auto;
+  padding: 30px;
+  font-size: 13px;
+  color: var(--text-faint);
+  text-align: center;
+}
+
+/* Страницы и низ */
+.atm-pages {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
+}
+
+.atm-foot {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border-soft);
+  flex-shrink: 0;
+}
+
+.atm-count { flex: 1; font-size: 12px; color: var(--text-muted); }
+
+/* ===== Колонка «сортировка + добавить треки» в шапке плейлиста ===== */
+.hero-tools {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 10px;
+}
+
+.hero-add-tracks { width: 100%; }

@@ -1,0 +1,186 @@
+/* ===== Баннер плейлиста ===== */
+.pl-banner {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.pl-banner > img {
+  position: absolute;
+  inset: 0;
+}
+
+.pl-banner-blur {
+  position: absolute;
+  inset: 0;
+}
+
+/* Затемнение сильнее слева, где текст, и снизу, где кнопки */
+.pl-banner-shade {
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(90deg,
+      rgba(0, 0, 0, calc(var(--dim, 0.35) + 0.15)) 0%,
+      rgba(0, 0, 0, var(--dim, 0.35)) 45%,
+      rgba(0, 0, 0, calc(var(--dim, 0.35) * 0.45)) 100%),
+    linear-gradient(0deg, rgba(0, 0, 0, calc(var(--dim, 0.35) * 0.8)) 0%, transparent 55%);
+}
+
+/* ===== Шапка плейлиста с баннером ===== */
+.playlist-view .hero { position: relative; }
+
+.hero.has-banner {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+  min-height: 220px;
+  border-color: rgba(255, 255, 255, 0.08);
+  background: #111 !important;
+}
+
+.hero.has-banner > :not(.pl-banner) { position: relative; z-index: 1; }
+
+/* На баннере текст всегда светлый — в любой теме */
+.hero.has-banner .hero-label { color: rgba(255, 255, 255, 0.75); }
+.hero.has-banner .hero-title { color: #fff; text-shadow: 0 2px 16px rgba(0, 0, 0, 0.45); }
+.hero.has-banner .hero-meta { color: rgba(255, 255, 255, 0.78); }
+.hero.has-banner .hero-meta-dot { background: rgba(255, 255, 255, 0.5); }
+.hero.has-banner .hero-cover-img,
+.hero.has-banner .hero-icon { box-shadow: 0 14px 34px rgba(0, 0, 0, 0.5); }
+
+.hero.has-banner .sort-select-label { color: rgba(255, 255, 255, 0.7); }
+
+/* Миниатюра баннера в окне редактирования плейлиста */
+.sb-banner-thumb {
+  width: 72px;
+  height: 28px;
+  border-radius: 7px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  background:
+    repeating-linear-gradient(45deg, var(--element) 0 6px, transparent 6px 12px),
+    var(--element-strong);
+  flex-shrink: 0;
+}
+
+.sb-banner-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+
+/* ===== Редактор баннера ===== */
+.banner-editor-preview {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 3.4 / 1;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+}
+
+.banner-editor-sample {
+  position: absolute;
+  left: 22px;
+  bottom: 18px;
+  z-index: 2;
+  pointer-events: none;
+  color: #fff;
+}
+
+.banner-editor-sample small {
+  display: block;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  opacity: 0.75;
+  margin-bottom: 4px;
+}
+
+.banner-editor-sample strong {
+  font-size: 24px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  text-shadow: 0 2px 16px rgba(0, 0, 0, 0.45);
+}
+
+.banner-editor-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+  aspect-ratio: 3.4 / 1;
+  border-radius: 14px;
+  border: 1.5px dashed var(--dashed);
+  background: var(--element);
+  color: var(--text-muted);
+  font-size: 13px;
+  text-align: center;
+}
+
+.banner-editor-empty svg { width: 30px; height: 30px; color: var(--text-faint); }
+
+.banner-editor-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px 22px;
+}
+
+.banner-editor-field { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.banner-editor-field.full { grid-column: 1 / -1; }
+
+.banner-editor-label {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.banner-editor-label span:last-child {
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.banner-editor-field.disabled { opacity: 0.4; pointer-events: none; }
+
+.banner-editor-file { display: flex; gap: 8px; flex-wrap: wrap; }
+
+/* Сегментированный выбор */
+.segmented {
+  display: flex;
+  padding: 3px;
+  gap: 2px;
+  border-radius: 11px;
+  background: var(--element);
+  border: 1px solid var(--border-soft);
+}
+
+.segmented button {
+  flex: 1;
+  height: 30px;
+  padding: 0 8px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-muted);
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background-color 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.segmented button:hover { color: var(--text); }
+
+.segmented button.active {
+  background: var(--panel-solid);
+  color: var(--text);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25), inset 0 0 0 1px var(--border);
+}
+
+@media (max-width: 720px) {
+  .banner-editor-grid { grid-template-columns: 1fr; }
+}

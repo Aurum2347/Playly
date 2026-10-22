@@ -1,6 +1,6 @@
 {
   "productName": "Playly",
-  "version": "2.0.2",
+  "version": "2.0.3",
   "identifier": "com.playly.player",
   "build": {
     "beforeDevCommand": "npm run dev",

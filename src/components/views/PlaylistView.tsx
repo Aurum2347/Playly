@@ -1,11 +1,15 @@
-import { useMemo, useState, useEffect, useRef } from 'react'
+import { useMemo, useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import type { Track, Playlist } from '../../App'
+import { BannerLayers } from '../PlaylistBanner'
+import AddTracksModal from '../AddTracksModal'
 import TrackEditModal from './TrackEditModal'
 import TrackDetailsModal from './TrackDetailsModal'
 import type { TrackUpdates } from './TrackEditModal'
 import { useI18n } from '../../i18n'
-import { cx, inlineButton, inlineInput, inlineRow, parseDuration, useContextMenu, usePresence } from './shared'
+import SortSelect from '../SortSelect'
+import { sortIcons } from '../sortIcons'
+import { cx, inlineButton, inlineInput, inlineRow, parseDuration, useContextMenu } from './shared'
 import './LikedView.css'
 import './PlaylistView.css'
 
@@ -27,14 +31,18 @@ interface PlaylistViewProps {
   onRevealInDir?: (trackId: number) => void
   onAddToPlaylist?: (trackIds: number[], playlistId: number) => void
   onCreatePlaylist?: (name: string) => number | void
+  /* Импорт новых файлов в библиотеку; возвращает id добавленных треков */
+  onImportTracks?: () => Promise<number[]>
 }
 
 export default function PlaylistView({
   playlist, playlists, tracks, onSelectTrack, playingTrackId = null, onToggleLike, onRemoveFromPlaylist,
   onEditTrack, onCopyTitle, onCopyArtist, onCopyPath, onRevealInDir,
-  onAddToPlaylist, onCreatePlaylist,
+  onAddToPlaylist, onCreatePlaylist, onImportTracks,
 }: PlaylistViewProps) {
   const { t } = useI18n()
+  const [isAddTracksOpen, setIsAddTracksOpen] = useState(false)
+  const hasBanner = !!playlist?.banner?.url
   const contextMenu = useContextMenu<number>()
   const [animatingLikeId, setAnimatingLikeId] = useState<number | null>(null)
   const [editingTrack, setEditingTrack] = useState<Track | null>(null)
@@ -43,9 +51,6 @@ export default function PlaylistView({
   const [selectionMode, setSelectionMode] = useState(false)
   const [selectedTrackIds, setSelectedTrackIds] = useState<Set<number>>(new Set())
   const [currentSort, setCurrentSort] = useState<SortOption>('default')
-  const [isSortMenuOpen, setIsSortMenuOpen] = useState(false)
-  const sortMenu = usePresence(isSortMenuOpen)
-  const sortMenuRef = useRef<HTMLDivElement>(null)
 
   const items = useMemo(() => {
     if (!playlist) return []
@@ -60,7 +65,7 @@ export default function PlaylistView({
     return arr
   }, [playlist, tracks, currentSort])
 
-  const handleSort = (sort: SortOption) => { setCurrentSort(sort); setIsSortMenuOpen(false) }
+  const handleSort = (sort: SortOption) => setCurrentSort(sort)
 
   const totalSec = useMemo(() => items.reduce((sum, t) => sum + parseDuration(t.duration), 0), [items])
 
@@ -75,10 +80,7 @@ export default function PlaylistView({
   /* Добавлять трек в тот же плейлист, где он уже лежит, бессмысленно */
   const otherPlaylists = playlists.filter((pl) => pl.id !== playlist?.id)
 
-  const openContextMenu = (e: React.MouseEvent, trackId: number) => {
-    setIsSortMenuOpen(false)
-    contextMenu.open(e, trackId)
-  }
+  const openContextMenu = (e: React.MouseEvent, trackId: number) => contextMenu.open(e, trackId)
   const closeContextMenu = contextMenu.close
 
   const runContextAction = (action: (id: number) => void) => {
@@ -153,19 +155,17 @@ export default function PlaylistView({
     const onDown = (e: MouseEvent) => {
       const target = e.target as Node
       if (contextMenuRef.current && !contextMenuRef.current.contains(target)) closeContextMenu()
-      if (sortMenuRef.current && !sortMenuRef.current.contains(target)) setIsSortMenuOpen(false)
     }
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== 'Escape') return
       if (isPlaylistModalOpen) setIsPlaylistModalOpen(false)
       else if (isContextMenuOpen) closeContextMenu()
-      else if (isSortMenuOpen) setIsSortMenuOpen(false)
       else if (selectionMode || selectedCount > 0) { setSelectionMode(false); setSelectedTrackIds(new Set()) }
     }
     document.addEventListener('mousedown', onDown)
     document.addEventListener('keydown', onKey)
     return () => { document.removeEventListener('mousedown', onDown); document.removeEventListener('keydown', onKey) }
-  }, [isPlaylistModalOpen, isContextMenuOpen, isSortMenuOpen, selectionMode, selectedCount, closeContextMenu, contextMenuRef])
+  }, [isPlaylistModalOpen, isContextMenuOpen, selectionMode, selectedCount, closeContextMenu, contextMenuRef])
 
   const heartSVG = (filled: boolean) => filled ? (
     <svg viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round"><path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z" /></svg>
@@ -191,9 +191,10 @@ export default function PlaylistView({
   return (
     <div className="liked-view-container playlist-view">
       <div
-        className="hero"
-        style={playlist.color ? { background: `linear-gradient(135deg, ${playlist.color}66 0%, var(--panel) 60%)` } : undefined}
+        className={cx('hero', hasBanner && 'has-banner')}
+        style={!hasBanner && playlist.color ? { background: `linear-gradient(135deg, ${playlist.color}66 0%, var(--panel) 60%)` } : undefined}
       >
+        {hasBanner && playlist.banner && <BannerLayers banner={playlist.banner} />}
         <div className="hero-top">
           {playlist.cover ? <img className="hero-cover-img" src={playlist.cover} alt="" /> : <div className="hero-icon">{musicIconSVG}</div>}
           <div className="hero-info">
@@ -228,38 +229,27 @@ export default function PlaylistView({
               {t('views.tracks.addToPlaylist')}
             </button>
           </div>
-          <div className="dropdown" ref={sortMenuRef}>
-            <button className="btn" onClick={() => setIsSortMenuOpen((v) => !v)}>
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-                <line x1="4" y1="6" x2="14" y2="6" /><line x1="4" y1="12" x2="11" y2="12" /><line x1="4" y1="18" x2="8" y2="18" /><polyline points="16 15 19 18 22 15" /><line x1="19" y1="6" x2="19" y2="18" />
-              </svg>
-              {t('views.liked.sort')}
-            </button>
-            {sortMenu.mounted && (
-              <div className={cx('dropdown-menu', 'open', sortMenu.closing && 'closing')}>
-                <button className={cx('dropdown-item', currentSort === 'default' && 'active')} onClick={() => handleSort('default')}>
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="8" y1="6" x2="21" y2="6" /><line x1="8" y1="12" x2="21" y2="12" /><line x1="8" y1="18" x2="21" y2="18" /><line x1="3" y1="6" x2="3.01" y2="6" /><line x1="3" y1="12" x2="3.01" y2="12" /><line x1="3" y1="18" x2="3.01" y2="18" /></svg>
-                  {t('sort.playlistOrder')}
-                </button>
-                <div className="dropdown-divider"></div>
-                <button className={cx('dropdown-item', currentSort === 'name-az' && 'active')} onClick={() => handleSort('name-az')}>
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 6h13M3 12h9M3 18h5" /></svg>
-                  {t('sort.nameAz')}
-                </button>
-                <button className={cx('dropdown-item', currentSort === 'name-za' && 'active')} onClick={() => handleSort('name-za')}>
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 6H8M21 12h-9M21 18h-5" /></svg>
-                  {t('sort.nameZa')}
-                </button>
-                <div className="dropdown-divider"></div>
-                <button className={cx('dropdown-item', currentSort === 'dur-desc' && 'active')} onClick={() => handleSort('dur-desc')}>
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" /></svg>
-                  {t('sort.durDesc')}
-                </button>
-                <button className={cx('dropdown-item', currentSort === 'dur-asc' && 'active')} onClick={() => handleSort('dur-asc')}>
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" /></svg>
-                  {t('sort.durAsc')}
-                </button>
-              </div>
+          {/* Сортировка сверху, под ней — добавление треков */}
+          <div className="hero-tools">
+            <SortSelect
+              label={t('views.liked.sort')}
+              value={currentSort}
+              onChange={handleSort}
+              options={[
+                { value: 'default', label: t('sort.playlistOrder'), icon: sortIcons.order },
+                { value: 'name-az', label: t('sort.nameAz'), icon: sortIcons.nameAsc, group: t('sort.groupName') },
+                { value: 'name-za', label: t('sort.nameZa'), icon: sortIcons.nameDesc, group: t('sort.groupName') },
+                { value: 'dur-desc', label: t('sort.durDesc'), icon: sortIcons.durDesc, group: t('sort.groupDuration') },
+                { value: 'dur-asc', label: t('sort.durAsc'), icon: sortIcons.durAsc, group: t('sort.groupDuration') },
+              ]}
+            />
+            {onAddToPlaylist && (
+              <button className="btn btn-primary hero-add-tracks" onClick={() => setIsAddTracksOpen(true)}>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+                  <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
+                </svg>
+                {t('views.playlist.addTracks')}
+              </button>
             )}
           </div>
           </div>
@@ -407,7 +397,17 @@ export default function PlaylistView({
       )}
       
       <TrackEditModal track={editingTrack} onClose={() => setEditingTrack(null)} onSave={handleEditSave} tracks={tracks} />
-      
+
+      {onAddToPlaylist && (
+        <AddTracksModal
+          open={isAddTracksOpen}
+          playlist={playlist}
+          tracks={tracks}
+          onClose={() => setIsAddTracksOpen(false)}
+          onAdd={(ids) => onAddToPlaylist(ids, playlist.id)}
+          onImport={onImportTracks}
+        />
+      )}      
       <TrackDetailsModal 
         track={detailsTrack} 
         onClose={() => setDetailsTrackId(null)}

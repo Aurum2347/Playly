@@ -1,0 +1,370 @@
+/*
+ * Единый стиль кнопок Playly. Подключается последним (после стилей всех компонентов),
+ * поэтому выравнивает .btn, которые раньше по-разному описывались в нескольких файлах.
+ */
+
+:root {
+  --btn-h: 36px;
+  --btn-radius: 10px;
+  --btn-bg: var(--element-strong);
+  --btn-bg-hover: var(--hover-strong);
+  --btn-border: var(--border);
+  --btn-border-hover: var(--dashed);
+  --btn-shine: rgba(255, 255, 255, 0.045);
+  --btn-ring: var(--selection);
+  --btn-ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --viz-fallback: 240, 240, 240;
+}
+
+:root[data-theme='light'] {
+  --btn-bg: #ffffff;
+  --btn-bg-hover: #f4f4f7;
+  --btn-shine: rgba(255, 255, 255, 0.9);
+  --viz-fallback: 23, 23, 26;
+}
+
+/* ===== Общее для всех кнопок ===== */
+button {
+  -webkit-tap-highlight-color: transparent;
+}
+
+button:focus { outline: none; }
+
+button:focus-visible,
+a:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--btn-ring);
+}
+
+/* ===== Базовая кнопка ===== */
+.btn,
+.tem-btn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: var(--btn-h);
+  padding: 0 14px;
+  border-radius: var(--btn-radius);
+  border: 1px solid var(--btn-border);
+  background: linear-gradient(180deg, var(--btn-shine), transparent 70%), var(--btn-bg);
+  color: var(--text-secondary);
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 550;
+  letter-spacing: -0.005em;
+  line-height: 1;
+  white-space: nowrap;
+  cursor: pointer;
+  user-select: none;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.14), inset 0 1px 0 var(--btn-shine);
+  transition:
+    background-color 0.16s var(--btn-ease),
+    border-color 0.16s var(--btn-ease),
+    color 0.16s var(--btn-ease),
+    box-shadow 0.16s var(--btn-ease),
+    transform 0.16s var(--btn-ease),
+    opacity 0.16s ease;
+}
+
+.btn:hover,
+.tem-btn:hover:not(:disabled) {
+  background: linear-gradient(180deg, var(--btn-shine), transparent 70%), var(--btn-bg-hover);
+  border-color: var(--btn-border-hover);
+  color: var(--text);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.18), inset 0 1px 0 var(--btn-shine);
+  transform: translateY(-1px);
+}
+
+.btn:active,
+.tem-btn:active:not(:disabled) {
+  transform: translateY(0) scale(0.97);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.14);
+}
+
+.btn:focus-visible,
+.tem-btn:focus-visible {
+  box-shadow: 0 0 0 3px var(--btn-ring), inset 0 1px 0 var(--btn-shine);
+}
+
+.btn svg,
+.tem-btn svg { width: 15px; height: 15px; flex-shrink: 0; }
+
+.btn:disabled,
+.btn:disabled:hover,
+.tem-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  transform: none;
+  background: linear-gradient(180deg, var(--btn-shine), transparent 70%), var(--btn-bg);
+  border-color: var(--btn-border);
+  color: var(--text-secondary);
+  box-shadow: none;
+}
+
+/* ===== Главная (акцентная) ===== */
+.btn-primary,
+.tem-btn-primary {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.18), transparent 60%), var(--accent);
+  border-color: transparent;
+  color: var(--accent-text);
+  font-weight: 650;
+  box-shadow: 0 4px 14px var(--logo-shadow), inset 0 1px 0 rgba(255, 255, 255, 0.25);
+}
+
+.btn-primary:hover,
+.tem-btn-primary:hover:not(:disabled) {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.22), transparent 60%), var(--accent-hover);
+  border-color: transparent;
+  color: var(--accent-text);
+  box-shadow: 0 8px 22px var(--logo-shadow), inset 0 1px 0 rgba(255, 255, 255, 0.3);
+}
+
+.btn-primary:disabled,
+.btn-primary:disabled:hover,
+.tem-btn-primary:disabled {
+  background: var(--dashed);
+  color: var(--text-faint);
+  border-color: transparent;
+  box-shadow: none;
+  opacity: 1;
+}
+
+/* ===== Опасная ===== */
+.btn-danger {
+  background: var(--danger-hover);
+  border-color: var(--danger-border);
+  color: var(--danger);
+  box-shadow: none;
+}
+
+.btn-danger:hover {
+  background: var(--danger-soft);
+  border-color: var(--danger);
+  color: var(--danger);
+  box-shadow: 0 6px 16px var(--danger-glow);
+}
+
+.btn-danger:disabled,
+.btn-danger:disabled:hover {
+  background: var(--danger-hover);
+  border-color: var(--danger-border);
+  color: var(--danger);
+}
+
+.btn-danger-solid {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.14), transparent 60%), var(--danger-strong);
+  border-color: transparent;
+  color: #fff;
+  font-weight: 650;
+  box-shadow: 0 4px 14px var(--danger-glow);
+}
+
+.btn-danger-solid:hover {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.18), transparent 60%), var(--danger);
+  border-color: transparent;
+  color: #fff;
+  box-shadow: 0 8px 22px var(--danger-glow);
+}
+
+/* ===== Прозрачная ===== */
+.btn-ghost {
+  background: transparent;
+  border-color: transparent;
+  box-shadow: none;
+}
+
+.btn-ghost:hover {
+  background: var(--hover);
+  border-color: transparent;
+  box-shadow: none;
+  transform: none;
+}
+
+.btn-ghost:disabled,
+.btn-ghost:disabled:hover {
+  background: transparent;
+  border-color: transparent;
+}
+
+/* ===== «Стеклянная» — для кнопок поверх обложек ===== */
+.btn-glass {
+  height: 40px;
+  padding: 0 16px;
+  border-radius: 999px;
+  border-color: color-mix(in srgb, var(--text) 14%, transparent);
+  background: color-mix(in srgb, var(--panel) 55%, transparent);
+  backdrop-filter: blur(14px) saturate(1.3);
+  color: var(--text);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+
+.btn-glass:hover {
+  background: color-mix(in srgb, var(--panel) 75%, transparent);
+  border-color: color-mix(in srgb, var(--text) 26%, transparent);
+  color: var(--text);
+}
+
+/* ===== Квадратная кнопка-иконка ===== */
+.btn-icon {
+  width: var(--btn-h);
+  padding: 0;
+}
+
+.icon-btn {
+  width: 32px;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9px;
+  border: 1px solid var(--border);
+  background: var(--btn-bg);
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease, transform 0.15s ease, opacity 0.15s ease;
+}
+
+.icon-btn:hover:not(:disabled) {
+  background: var(--btn-bg-hover);
+  border-color: var(--btn-border-hover);
+  color: var(--text);
+}
+
+.icon-btn:active:not(:disabled) { transform: scale(0.92); }
+.icon-btn:disabled { opacity: 0.3; cursor: default; }
+.icon-btn svg { width: 16px; height: 16px; }
+
+/* ===== Кнопки модалок и подтверждений ===== */
+.confirm-btn,
+.sb-modal-btn {
+  height: 38px;
+  padding: 0 18px;
+  border-radius: var(--btn-radius);
+  font-weight: 600;
+  transition: background-color 0.16s var(--btn-ease), color 0.16s var(--btn-ease), box-shadow 0.16s var(--btn-ease), transform 0.16s var(--btn-ease);
+}
+
+.confirm-btn-cancel,
+.sb-modal-btn-cancel {
+  background: var(--btn-bg);
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+}
+
+.confirm-btn-cancel:hover,
+.sb-modal-btn-cancel:hover {
+  background: var(--btn-bg-hover);
+  color: var(--text);
+}
+
+.sb-modal-btn-primary {
+  box-shadow: 0 4px 14px var(--logo-shadow);
+}
+
+.upload-cancel-btn {
+  height: 34px;
+  border-radius: var(--btn-radius);
+  background: var(--danger-hover);
+  transition: background-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
+}
+
+.upload-cancel-btn:hover { background: var(--danger-soft); box-shadow: 0 4px 12px var(--danger-glow); }
+.upload-cancel-btn:active { transform: scale(0.97); }
+
+/* ===== Шапки «Понравившихся» и плейлиста ===== */
+.btn-play-all {
+  height: 44px;
+  padding: 0 24px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.18), transparent 60%), var(--accent);
+  box-shadow: 0 6px 18px var(--logo-shadow), inset 0 1px 0 rgba(255, 255, 255, 0.25);
+  transition: transform 0.2s cubic-bezier(0.34, 1.4, 0.64, 1), box-shadow 0.2s ease, background-color 0.2s ease;
+}
+
+.btn-play-all:hover {
+  transform: translateY(-1px) scale(1.02);
+  box-shadow: 0 10px 26px var(--logo-shadow), inset 0 1px 0 rgba(255, 255, 255, 0.3);
+}
+
+.btn-play-all:active { transform: scale(0.97); }
+
+.btn-shuffle {
+  width: 44px;
+  height: 44px;
+  background: var(--btn-bg);
+  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease, transform 0.15s ease;
+}
+
+.btn-shuffle:hover { background: var(--btn-bg-hover); }
+.btn-shuffle:active { transform: scale(0.92); }
+
+/* Сортировка с подписью выше — остальные кнопки выравниваем по её нижнему краю */
+.header-actions,
+.hero-right {
+  align-items: flex-end;
+}
+
+.playlist-view .hero-actions {
+  align-items: flex-end;
+}
+
+/* ===== Выпадающие поля в настройках ===== */
+.select-btn {
+  height: var(--btn-h);
+  border-radius: var(--btn-radius);
+  border-color: var(--border);
+  background: linear-gradient(180deg, var(--btn-shine), transparent 70%), var(--btn-bg);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.14), inset 0 1px 0 var(--btn-shine);
+}
+
+.select-btn:hover,
+.select-btn.open {
+  background: linear-gradient(180deg, var(--btn-shine), transparent 70%), var(--btn-bg-hover);
+  border-color: var(--btn-border-hover);
+}
+
+.select-btn.open { box-shadow: 0 0 0 3px var(--glow); }
+
+/* ===== Плеер ===== */
+.p-btn,
+.p-vol-btn,
+.p-like-btn {
+  border-radius: 10px;
+}
+
+.p-btn.active {
+  color: var(--text);
+  background: var(--hover-strong);
+  box-shadow: inset 0 0 0 1px var(--border);
+}
+
+.p-play {
+  width: 42px;
+  height: 42px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.2), transparent 60%), var(--accent);
+}
+
+.p-expand-btn {
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  border: none;
+  background: transparent;
+  color: var(--text-faint);
+  cursor: pointer;
+  transition: background-color 0.15s ease, color 0.15s ease, transform 0.15s ease;
+}
+
+.p-expand-btn:hover { background: var(--hover); color: var(--text); }
+.p-expand-btn:active { transform: scale(0.9); }
+.p-expand-btn.active { color: var(--text); background: var(--hover-strong); }
+.p-expand-btn svg { width: 16px; height: 16px; }
+
+/* ===== Окно ===== */
+.control-btn { border-radius: 8px; }
+.control-btn.close-btn:hover { background: var(--danger-strong); color: #fff; }

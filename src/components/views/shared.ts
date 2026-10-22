@@ -78,6 +78,8 @@ interface MenuState<T> {
   target: T | null
 }
 
+export type ContextMenuApi<T> = ReturnType<typeof useContextMenu<T>>
+
 export function useContextMenu<T>() {
   const ref = useRef<HTMLDivElement>(null)
   const [state, setState] = useState<MenuState<T>>({

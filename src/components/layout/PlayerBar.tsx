@@ -29,6 +29,9 @@ interface PlayerBarProps {
   onCopyTitle?: () => void
   onCopyArtist?: () => void
   onCopyTitleArtist?: () => void
+  /* Расширенный режим: открыть / закрыть */
+  isNowPlayingOpen?: boolean
+  onToggleNowPlaying?: () => void
 }
 
 const fmt = (s: number) => {
@@ -60,6 +63,8 @@ export default function PlayerBar({
   onCopyTitle,
   onCopyArtist,
   onCopyTitleArtist,
+  isNowPlayingOpen = false,
+  onToggleNowPlaying,
 }: PlayerBarProps) {
   const { t } = useI18n()
   const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number } | null>(null)
@@ -390,6 +395,19 @@ export default function PlayerBar({
         </div>
       </div>
       <div className="p-right">
+        {onToggleNowPlaying && (
+          <button
+            className={`p-expand-btn ${isNowPlayingOpen ? 'active' : ''}`}
+            onClick={onToggleNowPlaying}
+            title={isNowPlayingOpen ? t('views.nowPlaying.back') : t('views.home.expanded')}
+          >
+            {isNowPlayingOpen ? (
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="4 14 10 14 10 20" /><polyline points="20 10 14 10 14 4" /><line x1="14" y1="10" x2="21" y2="3" /><line x1="3" y1="21" x2="10" y2="14" /></svg>
+            ) : (
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 3 21 3 21 9" /><polyline points="9 21 3 21 3 15" /><line x1="21" y1="3" x2="14" y2="10" /><line x1="3" y1="21" x2="10" y2="14" /></svg>
+            )}
+          </button>
+        )}
         <button
           className={`p-like-btn ${isLiked ? 'liked' : ''}`}
           onClick={() => onToggleLike?.(track.id, !isLiked)}

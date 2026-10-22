@@ -1,11 +1,13 @@
-import { useState, useRef, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { createPortal } from 'react-dom'
 import type { Track, Playlist } from '../../App'
 import TrackEditModal from './TrackEditModal'
 import TrackDetailsModal from './TrackDetailsModal'
 import type { TrackUpdates } from './TrackEditModal'
 import { useI18n } from '../../i18n'
-import { cx, inlineButton, inlineInput, inlineRow, parseDuration, shuffled, useContextMenu, usePresence } from './shared'
+import SortSelect from '../SortSelect'
+import { sortIcons } from '../sortIcons'
+import { cx, inlineButton, inlineInput, inlineRow, parseDuration, shuffled, useContextMenu } from './shared'
 import './LikedView.css'
 
 interface LikedViewProps {
@@ -40,7 +42,6 @@ export default function LikedView({
   /* Порядок id при перемешивании. Фиксируется в момент нажатия кнопки, а не пересчитывается на каждом рендере */
   const [shuffleOrder, setShuffleOrder] = useState<number[] | null>(null)
   const shuffleActive = shuffleOrder !== null
-  const [isSortMenuOpen, setIsSortMenuOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [isPlaylistModalOpen, setIsPlaylistModalOpen] = useState(false)
   const [selectedPlaylistId, setSelectedPlaylistId] = useState<number | null>(null)
@@ -60,8 +61,6 @@ export default function LikedView({
   const [detailsTrackId, setDetailsTrackId] = useState<number | null>(null)
   const [flashingTrackId, setFlashingTrackId] = useState<number | null>(null)
 
-  const sortMenuRef = useRef<HTMLDivElement>(null)
-  const sortMenu = usePresence(isSortMenuOpen)
   const contextMenu = useContextMenu<number>()
 
   const formatTotalDuration = (seconds: number) => {
@@ -156,7 +155,7 @@ export default function LikedView({
     onDeleteTracks?.(ids)
   }
 
-  const handleSort = (sort: SortOption) => { setCurrentSort(sort); setShuffleOrder(null); setIsSortMenuOpen(false) }
+  const handleSort = (sort: SortOption) => { setCurrentSort(sort); setShuffleOrder(null) }
   const handleShuffle = () => {
     if (shuffleActive) {
       setShuffleOrder(null)
@@ -166,10 +165,7 @@ export default function LikedView({
     }
   }
 
-  const openContextMenu = (e: React.MouseEvent, trackId: number) => {
-    setIsSortMenuOpen(false)
-    contextMenu.open(e, trackId)
-  }
+  const openContextMenu = (e: React.MouseEvent, trackId: number) => contextMenu.open(e, trackId)
   const closeContextMenu = contextMenu.close
 
   const runContextAction = (action: (id: number) => void) => {
@@ -215,14 +211,12 @@ export default function LikedView({
   useEffect(() => {
     const onMouseDown = (e: MouseEvent) => {
       const target = e.target as Node
-      if (sortMenuRef.current && !sortMenuRef.current.contains(target)) setIsSortMenuOpen(false)
       if (contextMenuRef.current && !contextMenuRef.current.contains(target)) closeContextMenu()
     }
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key !== 'Escape') return
       if (isPlaylistModalOpen) setIsPlaylistModalOpen(false)
       else if (isContextMenuOpen) closeContextMenu()
-      else if (isSortMenuOpen) setIsSortMenuOpen(false)
       else if (selectionMode || selectedCount > 0) { setSelectionMode(false); setSelectedTrackIds(new Set()) }
     }
     document.addEventListener('mousedown', onMouseDown)
@@ -231,7 +225,7 @@ export default function LikedView({
       document.removeEventListener('mousedown', onMouseDown)
       document.removeEventListener('keydown', onKeyDown)
     }
-  }, [isPlaylistModalOpen, isContextMenuOpen, isSortMenuOpen, selectionMode, selectedCount, closeContextMenu, contextMenuRef])
+  }, [isPlaylistModalOpen, isContextMenuOpen, selectionMode, selectedCount, closeContextMenu, contextMenuRef])
 
   const heartFilledSVG = (
     <svg viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round">
@@ -304,44 +298,20 @@ export default function LikedView({
                 {t('views.liked.toPlaylist')}
               </button>
             </div>
-          <div className="dropdown" ref={sortMenuRef}>
-            <button className="btn" onClick={() => setIsSortMenuOpen(!isSortMenuOpen)}>
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-                <line x1="4" y1="6" x2="14" y2="6" /><line x1="4" y1="12" x2="11" y2="12" /><line x1="4" y1="18" x2="8" y2="18" /><polyline points="16 15 19 18 22 15" /><line x1="19" y1="6" x2="19" y2="18" />
-              </svg>
-              {t('views.liked.sort')}
-            </button>
-            {sortMenu.mounted && (
-              <div className={cx('dropdown-menu', 'open', sortMenu.closing && 'closing')}>
-                <button className={`dropdown-item ${!shuffleActive && currentSort === 'date-new' ? 'active' : ''}`} onClick={() => handleSort('date-new')}>
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="4" width="18" height="18" rx="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" /></svg>
-                  {t('sort.addedNew')}
-                </button>
-                <button className={`dropdown-item ${!shuffleActive && currentSort === 'date-old' ? 'active' : ''}`} onClick={() => handleSort('date-old')}>
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="4" width="18" height="18" rx="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" /></svg>
-                  {t('sort.addedOld')}
-                </button>
-                <div className="dropdown-divider"></div>
-                <button className={`dropdown-item ${!shuffleActive && currentSort === 'name-az' ? 'active' : ''}`} onClick={() => handleSort('name-az')}>
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 6h13M3 12h9M3 18h5" /></svg>
-                  {t('sort.nameAz')}
-                </button>
-                <button className={`dropdown-item ${!shuffleActive && currentSort === 'name-za' ? 'active' : ''}`} onClick={() => handleSort('name-za')}>
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 6H8M21 12h-9M21 18h-5" /></svg>
-                  {t('sort.nameZa')}
-                </button>
-                <div className="dropdown-divider"></div>
-                <button className={`dropdown-item ${!shuffleActive && currentSort === 'dur-desc' ? 'active' : ''}`} onClick={() => handleSort('dur-desc')}>
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" /></svg>
-                  {t('sort.durDesc')}
-                </button>
-                <button className={`dropdown-item ${!shuffleActive && currentSort === 'dur-asc' ? 'active' : ''}`} onClick={() => handleSort('dur-asc')}>
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" /></svg>
-                  {t('sort.durAsc')}
-                </button>
-              </div>
-            )}
-          </div>
+          <SortSelect
+            label={t('views.liked.sort')}
+            value={shuffleActive ? null : currentSort}
+            placeholder={t('sort.shuffled')}
+            onChange={handleSort}
+            options={[
+              { value: 'date-new', label: t('sort.addedNew'), icon: sortIcons.dateNew, group: t('sort.groupAdded') },
+              { value: 'date-old', label: t('sort.addedOld'), icon: sortIcons.dateOld, group: t('sort.groupAdded') },
+              { value: 'name-az', label: t('sort.nameAz'), icon: sortIcons.nameAsc, group: t('sort.groupName') },
+              { value: 'name-za', label: t('sort.nameZa'), icon: sortIcons.nameDesc, group: t('sort.groupName') },
+              { value: 'dur-desc', label: t('sort.durDesc'), icon: sortIcons.durDesc, group: t('sort.groupDuration') },
+              { value: 'dur-asc', label: t('sort.durAsc'), icon: sortIcons.durAsc, group: t('sort.groupDuration') },
+            ]}
+          />
         </div>
       </div>
 

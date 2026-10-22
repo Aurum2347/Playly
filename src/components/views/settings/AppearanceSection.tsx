@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type CSSProperties } from 'react'
+import { createPortal } from 'react-dom'
 import { join } from '@tauri-apps/api/path'
 import { exists, readFile, writeFile } from '@tauri-apps/plugin-fs'
 import { open } from '@tauri-apps/plugin-dialog'
@@ -10,12 +11,42 @@ import {
   getFontsDir,
   loadThemeSetting,
   readFontSetting,
+  readSettingsRaw,
+  removeSettingsKeys,
   saveThemeSetting,
+  sliderPercent,
   useOutsideClose,
   writeFontSetting,
+  writeSettingsRaw,
   type ThemeMode,
 } from './helpers'
 import { useI18n } from '../../../i18n'
+import {
+  applyUiScale,
+  clampUiScale,
+  UI_SCALE_DEFAULT,
+  UI_SCALE_MAX,
+  UI_SCALE_MIN,
+  UI_SCALE_STEP,
+} from '../../../lib/uiScale'
+
+/* Всё, что сбрасывает «Сбросить все настройки». Язык, библиотека и профиль не трогаются */
+const RESETTABLE_KEYS = [
+  'theme',
+  'customFont',
+  'uiScale',
+  'volume',
+  'isMuted',
+  'crossfade',
+  'manualCrossfade',
+  'crossfadeCurve',
+  'outputDevice',
+  'normalization',
+  'eqEnabled',
+  'eq',
+  'discordRpc',
+  'visualizer',
+]
 
 interface AppearanceSectionProps {
   theme?: ThemeMode
@@ -31,6 +62,50 @@ export default function AppearanceSection({ theme, onChangeTheme }: AppearanceSe
   const [isFontLoading, setIsFontLoading] = useState(false)
 
   useOutsideClose(dropdownRef, () => setIsThemeOpen(false))
+
+  /* ===== Масштаб ===== */
+  const [uiScale, setUiScale] = useState(UI_SCALE_DEFAULT)
+  /* Значение под ползунком во время перетаскивания; применяется при отпускании,
+     иначе ползунок «уезжает» из-под курсора вместе с масштабом */
+  const [scaleDraft, setScaleDraft] = useState<number | null>(null)
+  const [isResetOpen, setIsResetOpen] = useState(false)
+  const [isResetting, setIsResetting] = useState(false)
+
+  useEffect(() => {
+    let cancelled = false
+    readSettingsRaw().then((data) => {
+      if (!cancelled) setUiScale(clampUiScale(data.uiScale))
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  const commitScale = (value: number) => {
+    const v = clampUiScale(value)
+    setScaleDraft(null)
+    if (v === uiScale) return
+    setUiScale(v)
+    void applyUiScale(v)
+    writeSettingsRaw({ uiScale: v })
+  }
+
+  const shownScale = scaleDraft ?? uiScale
+
+  const handleResetAll = async () => {
+    if (isResetting) return
+    setIsResetting(true)
+    try {
+      deactivateFont()
+      await deleteFontFiles()
+      await removeSettingsKeys(RESETTABLE_KEYS)
+      applyTheme('dark')
+      await applyUiScale(UI_SCALE_DEFAULT)
+    } finally {
+      /* Проще и надёжнее перечитать всё с нуля, чем сбрасывать состояние по кусочкам */
+      window.location.reload()
+    }
+  }
 
   useEffect(() => {
     if (theme !== undefined) {
@@ -225,7 +300,81 @@ export default function AppearanceSection({ theme, onChangeTheme }: AppearanceSe
             </div>
           </div>
         </div>
+        <div className="setting-row">
+          <div className="setting-info">
+            <div className="setting-name">{t('settings.appearance.scale')}</div>
+            <div className="setting-desc">{t('settings.appearance.scaleDesc')}</div>
+          </div>
+          <div className="setting-control">
+            <div className="slider-wrap scale-wrap">
+              <input
+                type="range"
+                min={UI_SCALE_MIN}
+                max={UI_SCALE_MAX}
+                step={UI_SCALE_STEP}
+                value={shownScale}
+                style={{ '--val': `${sliderPercent(shownScale, UI_SCALE_MIN, UI_SCALE_MAX)}%` } as CSSProperties}
+                onChange={(e) => setScaleDraft(Number(e.target.value))}
+                onPointerUp={(e) => commitScale(Number(e.currentTarget.value))}
+                onKeyUp={(e) => commitScale(Number(e.currentTarget.value))}
+                onBlur={() => scaleDraft !== null && commitScale(scaleDraft)}
+              />
+              <span className="slider-value">{shownScale}%</span>
+              <button
+                className="btn btn-ghost btn-icon"
+                onClick={() => commitScale(UI_SCALE_DEFAULT)}
+                disabled={shownScale === UI_SCALE_DEFAULT}
+                title={t('settings.appearance.scaleReset')}
+              >
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M3 12a9 9 0 1 0 3-6.7" />
+                  <polyline points="3 3 3 9 9 9" />
+                </svg>
+              </button>
+            </div>
+          </div>
+        </div>
       </div>
+
+      <div className="settings-section">
+        <div className="section-title">{t('settings.appearance.resetSection')}</div>
+        <div className="setting-row">
+          <div className="setting-info">
+            <div className="setting-name">{t('settings.appearance.resetAll')}</div>
+            <div className="setting-desc">{t('settings.appearance.resetAllDesc')}</div>
+          </div>
+          <div className="setting-control">
+            <button className="btn btn-danger" onClick={() => setIsResetOpen(true)}>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M3 12a9 9 0 1 0 3-6.7" />
+                <polyline points="3 3 3 9 9 9" />
+              </svg>
+              {t('settings.appearance.resetAllBtn')}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {createPortal(
+        <div
+          className={`modal-overlay ${isResetOpen ? 'open' : ''}`}
+          onClick={(e) => e.target === e.currentTarget && !isResetting && setIsResetOpen(false)}
+        >
+          <div className="modal">
+            <div className="modal-title">{t('settings.appearance.resetConfirmTitle')}</div>
+            <div className="modal-text">{t('settings.appearance.resetConfirmText')}</div>
+            <div className="modal-actions">
+              <button className="btn" onClick={() => setIsResetOpen(false)} disabled={isResetting}>
+                {t('common.cancel')}
+              </button>
+              <button className="btn btn-danger-solid" onClick={handleResetAll} disabled={isResetting}>
+                {t('settings.appearance.resetAllBtn')}
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
     </>
   )
 }

@@ -5,7 +5,7 @@ use base64::Engine as _;
 use discord_rich_presence::{activity, DiscordIpc, DiscordIpcClient};
 use lofty::file::{AudioFile, TaggedFileExt};
 use lofty::picture::MimeType;
-use lofty::tag::Accessor;
+use lofty::tag::{Accessor, ItemKey};
 use std::fs;
 use std::sync::mpsc;
 use std::thread;
@@ -71,6 +71,29 @@ fn get_track_metadata(path: String) -> Result<TrackMeta, String> {
         duration_secs,
         cover,
     })
+}
+
+/// Текст песни: сначала файл .lrc рядом с треком, затем встроенный тег (USLT / LYRICS / ©lyr)
+#[command]
+fn get_track_lyrics(path: String) -> Option<String> {
+    let sidecar = std::path::Path::new(&path).with_extension("lrc");
+    if sidecar.is_file() {
+        if let Ok(bytes) = fs::read(&sidecar) {
+            let text = String::from_utf8_lossy(&bytes);
+            let text = text.trim_start_matches('\u{feff}');
+            if !text.trim().is_empty() {
+                return Some(text.to_string());
+            }
+        }
+    }
+
+    let tagged_file = lofty::read_from_path(&path).ok()?;
+    tagged_file
+        .tags()
+        .iter()
+        .filter_map(|t| t.get_string(&ItemKey::Lyrics))
+        .find(|l| !l.trim().is_empty())
+        .map(|l| l.to_string())
 }
 
 #[command]
@@ -370,6 +393,7 @@ fn main() {
         .invoke_handler(tauri::generate_handler![
             get_track_metadata,
             get_file_mtime,
+            get_track_lyrics,
             reveal_item_in_dir,
             discord_update_presence,
             discord_idle_presence,

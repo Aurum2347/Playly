@@ -4,12 +4,23 @@ import { exists, readFile, readTextFile, writeTextFile, writeFile, remove, mkdir
 import { open } from '@tauri-apps/plugin-dialog'
 import { imageMime } from './helpers'
 import { useI18n } from '../../../i18n'
+import AvatarCropModal from '../../AvatarCropModal'
+import { DEFAULT_FRAME, frameStyle, normalizeFrame, type ImageFrame } from '../../../lib/imageFrame'
 
 type AvatarShape = 'circle' | 'square'
 
 interface ProfileSettings {
   avatarFile?: string
   avatarShape?: AvatarShape
+  /* Кадр аватарки: файл не пересохраняется, поэтому кадр можно поменять в любой момент */
+  avatarFrame?: ImageFrame
+}
+
+/* Открытое окно кадрирования: новый файл (ещё не сохранён) или уже установленная аватарка */
+interface CropState {
+  src: string
+  frame: ImageFrame
+  pending?: { bytes: Uint8Array; ext: string }
 }
 
 interface ProfileSectionProps {
@@ -26,6 +37,8 @@ export default function ProfileSection({ currentNickname, onSaveNickname }: Prof
   const [avatarFile, setAvatarFile] = useState<string | null>(null)
   const [isProfileLoading, setIsProfileLoading] = useState(true)
   const [isSavingAvatar, setIsSavingAvatar] = useState(false)
+  const [avatarFrame, setAvatarFrame] = useState<ImageFrame>(DEFAULT_FRAME)
+  const [crop, setCrop] = useState<CropState | null>(null)
 
   const profileDirRef = useRef<string | null>(null)
   const avatarUrlRef = useRef<string | null>(null)
@@ -54,7 +67,11 @@ export default function ProfileSection({ currentNickname, onSaveNickname }: Prof
     window.dispatchEvent(new Event('playly-profile-updated'))
   }
 
-  const writeProfile = async (patch: { avatarFile?: string | null; avatarShape?: AvatarShape | null }) => {
+  const writeProfile = async (patch: {
+    avatarFile?: string | null
+    avatarShape?: AvatarShape | null
+    avatarFrame?: ImageFrame | null
+  }) => {
     const profileDir = await getProfileDir()
     const profileFile = await join(profileDir, 'profile.json')
 
@@ -80,6 +97,11 @@ export default function ProfileSection({ currentNickname, onSaveNickname }: Prof
       else next.avatarFile = patch.avatarFile
     }
 
+    if (patch.avatarFrame !== undefined) {
+      if (patch.avatarFrame === null) delete next.avatarFrame
+      else next.avatarFrame = patch.avatarFrame
+    }
+
     await writeTextFile(profileFile, JSON.stringify(next, null, 2))
   }
 
@@ -97,6 +119,7 @@ export default function ProfileSection({ currentNickname, onSaveNickname }: Prof
 
           if (!cancelled) {
             setAvatarShape(data.avatarShape === 'square' ? 'square' : 'circle')
+            setAvatarFrame(normalizeFrame(data.avatarFrame))
           }
 
           if (data.avatarFile) {
@@ -174,37 +197,54 @@ export default function ProfileSection({ currentNickname, onSaveNickname }: Prof
 
       const extRaw = selected.split('.').pop()?.toLowerCase() || 'png'
       const ext = extRaw === 'jpeg' ? 'jpg' : extRaw
-      const fileName = `avatar.${ext}`
-
-      const profileDir = await getProfileDir()
-      const targetPath = await join(profileDir, fileName)
-
       const bytes = await readFile(selected)
-      await writeFile(targetPath, bytes)
-
-      if (avatarUrlRef.current) URL.revokeObjectURL(avatarUrlRef.current)
-
-      const url = URL.createObjectURL(
-        new Blob([bytes as unknown as BlobPart], { type: imageMime(targetPath) })
+      const src = URL.createObjectURL(
+        new Blob([bytes as unknown as BlobPart], { type: imageMime(`a.${ext}`) })
       )
-
-      avatarUrlRef.current = url
-      setAvatarUrl(url)
-
-      const oldFile = avatarFile
-      setAvatarFile(fileName)
-
-      await writeProfile({ avatarFile: fileName, avatarShape })
-      notifyProfileUpdated()
-
-      if (oldFile && oldFile !== fileName) {
-        const oldPath = await join(profileDir, oldFile)
-        if (await exists(oldPath)) await remove(oldPath)
-      }
+      /* Сначала кадрирование — файл сохраняется только после подтверждения */
+      setCrop({ src, frame: DEFAULT_FRAME, pending: { bytes, ext } })
     } catch (e) {
       console.error('Ошибка загрузки аватара:', e)
     } finally {
       setIsSavingAvatar(false)
+    }
+  }
+
+  const handleCropCancel = () => {
+    if (crop?.pending) URL.revokeObjectURL(crop.src)
+    setCrop(null)
+  }
+
+  const handleCropSave = async (frame: ImageFrame) => {
+    const current = crop
+    if (!current) return
+    setCrop(null)
+    try {
+      if (current.pending) {
+        const fileName = `avatar.${current.pending.ext}`
+        const profileDir = await getProfileDir()
+        await writeFile(await join(profileDir, fileName), current.pending.bytes)
+
+        if (avatarUrlRef.current) URL.revokeObjectURL(avatarUrlRef.current)
+        avatarUrlRef.current = current.src
+        setAvatarUrl(current.src)
+
+        const oldFile = avatarFile
+        setAvatarFile(fileName)
+        setAvatarFrame(frame)
+        await writeProfile({ avatarFile: fileName, avatarShape, avatarFrame: frame })
+
+        if (oldFile && oldFile !== fileName) {
+          const oldPath = await join(profileDir, oldFile)
+          if (await exists(oldPath)) await remove(oldPath)
+        }
+      } else {
+        setAvatarFrame(frame)
+        await writeProfile({ avatarFrame: frame })
+      }
+      notifyProfileUpdated()
+    } catch (e) {
+      console.error('Ошибка сохранения аватара:', e)
     }
   }
 
@@ -224,8 +264,9 @@ export default function ProfileSection({ currentNickname, onSaveNickname }: Prof
 
       setAvatarUrl(null)
       setAvatarFile(null)
+      setAvatarFrame(DEFAULT_FRAME)
 
-      await writeProfile({ avatarFile: null })
+      await writeProfile({ avatarFile: null, avatarFrame: null })
       notifyProfileUpdated()
     } catch (e) {
       console.error('Ошибка удаления аватара:', e)
@@ -284,11 +325,7 @@ export default function ProfileSection({ currentNickname, onSaveNickname }: Prof
             <div className="avatar-row">
               <div className={`avatar shape-${avatarShape}`}>
                 {avatarUrl ? (
-                  <img
-                    src={avatarUrl}
-                    alt={t('settings.profile.avatarImage')}
-                    style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
-                  />
+                  <img src={avatarUrl} alt={t('settings.profile.avatarImage')} style={frameStyle(avatarFrame)} />
                 ) : (
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                     <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2" />
@@ -311,6 +348,21 @@ export default function ProfileSection({ currentNickname, onSaveNickname }: Prof
                   </svg>
                   {isSavingAvatar ? t('common.loading') : t('settings.profile.upload')}
                 </button>
+
+                {avatarUrl && (
+                  <button
+                    className="btn"
+                    onClick={() => setCrop({ src: avatarUrl, frame: avatarFrame })}
+                    disabled={isSavingAvatar || isProfileLoading}
+                    title={t('settings.profile.cropDesc')}
+                  >
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M6 2v14a2 2 0 0 0 2 2h14" />
+                      <path d="M18 22V8a2 2 0 0 0-2-2H2" />
+                    </svg>
+                    {t('settings.profile.crop')}
+                  </button>
+                )}
 
                 <button
                   className="btn btn-ghost"
@@ -360,6 +412,14 @@ export default function ProfileSection({ currentNickname, onSaveNickname }: Prof
           </div>
         </div>
       </div>
+
+      <AvatarCropModal
+        src={crop?.src ?? null}
+        shape={avatarShape}
+        initialFrame={crop?.frame}
+        onCancel={handleCropCancel}
+        onSave={handleCropSave}
+      />
     </>
   )
 }

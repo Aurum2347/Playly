@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { createPortal } from 'react-dom'
 import type { Track, Playlist } from '../../App'
 import TrackEditModal from './TrackEditModal'
@@ -7,6 +7,8 @@ import { useI18n } from '../../i18n'
 import TrackDetailsModal from './TrackDetailsModal'
 import { cx, inlineInput, inlineRow, parseDuration, useContextMenu } from './shared'
 import styles from './TracksView.module.css'
+import SortSelect from '../SortSelect'
+import { sortIcons } from '../sortIcons'
 
 type SortOption = 'name-az' | 'name-za' | 'dur-desc' | 'dur-asc' | 'date-new' | 'date-old'
 
@@ -38,7 +40,6 @@ export default function TracksView({
   const [selectionMode, setSelectionMode] = useState(false)
   const [selectedTrackIds, setSelectedTrackIds] = useState<Set<number>>(new Set())
   const [currentSort, setCurrentSort] = useState<SortOption>('date-new')
-  const [isSortMenuOpen, setIsSortMenuOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [currentPage, setCurrentPage] = useState(1)
   const [isPlaylistModalOpen, setIsPlaylistModalOpen] = useState(false)
@@ -59,7 +60,6 @@ export default function TracksView({
   const [flashingTrackId, setFlashingTrackId] = useState<number | null>(null)
 
   const contextMenu = useContextMenu<number>()
-  const sortMenuRef = useRef<HTMLDivElement>(null)
 
   const sortedTracks = useMemo(() => {
     const arr = [...tracks]
@@ -139,14 +139,10 @@ export default function TracksView({
 
   const handleSortChange = (sort: SortOption) => {
     setCurrentSort(sort)
-    setIsSortMenuOpen(false)
     setCurrentPage(1)
   }
 
-  const openContextMenu = (e: React.MouseEvent, trackId: number) => {
-    setIsSortMenuOpen(false)
-    contextMenu.open(e, trackId)
-  }
+  const openContextMenu = (e: React.MouseEvent, trackId: number) => contextMenu.open(e, trackId)
   const closeContextMenu = contextMenu.close
 
   const handleEditSave = (trackId: number, updates: TrackUpdates) => {
@@ -212,13 +208,11 @@ export default function TracksView({
     const onMouseDown = (e: MouseEvent) => {
       const target = e.target as Node
       if (contextMenuRef.current && !contextMenuRef.current.contains(target)) closeContextMenu()
-      if (sortMenuRef.current && !sortMenuRef.current.contains(target)) setIsSortMenuOpen(false)
     }
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key !== 'Escape') return
       if (isPlaylistModalOpen) setIsPlaylistModalOpen(false)
       else if (isContextMenuOpen) closeContextMenu()
-      else if (isSortMenuOpen) setIsSortMenuOpen(false)
       else if (selectionMode || selectedCount > 0) { setSelectionMode(false); setSelectedTrackIds(new Set()) }
     }
     document.addEventListener('mousedown', onMouseDown)
@@ -227,7 +221,7 @@ export default function TracksView({
       document.removeEventListener('mousedown', onMouseDown)
       document.removeEventListener('keydown', onKeyDown)
     }
-  }, [isPlaylistModalOpen, isContextMenuOpen, isSortMenuOpen, selectionMode, selectedCount, closeContextMenu, contextMenuRef])
+  }, [isPlaylistModalOpen, isContextMenuOpen, selectionMode, selectedCount, closeContextMenu, contextMenuRef])
 
   const paginationItems = useMemo(() => {
     const items: Array<number | 'ellipsis'> = []
@@ -269,44 +263,19 @@ export default function TracksView({
             </button>
           </div>
 
-          <div className={styles.dropdown} ref={sortMenuRef}>
-            <button className={styles.btn} onClick={() => setIsSortMenuOpen((v) => !v)}>
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-                <line x1="4" y1="6" x2="14" y2="6" /><line x1="4" y1="12" x2="11" y2="12" />
-                <line x1="4" y1="18" x2="8" y2="18" /><polyline points="16 15 19 18 22 15" />
-                <line x1="19" y1="6" x2="19" y2="18" />
-              </svg>
-              {t('views.tracks.sort')}
-            </button>
-            <div className={cx(styles.dropdownMenu, isSortMenuOpen && styles.open)}>
-              <button className={cx(styles.dropdownItem, currentSort === 'name-az' && styles.active)} onClick={() => handleSortChange('name-az')}>
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 6h13M3 12h9M3 18h5" /></svg>
-                {t('sort.nameAz')}
-              </button>
-              <button className={cx(styles.dropdownItem, currentSort === 'name-za' && styles.active)} onClick={() => handleSortChange('name-za')}>
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 6H8M21 12h-9M21 18h-5" /></svg>
-                {t('sort.nameZa')}
-              </button>
-              <div className={styles.dropdownDivider} />
-              <button className={cx(styles.dropdownItem, currentSort === 'dur-desc' && styles.active)} onClick={() => handleSortChange('dur-desc')}>
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" /></svg>
-                {t('sort.durDesc')}
-              </button>
-              <button className={cx(styles.dropdownItem, currentSort === 'dur-asc' && styles.active)} onClick={() => handleSortChange('dur-asc')}>
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" /></svg>
-                {t('sort.durAsc')}
-              </button>
-              <div className={styles.dropdownDivider} />
-              <button className={cx(styles.dropdownItem, currentSort === 'date-new' && styles.active)} onClick={() => handleSortChange('date-new')}>
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="4" width="18" height="18" rx="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" /></svg>
-                {t('sort.dateNew')}
-              </button>
-              <button className={cx(styles.dropdownItem, currentSort === 'date-old' && styles.active)} onClick={() => handleSortChange('date-old')}>
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="4" width="18" height="18" rx="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" /></svg>
-                {t('sort.dateOld')}
-              </button>
-            </div>
-          </div>
+          <SortSelect
+            label={t('views.tracks.sort')}
+            value={currentSort}
+            onChange={handleSortChange}
+            options={[
+              { value: 'date-new', label: t('sort.dateNew'), icon: sortIcons.dateNew, group: t('sort.groupDate') },
+              { value: 'date-old', label: t('sort.dateOld'), icon: sortIcons.dateOld, group: t('sort.groupDate') },
+              { value: 'name-az', label: t('sort.nameAz'), icon: sortIcons.nameAsc, group: t('sort.groupName') },
+              { value: 'name-za', label: t('sort.nameZa'), icon: sortIcons.nameDesc, group: t('sort.groupName') },
+              { value: 'dur-desc', label: t('sort.durDesc'), icon: sortIcons.durDesc, group: t('sort.groupDuration') },
+              { value: 'dur-asc', label: t('sort.durAsc'), icon: sortIcons.durAsc, group: t('sort.groupDuration') },
+            ]}
+          />
 
           {onAddTracks && (
             <button className={cx(styles.btn, styles.btnPrimary)} onClick={onAddTracks}>

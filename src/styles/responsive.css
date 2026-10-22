@@ -1,0 +1,59 @@
+/*
+ * Узкий CSS-вьюпорт: маленькое окно или крупный масштаб приложения (при 200 % окно 1280 px
+ * превращается в 640 CSS-пикселей). Окно при этом не меняется — подстраивается вёрстка.
+ */
+
+.sidebar { width: auto; min-width: 0; }
+
+@media (max-width: 1100px) {
+  .app { grid-template-columns: 210px 1fr; }
+  .player {
+    grid-template-columns: minmax(170px, 1fr) minmax(240px, 1.4fr) minmax(150px, 1fr);
+    padding: 0 18px;
+    gap: 16px;
+  }
+}
+
+@media (max-width: 900px) {
+  .p-vol-input { display: none; }
+  .main { margin: 14px; }
+}
+
+/* ===== Компактный сайдбар: только иконки ===== */
+@media (max-width: 820px) {
+  .app { grid-template-columns: 72px 1fr; }
+
+  .sidebar { padding: 12px 10px; gap: 12px; }
+
+  .profile-card { justify-content: center; padding: 8px; }
+  .profile-info { display: none; }
+
+  .sidebar .nav-item {
+    justify-content: center;
+    padding: 12px 0;
+    font-size: 0;
+    gap: 0;
+  }
+
+  .playlists-header { justify-content: center; padding: 0; }
+  .playlists-title { display: none; }
+  .playlists-empty span { display: none; }
+
+  .playlist-item { justify-content: center; padding: 6px; }
+  .playlist-item .playlist-info,
+  .playlist-item .sb-grip { display: none; }
+
+  .player {
+    grid-template-columns: minmax(0, 1fr) auto minmax(0, auto);
+    padding: 0 12px;
+    gap: 12px;
+  }
+
+  .p-progress { min-width: 0; }
+  .p-vol-bar-wrapper { display: none; }
+}
+
+@media (max-width: 600px) {
+  .p-track .p-info { display: none; }
+  .main { margin: 8px; }
+}

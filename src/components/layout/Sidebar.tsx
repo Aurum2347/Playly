@@ -5,8 +5,10 @@ import { exists, readFile, readTextFile } from '@tauri-apps/plugin-fs'
 import type { ViewType, Playlist, CoverPick, Track } from '../../App'
 import { copyCover } from '../../lib/trackLoader'
 import CoverPicker from '../CoverPicker'
+import BannerEditor from '../BannerEditor'
 import { usePresence } from '../views/shared'
 import { useI18n } from '../../i18n'
+import { frameStyle, type ImageFrame } from '../../lib/imageFrame'
 import './Sidebar.css'
 
 type AvatarShape = 'circle' | 'square'
@@ -14,13 +16,17 @@ type AvatarShape = 'circle' | 'square'
 interface SidebarProps {
   currentView: ViewType
   onViewChange: (view: ViewType) => void
+  /* Открыть настройки сразу на вкладке «Профиль» */
+  onOpenProfile?: () => void
   nickname: string
   playlists: Playlist[]
   avatarUrl?: string | null
   avatarShape?: AvatarShape
+  avatarFrame?: ImageFrame
   onCreatePlaylist: (name: string, cover?: CoverPick | null) => number
   onRenamePlaylist: (id: number, name: string) => void
-  onUpdatePlaylist: (id: number, patch: Partial<Pick<Playlist, 'cover' | 'coverFile' | 'color'>>) => void
+  onUpdatePlaylist: (id: number, patch: Partial<Pick<Playlist, 'cover' | 'coverFile' | 'color' | 'banner'>>) => void
+  onPickBanner?: () => Promise<CoverPick | null>
   tracks: Track[]
   onDeletePlaylist: (id: number) => void
   onChangePlaylistCover: (id: number) => void
@@ -81,10 +87,12 @@ interface DragState {
 export default function Sidebar({
   currentView,
   onViewChange,
+  onOpenProfile,
   nickname,
   playlists,
   avatarUrl,
   avatarShape,
+  avatarFrame,
   onCreatePlaylist,
   onRenamePlaylist,
   onUpdatePlaylist,
@@ -92,6 +100,7 @@ export default function Sidebar({
   onDeletePlaylist,
   onChangePlaylistCover,
   onPickImage,
+  onPickBanner,
   onOpenPlaylist,
   onReorderPlaylists,
 }: SidebarProps) {
@@ -108,6 +117,8 @@ export default function Sidebar({
   if (ctxMenu && ctxMenu !== ctxShown) setCtxShown(ctxMenu)
   const ctxPresence = usePresence(ctxMenu !== null)
   const [deleteTarget, setDeleteTarget] = useState<Playlist | null>(null)
+  const [bannerFor, setBannerFor] = useState<number | null>(null)
+  const bannerPlaylist = bannerFor !== null ? playlists.find((p) => p.id === bannerFor) ?? null : null
 
   const [localAvatarUrl, setLocalAvatarUrl] = useState<string | null>(null)
   const [localAvatarShape, setLocalAvatarShape] = useState<AvatarShape>('circle')
@@ -444,13 +455,7 @@ export default function Sidebar({
                 src={displayAvatarUrl}
                 alt="Avatar"
                 draggable={false}
-                style={{
-                  width: '100%',
-                  height: '100%',
-                  objectFit: 'cover',
-                  display: 'block',
-                  borderRadius: 'inherit',
-                }}
+                style={frameStyle(avatarFrame)}
               />
             ) : null}
           </div>
@@ -458,7 +463,7 @@ export default function Sidebar({
           <div className="profile-info">
             <div className="profile-nickname">{nickname}</div>
 
-            <button className="profile-edit-btn" onClick={() => onViewChange('settings')}>
+            <button className="profile-edit-btn" onClick={() => (onOpenProfile ? onOpenProfile() : onViewChange('settings'))}>
               <svg viewBox="0 0 24 24">
                 <path className="edit-icon" d="M12 20h9" />
                 <path
@@ -475,6 +480,7 @@ export default function Sidebar({
           <button
             className={`nav-item ${currentView === 'home' ? 'active' : ''}`}
             onClick={() => onViewChange('home')}
+            title={t('layout.sidebar.home')}
           >
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z" />
@@ -486,6 +492,7 @@ export default function Sidebar({
           <button
             className={`nav-item ${currentView === 'tracks' ? 'active' : ''}`}
             onClick={() => onViewChange('tracks')}
+            title={t('layout.sidebar.tracks')}
           >
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <path d="M9 18V5l12-2v13" />
@@ -498,6 +505,7 @@ export default function Sidebar({
           <button
             className={`nav-item ${currentView === 'liked' ? 'active' : ''}`}
             onClick={() => onViewChange('liked')}
+            title={t('layout.sidebar.liked')}
           >
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z" />
@@ -508,6 +516,7 @@ export default function Sidebar({
           <button
             className={`nav-item ${currentView === 'settings' ? 'active' : ''}`}
             onClick={() => onViewChange('settings')}
+            title={t('layout.sidebar.settings')}
           >
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <circle cx="12" cy="12" r="3" />
@@ -760,6 +769,18 @@ export default function Sidebar({
                   </button>
                 </div>
 
+                {onPickBanner && (
+                  <div className="sb-color-row">
+                    <span className="sb-color-label">{t('banner.title')}</span>
+                    <div className="sb-banner-thumb">
+                      {editPlaylist?.banner?.url ? <img src={editPlaylist.banner.url} alt="" /> : null}
+                    </div>
+                    <button className="sb-modal-btn sb-modal-btn-cancel" onClick={() => setBannerFor(editState.id)}>
+                      {editPlaylist?.banner ? t('banner.edit') : t('banner.add')}
+                    </button>
+                  </div>
+                )}
+
                 <input
                   type="text"
                   className="sb-modal-input"
@@ -792,6 +813,15 @@ export default function Sidebar({
           </div>,
           document.body
         )}
+
+      {onPickBanner && (
+        <BannerEditor
+          playlist={bannerPlaylist}
+          onClose={() => setBannerFor(null)}
+          onSave={(id, banner) => onUpdatePlaylist(id, { banner })}
+          onPickFile={onPickBanner}
+        />
+      )}
 
       <CoverPicker
         open={borrowFor !== null}

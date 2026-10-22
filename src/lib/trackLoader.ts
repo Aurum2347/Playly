@@ -1,7 +1,8 @@
 import { appDataDir, join } from '@tauri-apps/api/path'
 import { exists, readTextFile, writeTextFile, readFile, writeFile, mkdir } from '@tauri-apps/plugin-fs'
 import { invoke } from '@tauri-apps/api/core'
-import type { Track } from '../App'
+import type { Track, PlaylistBanner } from '../App'
+import { normalizeFrame } from './imageFrame'
 
 export const SUPPORTED_EXT = ['mp3', 'wav', 'm4a', 'flac', 'ogg', 'aac', 'opus', 'wma']
 
@@ -114,11 +115,13 @@ export async function copyCover(
 /** Сохранить обложку из выбранного файла (key = id трека или 'pl-<id>' плейлиста) */
 export async function saveCoverFromFile(
   key: string,
-  sourcePath: string
+  sourcePath: string,
+  /* Баннеры (особенно GIF) бывают заметно тяжелее обложек */
+  maxBytes = 5 * 1024 * 1024
 ): Promise<{ coverFile: string; coverUrl: string } | null> {
   try {
     const bytes = await readFile(sourcePath)
-    if (!bytes || bytes.length === 0 || bytes.length > 5 * 1024 * 1024) return null
+    if (!bytes || bytes.length === 0 || bytes.length > maxBytes) return null
 
     const ext = sourcePath.split('.').pop()?.toLowerCase() || 'jpg'
     const coversDir = await ensureCoversDir()
@@ -226,6 +229,7 @@ export interface PlaylistData {
   cover?: string | null
   coverFile?: string | null
   color?: string | null
+  banner?: PlaylistBanner | null
   trackIds: number[]
 }
 
@@ -256,6 +260,19 @@ export async function loadPlaylists(): Promise<PlaylistData[]> {
             // ignore
           }
         }
+        if (pl.banner?.file) {
+          pl.banner.url = null
+          pl.banner.frame = normalizeFrame(pl.banner.frame)
+          try {
+            const abs = await join(coversDir, pl.banner.file)
+            if (await exists(abs)) {
+              const bytes = await readFile(abs)
+              pl.banner.url = bytesToObjectUrl(bytes, mimeFromExt(pl.banner.file))
+            }
+          } catch {
+            // ignore
+          }
+        }
       })
     )
 
@@ -269,7 +286,11 @@ export async function savePlaylists(lists: PlaylistData[]): Promise<void> {
   try {
     const dir = await ensureConfigDir()
     const path = await join(dir, 'playlists.json')
-    const stripped = lists.map((pl) => ({ ...pl, cover: null }))
+    const stripped = lists.map((pl) => ({
+      ...pl,
+      cover: null,
+      banner: pl.banner ? { ...pl.banner, url: null } : pl.banner,
+    }))
     await writeTextFile(path, JSON.stringify(stripped))
   } catch (e) {
     console.error('Не удалось сохранить playlists.json:', e)
@@ -388,17 +409,31 @@ export async function savePlayHistory(history: Record<number, number>): Promise<
 
 /* ===== Настройки ===== */
 
+export type CrossfadeCurveSetting = 'equal' | 'linear' | 'smooth'
+
 export interface AppSettings {
   volume: number
   isMuted: boolean
   crossfade: number
+  /* Кроссфейд и при ручном переключении треков */
+  manualCrossfade: boolean
+  crossfadeCurve: CrossfadeCurveSetting
   outputDevice: string
+  discordRpc?: boolean
+  /* Визуализатор в расширенном режиме */
+  visualizer?: boolean
+  /* Эквалайзер: включён ли, id пресета, свои пресеты */
+  eqEnabled?: boolean
+  eq?: string
+  eqCustomPresets?: Array<{ id: string; name: string; gains: number[] }>
 }
 
 const DEFAULT_SETTINGS: AppSettings = {
   volume: 100,
   isMuted: false,
   crossfade: 0,
+  manualCrossfade: false,
+  crossfadeCurve: 'equal',
   outputDevice: '',
 }
 
@@ -415,6 +450,11 @@ export async function loadSettings(): Promise<AppSettings> {
       volume: Math.max(0, Math.min(100, Math.round((data.volume as number) ?? 100))),
       isMuted: Boolean(data.isMuted),
       crossfade: Math.max(0, Math.min(12, Math.round((data.crossfade as number) ?? 0))),
+      manualCrossfade: data.manualCrossfade === true,
+      crossfadeCurve:
+        data.crossfadeCurve === 'linear' || data.crossfadeCurve === 'smooth'
+          ? data.crossfadeCurve
+          : 'equal',
       outputDevice: typeof data.outputDevice === 'string' ? (data.outputDevice as string) : '',
     }
   } catch {

@@ -19,6 +19,46 @@ body,
   overflow: hidden;
 }
 
+/* ===== Расширенный режим: сайдбар и плеер плавно уезжают, остаётся только просмотр ===== */
+.app {
+  transition:
+    grid-template-columns 0.5s cubic-bezier(0.2, 0.8, 0.2, 1),
+    grid-template-rows 0.5s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.app .sidebar,
+.app .player {
+  transition:
+    opacity 0.35s ease,
+    transform 0.5s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.app .main { transition: margin 0.5s cubic-bezier(0.2, 0.8, 0.2, 1); }
+
+.app.immersive {
+  grid-template-columns: 0px 1fr;
+  grid-template-rows: 40px 1fr 0px;
+}
+
+.app.immersive .sidebar {
+  opacity: 0;
+  transform: translateX(-40px);
+  pointer-events: none;
+}
+
+.app.immersive .player {
+  opacity: 0;
+  transform: translateY(40px);
+  pointer-events: none;
+}
+
+.app.immersive .main { margin: 0; }
+
+.app.immersive .np-view {
+  border-radius: 0;
+  border: none;
+}
+
 .titlebar { grid-area: titlebar; }
 .sidebar  { grid-area: sidebar; min-height: 0; }
 .main     { grid-area: main; min-height: 0; min-width: 0; overflow: hidden; position: relative; margin: 20px; }

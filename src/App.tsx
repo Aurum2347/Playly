@@ -15,18 +15,25 @@ import { invoke } from '@tauri-apps/api/core'
 import Sidebar from './components/layout/Sidebar'
 import PlayerBar from './components/layout/PlayerBar'
 import HomeView from './components/views/HomeView'
-import SettingsView from './components/views/SettingsView'
+import SettingsView, { type SettingsSection } from './components/views/SettingsView'
 import TracksView from './components/views/TracksView'
 import LikedView from './components/views/LikedView'
 import PlaylistView from './components/views/PlaylistView'
+import NowPlayingView from './components/views/NowPlayingView'
 import Onboarding from './components/Onboarding'
 import Logo from './components/Logo'
 import useLibrary from './hooks/useLibrary'
-import { loadSettings, saveSettings, isAudioFile } from './lib/trackLoader'
+import { loadSettings, saveSettings, isAudioFile, type AppSettings } from './lib/trackLoader'
+import { AudioEngine, type CrossfadeCurve, type EngineEvents } from './lib/audioEngine'
+import { applyUiScale, clampUiScale, UI_SCALE_DEFAULT } from './lib/uiScale'
+import { DEFAULT_FRAME, normalizeFrame, type ImageFrame } from './lib/imageFrame'
+import { normalizeCustomPresets, presetGains, type EqPreset } from './lib/equalizer'
 import { I18nProvider, useI18n } from './i18n'
 import './App.css'
+import './styles/buttons.css'
+import './styles/responsive.css'
 
-export type ViewType = 'home' | 'settings' | 'tracks' | 'liked' | 'playlist'
+export type ViewType = 'home' | 'settings' | 'tracks' | 'liked' | 'playlist' | 'nowplaying'
 
 export interface Track {
   id: number
@@ -52,7 +59,26 @@ export interface Playlist {
   coverFile?: string | null
   /* Цвет фона шапки плейлиста (#rrggbb), null — стандартный */
   color?: string | null
+  /* Картинка (можно GIF) на фоне шапки плейлиста */
+  banner?: PlaylistBanner | null
   trackIds: number[]
+}
+
+/* Где размыт баннер: нигде, у одного края, у обоих краёв или целиком */
+export type BannerBlur = 'none' | 'left' | 'right' | 'both' | 'all'
+
+export interface PlaylistBanner {
+  file: string
+  /* Загруженная картинка (blob-url); в playlists.json не сохраняется */
+  url?: string | null
+  frame: ImageFrame
+  blur: BannerBlur
+  /* Сила размытия, px */
+  blurAmount: number
+  /* Насколько далеко от края тянется размытие, % ширины */
+  blurSize: number
+  /* Затемнение для читаемости текста, 0–0.8 */
+  dim: number
 }
 
 export interface CoverPick {
@@ -64,26 +90,18 @@ export type RepeatMode = 'off' | 'all' | 'one'
 
 type AvatarShape = 'circle' | 'square'
 
-function audioMime(path: string): string {
-  const ext = path.split('.').pop()?.toLowerCase() || ''
-  switch (ext) {
-    case 'mp3':
-      return 'audio/mpeg'
-    case 'wav':
-      return 'audio/wav'
-    case 'flac':
-      return 'audio/flac'
-    case 'ogg':
-    case 'opus':
-      return 'audio/ogg'
-    case 'm4a':
-    case 'aac':
-      return 'audio/mp4'
-    case 'wma':
-      return 'audio/x-ms-wma'
-    default:
-      return 'application/octet-stream'
-  }
+/* За сколько секунд до начала кроссфейда подгружать следующий трек */
+const CROSSFADE_PRELOAD_LEAD = 12
+/* Ручное переключение не должно тянуться так же долго, как автоматический переход */
+const MANUAL_CROSSFADE_MAX = 4
+
+interface CrossfadePlan {
+  from: number
+  idx: number
+  trackId: number
+  shuffle: boolean
+  repeat: RepeatMode
+  failed: boolean
 }
 
 function imageMime(path: string): string {
@@ -107,6 +125,7 @@ function imageMime(path: string): string {
 
 const SidebarM = memo(Sidebar)
 const HomeViewM = memo(HomeView)
+const NowPlayingViewM = memo(NowPlayingView)
 const SettingsViewM = memo(SettingsView)
 const TracksViewM = memo(TracksView)
 const LikedViewM = memo(LikedView)
@@ -118,7 +137,9 @@ function AppInner() {
   const [userNickname, setUserNickname] = useState('Aurum2347')
   const [userAvatar, setUserAvatar] = useState<string | null>(null)
   const [avatarShape, setAvatarShape] = useState<AvatarShape>('circle')
+  const [avatarFrame, setAvatarFrame] = useState<ImageFrame>(DEFAULT_FRAME)
   const [currentView, setCurrentView] = useState<ViewType>('home')
+  const [settingsSection, setSettingsSection] = useState<SettingsSection>('appearance')
   const [isMaximized, setIsMaximized] = useState(false)
   const [queue, setQueue] = useState<number[]>([])
   const [queueIndex, setQueueIndex] = useState(-1)
@@ -130,20 +151,16 @@ function AppInner() {
   const [isShuffle, setIsShuffle] = useState(false)
   const [repeatMode, setRepeatMode] = useState<RepeatMode>('off')
   const [crossfade, setCrossfade] = useState(0)
+  const [manualCrossfade, setManualCrossfade] = useState(false)
+  const [crossfadeCurve, setCrossfadeCurve] = useState<CrossfadeCurve>('equal')
   const [outputDevice, setOutputDevice] = useState('')
+  /* Растёт при перемотке и смене трека — по нему обновляется позиция в Discord */
+  const [seekTick, setSeekTick] = useState(0)
   const [isDragging, setIsDragging] = useState(false)
   const settingsSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  const playersRef = useRef<HTMLAudioElement[]>([])
-  const gainsRef = useRef<GainNode[]>([])
-  const masterGainRef = useRef<GainNode | null>(null)
-  const audioCtxRef = useRef<AudioContext | null>(null)
-  const activeIndexRef = useRef(0)
-  const objectUrlsRef = useRef<(string | null)[]>([null, null])
-  const audioRef = useRef<HTMLAudioElement | null>(null)
-  const crossfadingRef = useRef(false)
-  const crossfadeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const pendingCrossfadeRef = useRef<{ nextIdx: number } | null>(null)
+  const engineRef = useRef<AudioEngine | null>(null)
+  const engineEventsRef = useRef<EngineEvents | null>(null)
   const skipLoadRef = useRef(false)
   const pendingPlayRef = useRef(false)
   const userAvatarUrlRef = useRef<string | null>(null)
@@ -156,8 +173,11 @@ function AppInner() {
   const volumeRef = useRef(100)
   const mutedRef = useRef(false)
   const crossfadeRef = useRef(0)
+  const manualCrossfadeRef = useRef(false)
   const outputDeviceRef = useRef('')
-  const crossfadeAbortedForTrackRef = useRef<number | null>(null)
+  /* Идёт загрузка трека для автоматического кроссфейда */
+  const autoXfadeRef = useRef(false)
+  const xfadePlanRef = useRef<CrossfadePlan | null>(null)
 
   const {
     tracks,
@@ -182,6 +202,7 @@ function AppInner() {
     handleDeletePlaylist,
     handleChangePlaylistCover,
     handlePickImage,
+    handlePickBanner,
     handleAddToPlaylist,
     handleRemoveFromPlaylist,
     handleReorderPlaylists,
@@ -207,8 +228,7 @@ function AppInner() {
         } else {
           setQueue([])
           setQueueIndex(-1)
-          playersRef.current.forEach((p) => p?.pause())
-          setIsPlaying(false)
+          engineRef.current?.stop()
         }
       } else {
         setQueue(newQueue)
@@ -218,10 +238,7 @@ function AppInner() {
     onLibraryCleared: () => {
       setQueue([])
       setQueueIndex(-1)
-      playersRef.current.forEach((p) => p?.pause())
-      setCurrentTime(0)
-      setDuration(0)
-      setIsPlaying(false)
+      engineRef.current?.stop()
     },
   })
 
@@ -270,23 +287,11 @@ function AppInner() {
   }, [queue, queueIndex, tracks])
 
   const applyOutputDevice = useCallback(async (deviceId: string) => {
-    for (const p of playersRef.current) {
-      if (!p) continue
-      const withSink = p as HTMLAudioElement & { setSinkId?: (id: string) => Promise<void> }
-      if (typeof withSink.setSinkId === 'function') {
-        try {
-          await withSink.setSinkId(deviceId || 'default')
-        } catch (e) {
-          console.warn('Не удалось применить устройство вывода:', e)
-        }
-      }
-    }
+    await engineRef.current?.setOutputDevice(deviceId)
   }, [])
 
   const applyMasterGain = useCallback(() => {
-    if (masterGainRef.current) {
-      masterGainRef.current.gain.value = mutedRef.current ? 0 : volumeRef.current / 100
-    }
+    engineRef.current?.setVolume(volumeRef.current / 100, mutedRef.current)
   }, [])
 
   const computeNextIndex = useCallback((): number | null => {
@@ -309,385 +314,194 @@ function AppInner() {
     return n
   }, [])
 
-  const finishCrossfade = useCallback(() => {
-    console.log('[CF] finishCrossfade вызван')
-    const pend = pendingCrossfadeRef.current
-    pendingCrossfadeRef.current = null
-    crossfadingRef.current = false
-    if (!pend) {
-      console.log('[CF] finishCrossfade: нет ожидающего перехода, выходим')
-      return
+  /*
+   * Следующий трек для кроссфейда выбирается один раз и запоминается (важно при перемешивании:
+   * предзагруженный и реально включённый трек должны совпасть). План сбрасывается сам,
+   * как только меняется текущий трек, очередь или режимы повтора/перемешивания.
+   */
+  const getCrossfadePlan = useCallback((): CrossfadePlan | null => {
+    const q = queueRef.current
+    const cur = queueIndexRef.current
+    const p = xfadePlanRef.current
+    if (
+      p &&
+      p.from === cur &&
+      p.shuffle === shuffleRef.current &&
+      p.repeat === repeatRef.current &&
+      q[p.idx] === p.trackId
+    ) {
+      return p
     }
-    console.log('[CF] finishCrossfade: завершаем переход на индекс', pend.nextIdx)
-    const ctx = audioCtxRef.current
-    const ai = activeIndexRef.current
-    const oi = 1 - ai
-    const oldPlayer = playersRef.current[ai]
-    const newPlayer = playersRef.current[oi]
-    if (!oldPlayer || !newPlayer) {
-      console.log('[CF] finishCrossfade: старый или новый плеер не найден')
-      return
+    const idx = computeNextIndex()
+    if (idx === null) {
+      xfadePlanRef.current = null
+      return null
     }
-    activeIndexRef.current = oi
-    audioRef.current = newPlayer
-    oldPlayer.pause()
-    console.log('[CF] finishCrossfade: активный индекс теперь', oi)
-    if (ctx && gainsRef.current[oi] && gainsRef.current[ai]) {
-      gainsRef.current[oi].gain.cancelScheduledValues(ctx.currentTime)
-      gainsRef.current[oi].gain.value = 1
-      gainsRef.current[ai].gain.cancelScheduledValues(ctx.currentTime)
-      gainsRef.current[ai].gain.value = 0
-      console.log('[CF] finishCrossfade: громкости переключены')
+    const plan: CrossfadePlan = {
+      from: cur,
+      idx,
+      trackId: q[idx],
+      shuffle: shuffleRef.current,
+      repeat: repeatRef.current,
+      failed: false,
     }
-    setCurrentTime(newPlayer.currentTime || 0)
-    setDuration(isFinite(newPlayer.duration) ? newPlayer.duration : 0)
-    setIsPlaying(true)
-    newPlayer.play().catch(() => {})
-    console.log('[CF] finishCrossfade: новый плеер запущен')
-    historyRef.current.push(queueIndexRef.current)
-    if (historyRef.current.length > 50) historyRef.current.shift()
-    skipLoadRef.current = true
-    setQueueIndex(pend.nextIdx)
-    const nextId = queueRef.current[pend.nextIdx]
-    if (nextId !== undefined) recordPlay(nextId)
-    console.log('[CF] finishCrossfade: завершён')
-  }, [recordPlay])
+    xfadePlanRef.current = plan
+    return plan
+  }, [computeNextIndex])
 
-  /* ===== Старт кроссфейда ===== */
-  const startCrossfade = useCallback(async () => {
-    console.log('[CF] startCrossfade вызван')
-    if (crossfadingRef.current) {
-      console.log('[CF] startCrossfade: уже идёт кроссфейд, выходим')
-      return
-    }
-    if (repeatRef.current === 'one') {
-      console.log('[CF] startCrossfade: repeat = one, выходим')
-      return
-    }
-    const currentTrackId = queueRef.current[queueIndexRef.current]
-    if (crossfadeAbortedForTrackRef.current === currentTrackId) {
-      console.log('[CF] startCrossfade: кроссфейд уже отменяли для этого трека, выходим')
-      return
-    }
-    const nextIdx = computeNextIndex()
-    if (nextIdx === null) {
-      console.log('[CF] startCrossfade: нет следующего индекса, выходим')
-      return
-    }
-    const nextId = queueRef.current[nextIdx]
-    const nextTrack = tracksRef.current.find((t) => t.id === nextId)
-    if (!nextTrack) {
-      console.log('[CF] startCrossfade: не найден следующий трек', nextId)
-      return
-    }
-    console.log('[CF] startCrossfade: следующий трек', nextTrack.title, 'id', nextId)
-    const ctx = audioCtxRef.current
-    const ai = activeIndexRef.current
-    const oi = 1 - ai
-    const incoming = playersRef.current[oi]
-    const gIn = gainsRef.current[oi]
-    const gOut = gainsRef.current[ai]
-    if (!ctx || !incoming || !gIn || !gOut) {
-      console.log('[CF] startCrossfade: недостаточно данных', {
-        ctx: !!ctx,
-        incoming: !!incoming,
-        gIn: !!gIn,
-        gOut: !!gOut,
-      })
-      return
-    }
+  /* Длительность визуальной смены трека в расширенном режиме: при кроссфейде — столько же, сколько звук */
+  const [trackFadeMs, setTrackFadeMs] = useState(450)
+  const markTrackFade = useCallback(
+    (sec: number) => setTrackFadeMs(Math.round(Math.min(6000, Math.max(450, sec * 1000)))),
+    []
+  )
+  const manualFadeSec = useCallback(
+    () => (manualCrossfadeRef.current && crossfadeRef.current > 0 ? Math.min(crossfadeRef.current, MANUAL_CROSSFADE_MAX) : 0),
+    []
+  )
+
+  /* Переключает интерфейс на трек, который движок уже играет */
+  const commitQueueIndex = useCallback(
+    (idx: number, fadeSec: number) => {
+      markTrackFade(fadeSec)
+      const q = queueRef.current
+      const nextId = q[idx]
+      historyRef.current.push(queueIndexRef.current)
+      if (historyRef.current.length > 50) historyRef.current.shift()
+      if (nextId !== q[queueIndexRef.current]) skipLoadRef.current = true
+      setQueueIndex(idx)
+      if (nextId !== undefined) recordPlay(nextId)
+    },
+    [recordPlay, markTrackFade]
+  )
+
+  /* ===== Автоматический кроссфейд: предзагрузка заранее, старт точно за N секунд до конца ===== */
+  const maybeAutoCrossfade = useCallback(() => {
+    const eng = engineRef.current
     const cf = crossfadeRef.current
-    crossfadingRef.current = true
-    pendingCrossfadeRef.current = { nextIdx }
-    try {
-      await ctx.resume().catch(() => {})
-      if (!crossfadingRef.current) return
-      const bytes = await readFile(nextTrack.filePath)
-      if (!crossfadingRef.current) return
-      const oldUrl = objectUrlsRef.current[oi]
-      if (oldUrl) URL.revokeObjectURL(oldUrl)
-      const url = URL.createObjectURL(
-        new Blob([bytes as unknown as BlobPart], { type: audioMime(nextTrack.filePath) })
-      )
-      objectUrlsRef.current[oi] = url
-      incoming.src = url
-      incoming.playbackRate = nextTrack.playbackRate ?? 1
-      const now = ctx.currentTime
-      gIn.gain.cancelScheduledValues(now)
-      gIn.gain.setValueAtTime(0, now)
-      gOut.gain.cancelScheduledValues(now)
-      gOut.gain.setValueAtTime(gOut.gain.value, now)
-      await incoming.play()
-      if (!crossfadingRef.current) {
-        incoming.pause()
+    if (!eng || cf <= 0 || autoXfadeRef.current || eng.isTransitioning) return
+    if (!isPlayingRef.current || repeatRef.current === 'one') return
+    const remaining = eng.remaining()
+    if (!isFinite(remaining) || remaining > cf + CROSSFADE_PRELOAD_LEAD) return
+    const plan = getCrossfadePlan()
+    if (!plan || plan.failed) return
+    const next = tracksRef.current.find((t) => t.id === plan.trackId)
+    if (!next) return
+    if (remaining > cf + 0.3) {
+      eng.preload(next)
+      return
+    }
+    /* Слишком поздно — трек доиграет и переключится обычным способом */
+    if (remaining < 0.2) return
+    autoXfadeRef.current = true
+    const fade = Math.min(cf, remaining)
+    eng.load(next, { autoplay: true, fade }).then((ok) => {
+      autoXfadeRef.current = false
+      if (!ok) {
+        plan.failed = true
         return
       }
-      gIn.gain.linearRampToValueAtTime(1, now + cf)
-      gOut.gain.linearRampToValueAtTime(0.0001, now + cf)
-      console.log('[CF] startCrossfade: начато затухание на', cf, 'сек')
-      if (crossfadeTimerRef.current) clearTimeout(crossfadeTimerRef.current)
-      crossfadeTimerRef.current = setTimeout(() => {
-        finishCrossfade()
-      }, cf * 1000)
-    } catch (e) {
-      console.error('[CF] startCrossfade: Ошибка:', e)
-      crossfadingRef.current = false
-      pendingCrossfadeRef.current = null
-      const now = ctx.currentTime
-      gOut.gain.cancelScheduledValues(now)
-      gOut.gain.setValueAtTime(gOut.gain.value, now)
-      gIn.gain.cancelScheduledValues(now)
-      gIn.gain.setValueAtTime(0, now)
-      incoming.pause()
-      incoming.removeAttribute('src')
-      incoming.load()
-      const oldUrl = objectUrlsRef.current[oi]
-      if (oldUrl) URL.revokeObjectURL(oldUrl)
-      objectUrlsRef.current[oi] = null
-    }
-  }, [computeNextIndex, finishCrossfade, tracksRef])
+      let idx = plan.idx
+      if (queueRef.current[idx] !== next.id) idx = queueRef.current.indexOf(next.id)
+      if (idx >= 0) commitQueueIndex(idx, fade)
+    })
+  }, [getCrossfadePlan, commitQueueIndex, tracksRef])
 
-  const abortCrossfade = useCallback(() => {
-    console.log('[CF] abortCrossfade вызван, crossfadingRef.current =', crossfadingRef.current)
-    if (!crossfadingRef.current) {
-      console.log('[CF] abortCrossfade: кроссфейд уже не активен, выходим')
+  /* Трек доиграл без кроссфейда */
+  const handleEnded = useCallback(() => {
+    const eng = engineRef.current
+    if (!eng || autoXfadeRef.current) return
+    const q = queueRef.current
+    const idx = queueIndexRef.current
+    if (repeatRef.current === 'one') {
+      eng.seek(0)
+      eng.play()
       return
     }
-    crossfadingRef.current = false
-    pendingCrossfadeRef.current = null
-    if (crossfadeTimerRef.current) {
-      clearTimeout(crossfadeTimerRef.current)
-      crossfadeTimerRef.current = null
+    if (q.length === 0) return
+    const next = computeNextIndex()
+    if (next === null) {
+      eng.pause()
+      return
     }
-    const activeTrackId = queueRef.current[queueIndexRef.current]
-    if (activeTrackId !== undefined) {
-      crossfadeAbortedForTrackRef.current = activeTrackId
+    if (next === idx) {
+      eng.seek(0)
+      eng.play()
+      recordPlay(q[idx])
+      return
     }
-    const ctx = audioCtxRef.current
-    const ai = activeIndexRef.current
-    const oi = 1 - ai
-    const incoming = playersRef.current[oi]
-    if (incoming) {
-      incoming.pause()
-      incoming.currentTime = 0
-    }
-    const oldUrl = objectUrlsRef.current[oi]
-    if (oldUrl) {
-      URL.revokeObjectURL(oldUrl)
-      objectUrlsRef.current[oi] = null
-    }
-    if (incoming) {
-      incoming.removeAttribute('src')
-      incoming.load()
-    }
-    if (ctx && gainsRef.current[oi] && gainsRef.current[ai]) {
-      const now = ctx.currentTime
-      gainsRef.current[oi].gain.cancelScheduledValues(now)
-      gainsRef.current[oi].gain.setValueAtTime(0, now)
-      gainsRef.current[ai].gain.cancelScheduledValues(now)
-      gainsRef.current[ai].gain.setValueAtTime(1, now)
-    }
-    console.log('[CF] abortCrossfade завершён')
-  }, [])
+    historyRef.current.push(idx)
+    if (historyRef.current.length > 50) historyRef.current.shift()
+    pendingPlayRef.current = true
+    markTrackFade(0)
+    setQueueIndex(next)
+  }, [computeNextIndex, recordPlay, markTrackFade])
 
   useEffect(() => {
-    const ctx = new AudioContext()
-    audioCtxRef.current = ctx
-    const master = ctx.createGain()
-    master.gain.value = mutedRef.current ? 0 : volumeRef.current / 100
-    master.connect(ctx.destination)
-    masterGainRef.current = master
-
-    const players: HTMLAudioElement[] = []
-    const gains: GainNode[] = []
-    for (let i = 0; i < 2; i++) {
-      const a = new Audio()
-      const src = ctx.createMediaElementSource(a)
-      const g = ctx.createGain()
-      g.gain.value = i === 0 ? 1 : 0
-      src.connect(g)
-      g.connect(master)
-      players.push(a)
-      gains.push(g)
+    engineEventsRef.current = {
+      onTime: (t) => {
+        setCurrentTime(t)
+        maybeAutoCrossfade()
+      },
+      onDuration: (d) => setDuration(d),
+      onPlayingChange: (p) => {
+        isPlayingRef.current = p
+        setIsPlaying(p)
+      },
+      onEnded: handleEnded,
     }
-    playersRef.current = players
-    gainsRef.current = gains
-    activeIndexRef.current = 0
-    audioRef.current = players[0]
+  }, [maybeAutoCrossfade, handleEnded])
 
-    const makeHandlers = (i: number) => {
-      const a = players[i]
-      const onTime = () => {
-        if (playersRef.current[i] !== audioRef.current) return
-        setCurrentTime(a.currentTime)
-        const cf = crossfadeRef.current
-        if (cf > 0 && !crossfadingRef.current && repeatRef.current !== 'one' && isPlayingRef.current) {
-          const currentTrackId = queueRef.current[queueIndexRef.current]
-          if (crossfadeAbortedForTrackRef.current === currentTrackId) return
-          const dur = a.duration
-          const cur = a.currentTime
-          if (isFinite(dur) && dur > cf) {
-            const remaining = dur - cur
-            if (remaining > 0.05 && remaining <= cf) {
-              startCrossfade()
-            }
-          }
-        }
-      }
-      const onMeta = () => {
-        if (playersRef.current[i] !== audioRef.current) return
-        setDuration(a.duration)
-      }
-      const onPlay = () => {
-        if (playersRef.current[i] !== audioRef.current) return
-        setIsPlaying(true)
-      }
-      const onPause = () => {
-        if (playersRef.current[i] !== audioRef.current) return
-        setIsPlaying(false)
-      }
-      const onEnded = () => {
-        if (playersRef.current[i] !== audioRef.current) return
-        if (crossfadingRef.current) return
-        if (pendingCrossfadeRef.current) return
-        const q = queueRef.current
-        const idx = queueIndexRef.current
-        const mode = repeatRef.current
-        if (mode === 'one') {
-          a.currentTime = 0
-          a.play().catch(() => {})
-          return
-        }
-        if (q.length === 0) return
-        let next: number
-        if (shuffleRef.current) {
-          if (q.length === 1) return
-          do {
-            next = Math.floor(Math.random() * q.length)
-          } while (next === idx)
-        } else {
-          next = idx + 1
-          if (next >= q.length) {
-            if (mode === 'all') {
-              next = 0
-            } else {
-              setIsPlaying(false)
-              return
-            }
-          }
-        }
-        historyRef.current.push(idx)
-        if (historyRef.current.length > 50) historyRef.current.shift()
-        pendingPlayRef.current = true
-        setQueueIndex(next)
-      }
-      a.addEventListener('timeupdate', onTime)
-      a.addEventListener('loadedmetadata', onMeta)
-      a.addEventListener('play', onPlay)
-      a.addEventListener('pause', onPause)
-      a.addEventListener('ended', onEnded)
-      return () => {
-        a.removeEventListener('timeupdate', onTime)
-        a.removeEventListener('loadedmetadata', onMeta)
-        a.removeEventListener('play', onPlay)
-        a.removeEventListener('pause', onPause)
-        a.removeEventListener('ended', onEnded)
-      }
-    }
-    const cleanups = [makeHandlers(0), makeHandlers(1)]
+  useEffect(() => {
+    const eng = new AudioEngine({
+      onTime: (t) => engineEventsRef.current?.onTime(t),
+      onDuration: (d) => engineEventsRef.current?.onDuration(d),
+      onPlayingChange: (p) => engineEventsRef.current?.onPlayingChange(p),
+      onEnded: () => engineEventsRef.current?.onEnded(),
+    })
+    eng.setVolume(volumeRef.current / 100, mutedRef.current)
+    engineRef.current = eng
     return () => {
-      cleanups.forEach((fn) => fn?.())
-      players.forEach((p) => p.pause())
-      objectUrlsRef.current.forEach((u) => {
-        if (u) URL.revokeObjectURL(u)
-      })
-      objectUrlsRef.current = [null, null]
-      ctx.close().catch(() => {})
+      eng.dispose()
+      if (engineRef.current === eng) engineRef.current = null
     }
   }, [])
 
   useEffect(() => {
     if (skipLoadRef.current) {
       skipLoadRef.current = false
-      crossfadeAbortedForTrackRef.current = null
       return
     }
-    crossfadeAbortedForTrackRef.current = null
-    const audio = audioRef.current
-    if (!audio) return
-    crossfadingRef.current = false
-    pendingCrossfadeRef.current = null
-    if (crossfadeTimerRef.current) clearTimeout(crossfadeTimerRef.current)
-    const ai = activeIndexRef.current
-    playersRef.current.forEach((p, idx) => {
-      if (idx !== ai) p.pause()
-    })
-    if (gainsRef.current[ai]) gainsRef.current[ai].gain.value = 1
-    if (gainsRef.current[1 - ai]) gainsRef.current[1 - ai].gain.value = 0
+    const eng = engineRef.current
+    if (!eng) return
     if (!selectedTrack) {
-      audio.pause()
-      audio.removeAttribute('src')
-      audio.load()
-      const oldUrl = objectUrlsRef.current[ai]
-      if (oldUrl) {
-        URL.revokeObjectURL(oldUrl)
-        objectUrlsRef.current[ai] = null
-      }
+      eng.stop()
       setCurrentTime(0)
       setDuration(0)
       return
     }
-    const trackId = selectedTrack.id
-    const filePath = selectedTrack.filePath
-    let cancelled = false
+    const autoplay = pendingPlayRef.current
+    pendingPlayRef.current = false
+    /* Ручное переключение: короткий кроссфейд, если включён, иначе мгновенно (но без щелчка) */
+    const cf = crossfadeRef.current
+    const fade = manualCrossfadeRef.current && cf > 0 ? Math.min(cf, MANUAL_CROSSFADE_MAX) : 0
     setCurrentTime(0)
     setDuration(0)
     setSeekTick((v) => v + 1)
-    ;(async () => {
-      try {
-        const bytes = await readFile(filePath)
-        if (cancelled) return
-        const oldUrl = objectUrlsRef.current[ai]
-        if (oldUrl) URL.revokeObjectURL(oldUrl)
-        const url = URL.createObjectURL(
-          new Blob([bytes as unknown as BlobPart], { type: audioMime(filePath) })
-        )
-        objectUrlsRef.current[ai] = url
-        audio.src = url
-        audio.playbackRate = selectedTrack.playbackRate ?? 1
-        audio.load()
-        if (pendingPlayRef.current) {
-          pendingPlayRef.current = false
-          audioCtxRef.current?.resume().catch(() => {})
-          audio.play().catch((e) => {
-            console.warn('Не удалось воспроизвести:', e)
-            setIsPlaying(false)
-          })
-        }
-      } catch (e) {
-        console.error(`Не удалось прочитать трек (id ${trackId}):`, e)
-      }
-    })()
-    return () => {
-      cancelled = true
-    }
+    void eng.load(selectedTrack, { autoplay, fade })
   }, [selectedTrack?.id])
 
-  const scheduleSettingsSave = useCallback(
-    (patch: {
-      volume?: number
-      isMuted?: boolean
-      crossfade?: number
-      outputDevice?: string
-      discordRpc?: boolean
-    }) => {
-      if (settingsSaveTimerRef.current) clearTimeout(settingsSaveTimerRef.current)
-      settingsSaveTimerRef.current = setTimeout(() => {
-        saveSettings(patch).catch((e) => console.error('Не удалось сохранить настройки:', e))
-      }, 250)
-    },
-    []
-  )
+  /* Патчи копятся, пока идёт задержка, — иначе быстрая смена двух разных настроек теряла первую */
+  const pendingSettingsRef = useRef<Partial<AppSettings>>({})
+  const scheduleSettingsSave = useCallback((patch: Partial<AppSettings>) => {
+    pendingSettingsRef.current = { ...pendingSettingsRef.current, ...patch }
+    if (settingsSaveTimerRef.current) clearTimeout(settingsSaveTimerRef.current)
+    settingsSaveTimerRef.current = setTimeout(() => {
+      const p = pendingSettingsRef.current
+      pendingSettingsRef.current = {}
+      saveSettings(p).catch((e) => console.error('Не удалось сохранить настройки:', e))
+    }, 250)
+  }, [])
 
   const handleCrossfadeChange = useCallback(
     (sec: number) => {
@@ -695,6 +509,24 @@ function AppInner() {
       setCrossfade(v)
       crossfadeRef.current = v
       scheduleSettingsSave({ crossfade: v })
+    },
+    [scheduleSettingsSave]
+  )
+
+  const handleManualCrossfadeChange = useCallback(
+    (v: boolean) => {
+      setManualCrossfade(v)
+      manualCrossfadeRef.current = v
+      scheduleSettingsSave({ manualCrossfade: v })
+    },
+    [scheduleSettingsSave]
+  )
+
+  const handleCrossfadeCurveChange = useCallback(
+    (c: CrossfadeCurve) => {
+      setCrossfadeCurve(c)
+      if (engineRef.current) engineRef.current.curve = c
+      scheduleSettingsSave({ crossfadeCurve: c })
     },
     [scheduleSettingsSave]
   )
@@ -710,7 +542,12 @@ function AppInner() {
   )
 
   const [discordRpc, setDiscordRpc] = useState(true)
-  const [seekTick, setSeekTick] = useState(0)
+  const [visualizerEnabled, setVisualizerEnabled] = useState(true)
+  const [eqEnabled, setEqEnabled] = useState(false)
+  const [eqPresetId, setEqPresetId] = useState('flat')
+  const [eqCustomPresets, setEqCustomPresets] = useState<EqPreset[]>([])
+  /* Усиления из открытого редактора пресета — слышны сразу, пока его двигают */
+  const [eqPreview, setEqPreview] = useState<number[] | null>(null)
 
   const handleDiscordRpcChange = useCallback(
     (v: boolean) => {
@@ -765,8 +602,9 @@ function AppInner() {
         return
       }
       const raw = await readTextFile(profileFile)
-      const data = JSON.parse(raw) as { avatarFile?: string; avatarShape?: AvatarShape }
+      const data = JSON.parse(raw) as { avatarFile?: string; avatarShape?: AvatarShape; avatarFrame?: unknown }
       setAvatarShape(data.avatarShape === 'square' ? 'square' : 'circle')
+      setAvatarFrame(normalizeFrame(data.avatarFrame))
       let nextUrl: string | null = null
       if (data.avatarFile) {
         const filePath =
@@ -813,7 +651,11 @@ function AppInner() {
         setVolume(settings.volume)
         setIsMuted(settings.isMuted)
         setCrossfade(settings.crossfade ?? 0)
+        setManualCrossfade(settings.manualCrossfade)
+        setCrossfadeCurve(settings.crossfadeCurve)
         setOutputDevice(settings.outputDevice ?? '')
+        manualCrossfadeRef.current = settings.manualCrossfade
+        if (engineRef.current) engineRef.current.curve = settings.crossfadeCurve
         volumeRef.current = settings.volume
         mutedRef.current = settings.isMuted
         crossfadeRef.current = settings.crossfade ?? 0
@@ -827,6 +669,13 @@ function AppInner() {
           try {
             const raw = JSON.parse(await readTextFile(settingsFile)) as Record<string, unknown>
             if (raw.discordRpc === false) setDiscordRpc(false)
+            if (raw.visualizer === false) setVisualizerEnabled(false)
+            if (raw.eqEnabled === true) setEqEnabled(true)
+            if (typeof raw.eq === 'string') setEqPresetId(raw.eq)
+            setEqCustomPresets(normalizeCustomPresets(raw.eqCustomPresets))
+            if (raw.uiScale !== undefined && clampUiScale(raw.uiScale) !== UI_SCALE_DEFAULT) {
+              void applyUiScale(clampUiScale(raw.uiScale))
+            }
           } catch {
           }
         }
@@ -865,24 +714,25 @@ function AppInner() {
   }, [])
 
   useEffect(() => {
+    /* Системное меню браузера (Назад / Обновить / Проверить элемент) не нужно нигде.
+       Оставляем его только в полях ввода — там через него вставляют и копируют текст.
+       Свои меню (треки, плеер, обложки) вызывают preventDefault сами и сюда не доходят. */
     const onCtx = (e: MouseEvent) => {
-      const target = e.target as HTMLElement
-      if (
-        target.closest('.track-row') ||
-        target.closest('.player') ||
-        target.closest('.confirm-overlay') ||
-        target.closest('.modal')
-      ) {
-        return
-      }
-      if (currentView === 'tracks' || currentView === 'liked' || currentView === 'playlist') {
-        return
+      const target = e.target as HTMLElement | null
+      const editable = target?.closest('input, textarea, [contenteditable="true"]') as
+        | HTMLInputElement
+        | HTMLTextAreaElement
+        | HTMLElement
+        | null
+      if (editable && !(editable as HTMLInputElement).disabled) {
+        const type = (editable as HTMLInputElement).type
+        if (editable.tagName !== 'INPUT' || !['range', 'checkbox', 'radio', 'button', 'color', 'file'].includes(type)) return
       }
       e.preventDefault()
     }
     document.addEventListener('contextmenu', onCtx)
     return () => document.removeEventListener('contextmenu', onCtx)
-  }, [currentView])
+  }, [])
 
   const handleCopyTitle = useCallback(
     async (trackId: number) => {
@@ -942,29 +792,22 @@ function AppInner() {
       const idx = ids.indexOf(track.id)
       if (idx < 0) return
       setQueue(ids)
+      markTrackFade(manualFadeSec())
       setQueueIndex(idx)
       historyRef.current = []
       pendingPlayRef.current = true
       recordPlay(track.id)
     },
-    [recordPlay, tracksRef]
+    [recordPlay, tracksRef, markTrackFade, manualFadeSec]
   )
 
   /* ===== Плеер ===== */
   const handlePlayPause = useCallback(() => {
-    const audio = audioRef.current
-    if (!audio || !audio.src) return
-    if (isPlayingRef.current) {
-      abortCrossfade()
-      audio.pause()
-      audioCtxRef.current?.suspend().catch(() => {})
-      setIsPlaying(false)
-    } else {
-      audioCtxRef.current?.resume().catch(() => {})
-      audio.play().catch(() => {})
-      setIsPlaying(true)
-    }
-  }, [abortCrossfade])
+    const eng = engineRef.current
+    if (!eng || !eng.hasSource) return
+    if (eng.isPlaying) eng.pause()
+    else eng.play()
+  }, [])
 
   const handleNext = useCallback(() => {
     const q = queueRef.current
@@ -988,13 +831,14 @@ function AppInner() {
     historyRef.current.push(queueIndexRef.current)
     if (historyRef.current.length > 50) historyRef.current.shift()
     pendingPlayRef.current = true
+    markTrackFade(manualFadeSec())
     setQueueIndex(next)
-  }, [])
+  }, [markTrackFade, manualFadeSec])
 
   const handlePrev = useCallback(() => {
-    const audio = audioRef.current
-    if (audio && audio.currentTime > 3) {
-      audio.currentTime = 0
+    const eng = engineRef.current
+    if (eng && eng.currentTime > 3) {
+      eng.seek(0)
       return
     }
     const q = queueRef.current
@@ -1002,23 +846,24 @@ function AppInner() {
     if (historyRef.current.length > 0) {
       const prev = historyRef.current.pop() as number
       pendingPlayRef.current = true
+      markTrackFade(manualFadeSec())
       setQueueIndex(prev)
       return
     }
     if (!shuffleRef.current) {
       pendingPlayRef.current = true
+      markTrackFade(manualFadeSec())
       setQueueIndex((queueIndexRef.current - 1 + q.length) % q.length)
     }
-  }, [])
+  }, [markTrackFade, manualFadeSec])
 
   const handleSeek = useCallback(
     (time: number) => {
-      abortCrossfade()
-      if (audioRef.current) audioRef.current.currentTime = time
+      engineRef.current?.seek(time)
       setCurrentTime(time)
       setSeekTick((v) => v + 1)
     },
-    [abortCrossfade]
+    []
   )
 
   const handleVolumeChange = useCallback(
@@ -1057,10 +902,7 @@ function AppInner() {
     ) => {
       libraryEditTrack(trackId, updates)
       if (typeof updates.playbackRate === 'number') {
-        const rate = updates.playbackRate
-        playersRef.current.forEach((p) => {
-          if (p) p.playbackRate = rate
-        })
+        engineRef.current?.setRate(trackId, updates.playbackRate)
       }
     },
     [libraryEditTrack]
@@ -1181,31 +1023,181 @@ function AppInner() {
     }
   }, [handlePlayPause, handleNext, handlePrev, handleSeek, handleVolumeChange, handleMuteToggle, handleToggleLike])
   
+  const handleShuffleToggle = useCallback(() => setIsShuffle((v) => !v), [])
+  const handleRepeatToggle = useCallback(
+    () => setRepeatMode((m) => (m === 'off' ? 'all' : m === 'all' ? 'one' : 'off')),
+    []
+  )
+
+  const openProfileSettings = useCallback(() => {
+    setSettingsSection('profile')
+    setCurrentView('settings')
+  }, [])
+
+  /* ===== Расширенный режим ===== */
+  const viewBeforeNowPlayingRef = useRef<ViewType>('home')
+
+  const openNowPlaying = useCallback(() => {
+    setCurrentView((v) => {
+      if (v !== 'nowplaying') viewBeforeNowPlayingRef.current = v
+      return 'nowplaying'
+    })
+  }, [])
+
+  const closeNowPlaying = useCallback(() => setCurrentView(viewBeforeNowPlayingRef.current), [])
+
+  const getAnalyser = useCallback(() => engineRef.current?.analyser ?? null, [])
+  const getEngineTime = useCallback(() => engineRef.current?.currentTime ?? 0, [])
+  const getPlayback = useCallback(
+    () => ({ time: engineRef.current?.currentTime ?? 0, duration: engineRef.current?.duration ?? 0 }),
+    []
+  )
+
+  /* ===== Эквалайзер ===== */
+  useEffect(() => {
+    const eng = engineRef.current
+    if (!eng) return
+    if (eqPreview) eng.setEq(eqPreview)
+    else eng.setEq(eqEnabled ? presetGains(eqPresetId, eqCustomPresets) : null)
+  }, [eqEnabled, eqPresetId, eqCustomPresets, eqPreview])
+
+  const handleEqEnabledChange = useCallback(
+    (v: boolean) => {
+      setEqEnabled(v)
+      scheduleSettingsSave({ eqEnabled: v })
+    },
+    [scheduleSettingsSave]
+  )
+
+  const handleEqPresetChange = useCallback(
+    (id: string) => {
+      setEqPresetId(id)
+      scheduleSettingsSave({ eq: id })
+    },
+    [scheduleSettingsSave]
+  )
+
+  /* Новый или изменённый свой пресет — сразу становится текущим */
+  const handleEqSavePreset = useCallback(
+    (preset: EqPreset) => {
+      setEqCustomPresets((prev) => {
+        const next = prev.some((p) => p.id === preset.id)
+          ? prev.map((p) => (p.id === preset.id ? preset : p))
+          : [...prev, preset]
+        scheduleSettingsSave({ eqCustomPresets: next, eq: preset.id })
+        return next
+      })
+      setEqPresetId(preset.id)
+    },
+    [scheduleSettingsSave]
+  )
+
+  const handleEqDeletePreset = useCallback(
+    (id: string) => {
+      setEqCustomPresets((prev) => {
+        const next = prev.filter((p) => p.id !== id)
+        scheduleSettingsSave({ eqCustomPresets: next })
+        return next
+      })
+      setEqPresetId((cur) => {
+        if (cur !== id) return cur
+        scheduleSettingsSave({ eq: 'flat' })
+        return 'flat'
+      })
+    },
+    [scheduleSettingsSave]
+  )
+
+  const handleVisualizerChange = useCallback(
+    (v: boolean) => {
+      setVisualizerEnabled(v)
+      scheduleSettingsSave({ visualizer: v })
+    },
+    [scheduleSettingsSave]
+  )
+
   /* Стабильная ссылка: иначе memo(LikedView) перерисовывается на каждом тике плеера */
   const likedTracks = useMemo(() => tracks.filter((t) => t.liked), [tracks])
+
+  const renderHome = () => (
+    <HomeViewM
+      tracks={tracks}
+      nickname={userNickname}
+      onSelectTrack={handleTrackSelect}
+      currentTrack={selectedTrack}
+      playHistory={playHistory}
+      playingTrackId={selectedTrack?.id ?? null}
+      isPlaying={isPlaying}
+      onPlayToggle={handlePlayPause}
+      onOpenNowPlaying={openNowPlaying}
+      getPlayback={getPlayback}
+      playlists={playlists}
+      onToggleLike={handleToggleLike}
+      onDeleteTracks={handleDeleteTracks}
+      onAddToPlaylist={handleAddToPlaylist}
+      onCreatePlaylist={handleCreatePlaylist}
+      onEditTrack={handleEditTrack}
+      onCopyTitle={handleCopyTitle}
+      onCopyArtist={handleCopyArtist}
+      onCopyPath={handleCopyPath}
+      onRevealInDir={handleRevealInDir}
+    />
+  )
 
   const renderView = () => {
     switch (currentView) {
       case 'home':
+        return renderHome()
+      case 'nowplaying':
         return (
-          <HomeViewM
-            tracks={tracks}
-            nickname={userNickname}
-            onSelectTrack={handleTrackSelect}
-            lastPlayed={selectedTrack}
-            playHistory={playHistory}
-            playingTrackId={selectedTrack?.id ?? null}
+          <NowPlayingViewM
+            track={selectedTrack}
             isPlaying={isPlaying}
+            currentTime={currentTime}
+            duration={duration}
+            isLiked={selectedTrack?.liked ?? false}
             onPlayToggle={handlePlayPause}
+            onNext={handleNext}
+            onPrev={handlePrev}
+            onSeek={handleSeek}
+            onToggleLike={handleToggleLike}
+            volume={volume}
+            isMuted={isMuted}
+            isShuffle={isShuffle}
+            repeatMode={repeatMode}
+            onVolumeChange={handleVolumeChange}
+            onMuteToggle={handleMuteToggle}
+            onShuffleToggle={handleShuffleToggle}
+            onRepeatToggle={handleRepeatToggle}
+            onBack={closeNowPlaying}
+            trackFadeMs={trackFadeMs}
+            getAnalyser={getAnalyser}
+            getCurrentTime={getEngineTime}
+            visualizerEnabled={visualizerEnabled}
+            onToggleVisualizer={handleVisualizerChange}
           />
         )
       case 'settings':
         return (
           <SettingsViewM
+            section={settingsSection}
+            onSectionChange={setSettingsSection}
             currentNickname={userNickname}
             onSaveNickname={handleSaveNickname}
             crossfade={crossfade}
             onChangeCrossfade={handleCrossfadeChange}
+            manualCrossfade={manualCrossfade}
+            onChangeManualCrossfade={handleManualCrossfadeChange}
+            crossfadeCurve={crossfadeCurve}
+            onChangeCrossfadeCurve={handleCrossfadeCurveChange}
+            eqEnabled={eqEnabled}
+            eqPresetId={eqPresetId}
+            eqCustomPresets={eqCustomPresets}
+            onChangeEqEnabled={handleEqEnabledChange}
+            onChangeEqPreset={handleEqPresetChange}
+            onSaveEqPreset={handleEqSavePreset}
+            onDeleteEqPreset={handleEqDeletePreset}
+            onPreviewEq={setEqPreview}
             outputDevice={outputDevice}
             onChangeOutputDevice={handleOutputDeviceChange}
             libraryFolder={libraryFolder}
@@ -1277,18 +1269,11 @@ function AppInner() {
             onCopyTitleArtist={handleCopyTitleArtist}
             onCreatePlaylist={handleCreatePlaylist}
             onAddToPlaylist={handleAddToPlaylist}
+            onImportTracks={handleAddTracks}
           />
         )
       default:
-        return (
-          <HomeViewM
-            tracks={tracks}
-            nickname={userNickname}
-            onSelectTrack={handleTrackSelect}
-            lastPlayed={selectedTrack}
-            playHistory={playHistory}
-          />
-        )
+        return renderHome()
     }
   }
 
@@ -1323,7 +1308,7 @@ function AppInner() {
                 Playly
               </span>
             </div>
-            <div className="subtitle">Version 2.0.2</div>
+            <div className="subtitle">Version 2.0.3</div>
             <div className="loading-bar-container">
               <div
                 className="loading-bar-fill"
@@ -1357,7 +1342,7 @@ function AppInner() {
     : 0
 
   return (
-    <div className="app">
+    <div className={`app ${currentView === 'nowplaying' ? 'immersive' : ''}`}>
       <div
         className="titlebar"
         data-tauri-drag-region
@@ -1468,10 +1453,12 @@ function AppInner() {
       <SidebarM
         currentView={currentView}
         onViewChange={setCurrentView}
+        onOpenProfile={openProfileSettings}
         nickname={userNickname}
         playlists={playlists}
         avatarUrl={userAvatar}
         avatarShape={avatarShape}
+        avatarFrame={avatarFrame}
         onCreatePlaylist={handleCreatePlaylist}
         onRenamePlaylist={handleRenamePlaylist}
         onUpdatePlaylist={handleUpdatePlaylist}
@@ -1479,6 +1466,7 @@ function AppInner() {
         onDeletePlaylist={handleDeletePlaylist}
         onChangePlaylistCover={handleChangePlaylistCover}
         onPickImage={handlePickImage}
+        onPickBanner={handlePickBanner}
         onOpenPlaylist={handleOpenPlaylist}
         onReorderPlaylists={handleReorderPlaylists}
       />
@@ -1494,6 +1482,8 @@ function AppInner() {
       </main>
       <PlayerBar
         track={selectedTrack}
+        isNowPlayingOpen={currentView === 'nowplaying'}
+        onToggleNowPlaying={currentView === 'nowplaying' ? closeNowPlaying : openNowPlaying}
         isPlaying={isPlaying}
         onPlayToggle={handlePlayPause}
         currentTime={currentTime}
@@ -1507,10 +1497,8 @@ function AppInner() {
         onPrev={handlePrev}
         isShuffle={isShuffle}
         repeatMode={repeatMode}
-        onShuffleToggle={() => setIsShuffle((v) => !v)}
-        onRepeatToggle={() =>
-          setRepeatMode((m) => (m === 'off' ? 'all' : m === 'all' ? 'one' : 'off'))
-        }
+        onShuffleToggle={handleShuffleToggle}
+        onRepeatToggle={handleRepeatToggle}
         isLiked={selectedTrack?.liked ?? false}
         onToggleLike={handleToggleLike}
         onCopyTitle={
