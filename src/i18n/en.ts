@@ -664,7 +664,7 @@ export const en = {
                   'Effects can be shown only while music plays. When the window is hidden, the animation stops and uses no resources.',
                   '<strong>Custom particles</strong>: a shape (dot, glow, star, heart, note, square) in any color or your own image — GIFs keep animating. Scaling is smooth or “pixels” (nearest neighbor) for pixel art.',
                   'Custom particle behavior: flow in any direction (with spread and sway), float, twinkle or wander; ranges for speed, size and opacity, spin, flipping and fading in and out.',
-                  'A live preview right in the settings, blur for the particle layer and compact sliders with icons.',
+                  'Blur for the particle layer and compact sliders with icons. The chosen effect shows up right away in the app background.',
                 ],
               },
             ],
@@ -702,7 +702,6 @@ export const en = {
             groups: [
               {
                 items: [
-                  'Back and Forward buttons for pages; mouse side buttons and Alt+←/→ work too.',
                   'The center shows what is playing with a dancing equalizer; click it to open expanded mode. With nothing playing, it shows the page name.',
                   'The maximize button always shows the right state, even if the window was maximized by dragging it to the screen edge. An inactive window is dimmed, and the close button turns red and explains that Playly hides to the tray.',
                   'Modal windows no longer cover the header: you can minimize, maximize or hide the window at any time.',
@@ -731,6 +730,8 @@ export const en = {
                 items: [
                   'Auto-update: new versions download in the background, are verified by signature and install only when you agree — “Restart” or “Later”.',
                   'In About, the “Why I build it” section is replaced with an updates block: check, download progress, release notes and an auto-download switch.',
+                  'The portable Playly.exe updates itself too: the new version replaces the old one on restart.',
+                  'If this build does not match any release, About shows “Unknown version”. It does not offer to update — only to install the current release with a button.',
                 ],
               },
             ],
@@ -781,6 +782,20 @@ export const en = {
                   'Renaming a track or artist updates the status right away.',
                   'Choose what your status shows: title, artist, album, time bar, buttons, paused status and idle status — with a live preview of the card.',
                   'Individual tracks can be hidden from Discord in their settings — your status then just says “Listening to music”.',
+                ],
+              },
+            ],
+          },
+          {
+            title: 'Speed and fixes',
+            groups: [
+              {
+                items: [
+                  'Playly uses noticeably less CPU while music plays and starts faster: covers load as they are needed.',
+                  'The mini player no longer hides while you drag or resize it, stays within the screen and moves freely between monitors.',
+                  'Expanded mode no longer starts the track by itself and fully fits a 1280×720 window.',
+                  'The Save buttons in Edit track and the look editors are always visible instead of hiding below the scroll.',
+                  'In the profile window the avatar no longer overlaps the nickname.',
                 ],
               },
             ],
