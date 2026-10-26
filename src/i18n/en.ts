@@ -604,6 +604,25 @@ export const en = {
     collapse: 'Collapse',
     entries: [
       {
+        version: '2.0.5',
+        date: '2026-10-26',
+        title: 'Hotfix: the mini player no longer hides from clicks',
+        sections: [
+          {
+            title: 'Mini player',
+            groups: [
+              {
+                items: [
+                  'The mini player no longer disappears when you press its buttons, drag its sliders or move it: it hides only when you switch to another window.',
+                  'Because of this bug, clicks in the mini player sometimes got lost — playback from the mini player works again.',
+                  'This version also tests auto-update: if it arrived by itself, everything works.',
+                ],
+              },
+            ],
+          },
+        ],
+      },
+      {
         version: '2.0.4',
         channel: 'snapshot',
         date: '2026-10-25',

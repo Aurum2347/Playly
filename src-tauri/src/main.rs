@@ -607,8 +607,10 @@ struct MiniState {
     hidden_at: std::sync::Mutex<Option<Instant>>,
     /* Последнее перемещение / изменение размера / нажатие на шапку или уголок */
     interaction_at: std::sync::Mutex<Option<Instant>>,
-    /* Уже идёт проверка «прятать ли окно после потери фокуса» */
+    /* Уже идёт слежка «не ушёл ли пользователь в другое окно» */
     blur_watch: std::sync::atomic::AtomicBool,
+    /* Мини-плеер хоть раз был активным окном с момента показа: только тогда его можно прятать */
+    armed: std::sync::atomic::AtomicBool,
     /* Номер последнего перемещения: окно встаёт в границы экрана, только когда движение закончилось */
     move_seq: std::sync::atomic::AtomicU64,
 }
@@ -625,9 +627,30 @@ impl MiniState {
             .is_some_and(|t| t.elapsed() < MINI_INTERACTION_GRACE)
     }
 
-    fn interacted_since(&self, since: Instant) -> bool {
-        self.interaction_at.lock().unwrap().is_some_and(|t| t > since)
+    fn interacted_within(&self, d: Duration) -> bool {
+        self.interaction_at.lock().unwrap().is_some_and(|t| t.elapsed() < d)
     }
+}
+
+/// Мини-плеер — активное окно Windows? Клик внутри WebView отдаёт фокус клавиатуры дочернему окну,
+/// и tao считает окно «не в фокусе» (is_focused() == false), хотя пользователь работает именно с ним.
+/// Поэтому смотрим, чьё окно на переднем плане
+#[cfg(target_os = "windows")]
+fn mini_in_foreground(w: &tauri::WebviewWindow) -> bool {
+    #[link(name = "user32")]
+    extern "system" {
+        fn GetForegroundWindow() -> isize;
+        fn GetAncestor(hwnd: isize, flags: u32) -> isize;
+    }
+    const GA_ROOT: u32 = 2;
+    let Ok(hwnd) = w.hwnd() else { return false };
+    let fg = unsafe { GetForegroundWindow() };
+    fg != 0 && unsafe { GetAncestor(fg, GA_ROOT) } == hwnd.0 as isize
+}
+
+#[cfg(not(target_os = "windows"))]
+fn mini_in_foreground(w: &tauri::WebviewWindow) -> bool {
+    w.is_focused().unwrap_or(false)
 }
 
 /// Прямоугольник рабочей области (без панели задач) монитора, ближайшего к точке
@@ -665,35 +688,41 @@ fn keep_mini_on_screen(app: &tauri::AppHandle, w: &tauri::WebviewWindow) {
     }
 }
 
-/// Окно потеряло фокус. На Windows это случается и при перетаскивании, и при изменении размера,
-/// и даже при клике внутри WebView — поэтому прячем не сразу, а убедившись, что фокус ушёл по-настоящему
+/// Пока мини-плеер открыт, следит, не ушёл ли пользователь в другое окно, и тогда прячет его.
+/// Прятать сразу по событию «потерял фокус» нельзя: на Windows оно приходит и при клике внутри окна,
+/// и при перетаскивании, и при изменении размера
 fn watch_mini_blur(app: tauri::AppHandle, w: tauri::WebviewWindow) {
     let state = app.state::<MiniState>();
     if state.blur_watch.swap(true, std::sync::atomic::Ordering::AcqRel) {
         return;
     }
-    let started = Instant::now();
     thread::spawn(move || {
         let state = app.state::<MiniState>();
         loop {
             thread::sleep(MINI_BLUR_CHECK);
-            if state.pinned.load(std::sync::atomic::Ordering::Relaxed)
-                || !w.is_visible().unwrap_or(false)
-                || w.is_focused().unwrap_or(false)
-            {
+            if state.pinned.load(std::sync::atomic::Ordering::Relaxed) || !w.is_visible().unwrap_or(false) {
                 break;
+            }
+            if mini_in_foreground(&w) {
+                state.armed.store(true, std::sync::atomic::Ordering::Relaxed);
+                continue;
             }
             /* Окно ещё двигают или тянут за край — ждём */
             if state.interacting() {
                 continue;
             }
-            if state.interacted_since(started) {
-                /* Перетаскивание закончилось: возвращаем фокус, чтобы следующий клик мимо снова прятал окно */
-                let _ = w.set_focus();
-            } else {
-                let _ = w.hide();
-                *state.hidden_at.lock().unwrap() = Some(Instant::now());
+            /* Windows не всегда отдаёт фокус показанному окну: пока мини-плеер ни разу не был активным,
+               не прячем его — иначе он исчезал бы сам через долю секунды */
+            if !state.armed.load(std::sync::atomic::Ordering::Relaxed) {
+                continue;
             }
+            if state.interacted_within(MINI_INTERACTION_GRACE * 2) {
+                /* Перетаскивание только что закончилось: возвращаем окну фокус, чтобы клик мимо снова его прятал */
+                let _ = w.set_focus();
+                continue;
+            }
+            let _ = w.hide();
+            *state.hidden_at.lock().unwrap() = Some(Instant::now());
             break;
         }
         state.blur_watch.store(false, std::sync::atomic::Ordering::Release);
@@ -726,7 +755,10 @@ fn mini_window(app: &tauri::AppHandle) -> Option<tauri::WebviewWindow> {
     let win = w.clone();
     w.on_window_event(move |event| match event {
         tauri::WindowEvent::Focused(false) => {
-            if !handle.state::<MiniState>().pinned.load(std::sync::atomic::Ordering::Relaxed) {
+            let state = handle.state::<MiniState>();
+            if !state.pinned.load(std::sync::atomic::Ordering::Relaxed) {
+                /* Фокус был у окна — значит, его можно прятать, когда пользователь уйдёт */
+                state.armed.store(true, std::sync::atomic::Ordering::Relaxed);
                 watch_mini_blur(handle.clone(), win.clone());
             }
         }
@@ -825,6 +857,8 @@ fn toggle_mini_window(app: &tauri::AppHandle, w: &tauri::WebviewWindow, anchor: 
     }
     let _ = w.show();
     let _ = w.set_focus();
+    state.armed.store(false, std::sync::atomic::Ordering::Relaxed);
+    watch_mini_blur(app.clone(), w.clone());
 }
 
 #[command]
@@ -840,8 +874,14 @@ fn hide_mini_player(app: tauri::AppHandle) {
 }
 
 #[command]
-fn set_mini_pinned(state: tauri::State<'_, MiniState>, pinned: bool) {
+fn set_mini_pinned(app: tauri::AppHandle, state: tauri::State<'_, MiniState>, pinned: bool) {
     state.pinned.store(pinned, std::sync::atomic::Ordering::Relaxed);
+    /* Открепили — снова следим, чтобы клик мимо прятал окно */
+    if !pinned {
+        if let Some(w) = app.get_webview_window(MINI_LABEL) {
+            watch_mini_blur(app.clone(), w);
+        }
+    }
 }
 
 /// Пользователь начал перетаскивать мини-плеер — запоминаем, что место выбрано им

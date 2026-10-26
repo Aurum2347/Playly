@@ -32,3 +32,6 @@ autoupd.md
 
 # Собранные файлы релиза (npm run release)
 release/
+
+# Описания релизов для npm run release --notes-file
+release-notes-*.md
