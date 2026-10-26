@@ -149,7 +149,7 @@ export default function PlaybackSection({
           )
         }
       } catch {
-        // ignore
+        /* Список устройств недоступен — остаётся вариант «По умолчанию» */
       }
     }
     load()

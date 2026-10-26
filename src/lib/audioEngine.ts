@@ -65,6 +65,16 @@ export function audioMime(path: string): string {
     case 'm4a':
     case 'aac': return 'audio/mp4'
     case 'wma': return 'audio/x-ms-wma'
+    case 'aif':
+    case 'aiff': return 'audio/aiff'
+    case 'weba': return 'audio/webm'
+    case 'oga': return 'audio/ogg'
+    /* У видео играет только звуковая дорожка */
+    case 'mp4':
+    case 'm4v': return 'video/mp4'
+    case 'mov': return 'video/quicktime'
+    case 'webm': return 'video/webm'
+    case 'mkv': return 'video/x-matroska'
     default: return 'application/octet-stream'
   }
 }

@@ -13,9 +13,15 @@
 
 :root {
   color-scheme: dark;
+  /* Высота шапки окна: модалки начинаются под ней, чтобы кнопки окна оставались доступны */
+  --titlebar-h: 40px;
 
   --bg: #0a0a0c;
   --bg-elevated: #0d0d0f;
+  /* Те же цвета компонентами — для полупрозрачного интерфейса поверх фона */
+  --bg-rgb: 10, 10, 12;
+  --bg-elevated-rgb: 13, 13, 15;
+  --panel-rgb: 20, 20, 23;
 
   --panel: #141417;
   --panel-solid: #1c1c20;
@@ -68,6 +74,9 @@
 
   --bg: #f2f2f5;
   --bg-elevated: #e9e9ee;
+  --bg-rgb: 242, 242, 245;
+  --bg-elevated-rgb: 233, 233, 238;
+  --panel-rgb: 255, 255, 255;
 
   --panel: #ffffff;
   --panel-solid: #ffffff;

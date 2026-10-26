@@ -129,7 +129,9 @@
 .np-stage {
   display: flex;
   flex-direction: column;
-  justify-content: center;
+  /* safe: если места не хватает, содержимое уходит вниз, а не наезжает на кнопку «Назад».
+     overflow не задаём — он обрезал бы тень карточки */
+  justify-content: safe center;
   gap: 18px;
   min-height: 0;
   min-width: 0;
@@ -486,10 +488,12 @@
 
 .np-viz-switch-bars i {
   width: 2px;
-  height: 4px;
+  height: 12px;
   border-radius: 1px;
   background: currentColor;
-  transition: height 0.2s ease;
+  transform: scaleY(0.33);
+  transform-origin: bottom;
+  transition: transform 0.2s ease;
 }
 
 .np-viz-switch.on .np-viz-switch-bars i { animation: npVizBars 1s ease-in-out infinite; }
@@ -498,9 +502,10 @@
 .np-viz-switch.on .np-viz-switch-bars i:nth-child(4) { animation-delay: -0.75s; }
 .np-view:not(.playing) .np-viz-switch-bars i { animation-play-state: paused; }
 
+/* transform вместо height — без пересчёта раскладки на каждом кадре */
 @keyframes npVizBars {
-  0%, 100% { height: 3px; }
-  50%      { height: 12px; }
+  0%, 100% { transform: scaleY(0.25); }
+  50%      { transform: scaleY(1); }
 }
 
 .np-viz-switch-track {
@@ -674,6 +679,14 @@
 .np-empty-icon svg { width: 38px; height: 38px; color: var(--text-faint); }
 .np-empty-title { font-size: 18px; font-weight: 700; color: var(--text); }
 .np-empty-text { font-size: 13px; color: var(--text-muted); max-width: 360px; line-height: 1.5; }
+
+/* ===== Невысокое окно (например, стандартные 1280×720): всё помещается без прокрутки ===== */
+@media (max-height: 860px) {
+  .np-view.with-lyrics .np-stage { gap: 12px; }
+  .np-view.with-lyrics .np-card { gap: 12px; padding: 18px; }
+  .np-view.with-lyrics .np-cover { max-width: min(300px, 26vh); }
+  .np-view.with-lyrics .np-visualizer { height: 72px; }
+}
 
 /* ===== Узкое окно / крупный масштаб ===== */
 @media (max-width: 980px) {

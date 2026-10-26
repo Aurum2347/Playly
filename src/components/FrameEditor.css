@@ -13,7 +13,8 @@
 .frame-box:active,
 body.is-panning .frame-box { cursor: grabbing; }
 
-.frame-box > img { pointer-events: none; }
+.frame-box > img,
+.frame-box > video { pointer-events: none; }
 
 body.is-panning,
 body.is-panning * { cursor: grabbing !important; }
@@ -41,7 +42,8 @@ body.is-panning * { cursor: grabbing !important; }
 /* ===== Окно редактора (аватарка, баннер) ===== */
 .frame-modal-overlay {
   position: fixed;
-  inset: 0;
+  /* Шапка окна с кнопками управления остаётся доступной */
+  inset: var(--titlebar-h, 0px) 0 0;
   z-index: 10004;
   display: flex;
   align-items: center;
@@ -57,7 +59,7 @@ body.is-panning * { cursor: grabbing !important; }
 .frame-modal {
   width: 100%;
   max-width: 440px;
-  max-height: calc(100vh - 48px);
+  max-height: calc(100vh - var(--titlebar-h, 0px) - 48px);
   overflow-y: auto;
   display: flex;
   flex-direction: column;
@@ -81,12 +83,21 @@ body.is-panning * { cursor: grabbing !important; }
 .frame-modal-title { font-size: 18px; font-weight: 700; color: var(--text); letter-spacing: -0.01em; }
 .frame-modal-sub { font-size: 12px; color: var(--text-muted); line-height: 1.5; }
 
+/* Кнопки прилипают к низу окна: в невысоком окне их не нужно искать прокруткой */
 .frame-modal-actions {
+  position: sticky;
+  bottom: -22px;
+  z-index: 3;
   display: flex;
   align-items: center;
   justify-content: flex-end;
   gap: 10px;
+  margin: 0 -22px -22px;
+  padding: 14px 22px 22px;
+  background: linear-gradient(to bottom, transparent, var(--panel-solid) 14px);
 }
+
+.frame-modal::-webkit-scrollbar-track { margin: 20px 0; }
 
 .frame-modal-actions .spacer { flex: 1; }
 

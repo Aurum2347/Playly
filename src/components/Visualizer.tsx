@@ -43,6 +43,10 @@ export default function Visualizer({ getAnalyser, isPlaying, tint, bars = 56, cl
     let width = 0
     let height = 0
     let frame = 0
+    /* Пауза и полосы уже опали: кадр нарисован, дальше перерисовывать нечего */
+    let settled = false
+    let lastEnergy = -1
+    let drawnColor = ''
     const readFallback = () =>
       getComputedStyle(canvas).getPropertyValue('--viz-fallback').trim() || '240, 240, 240'
     let fallback = readFallback()
@@ -55,6 +59,7 @@ export default function Visualizer({ getAnalyser, isPlaying, tint, bars = 56, cl
       canvas.width = Math.max(1, Math.round(width * dpr))
       canvas.height = Math.max(1, Math.round(height * dpr))
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
+      settled = false
     }
     resize()
     const ro = new ResizeObserver(resize)
@@ -80,11 +85,14 @@ export default function Visualizer({ getAnalyser, isPlaying, tint, bars = 56, cl
       const analyser = getAnalyser()
       if (analyser && (binsFor !== analyser.frequencyBinCount || !freq)) buildBins(analyser)
       if (analyser && freq && playingRef.current) analyser.getByteFrequencyData(freq)
-
-      ctx.clearRect(0, 0, width, height)
       /* Цвет темы перечитываем изредка: getComputedStyle на каждом кадре дорогой */
       if (++frame % 60 === 1) fallback = readFallback()
       const color = tintRef.current ?? fallback
+      if (playingRef.current || color !== drawnColor) settled = false
+      else if (settled) return
+      drawnColor = color
+
+      ctx.clearRect(0, 0, width, height)
 
       const gap = Math.max(2, width / bars / 3.2)
       const barW = Math.max(2, (width - gap * (bars - 1)) / bars)
@@ -116,7 +124,12 @@ export default function Visualizer({ getAnalyser, isPlaying, tint, bars = 56, cl
         ctx.fill()
       }
 
-      canvas.style.setProperty('--viz-energy', peak.toFixed(3))
+      /* Переменная стиля меняется только при заметной разнице — иначе пересчёт стилей на каждом кадре */
+      if (Math.abs(peak - lastEnergy) > 0.01) {
+        lastEnergy = peak
+        canvas.style.setProperty('--viz-energy', peak.toFixed(3))
+      }
+      if (!playingRef.current && peak < 0.002) settled = true
     }
     raf = requestAnimationFrame(draw)
 

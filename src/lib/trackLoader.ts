@@ -1,10 +1,15 @@
-import { appDataDir, join } from '@tauri-apps/api/path'
+import { appDataDir, join, sep } from '@tauri-apps/api/path'
 import { exists, readTextFile, writeTextFile, readFile, writeFile, mkdir } from '@tauri-apps/plugin-fs'
-import { invoke } from '@tauri-apps/api/core'
+import { convertFileSrc, invoke } from '@tauri-apps/api/core'
 import type { Track, PlaylistBanner } from '../App'
 import { normalizeFrame } from './imageFrame'
+import type { DiscordParts } from './discord'
+import type { AppBackdrop, ParticleSettings } from './appearance'
 
-export const SUPPORTED_EXT = ['mp3', 'wav', 'm4a', 'flac', 'ogg', 'aac', 'opus', 'wma']
+/* Аудио и видео: у видео играет звуковая дорожка, а кадры можно взять для анимированной обложки */
+export const AUDIO_EXT = ['mp3', 'wav', 'm4a', 'flac', 'ogg', 'oga', 'aac', 'opus', 'wma', 'aif', 'aiff', 'weba']
+export const VIDEO_EXT = ['mp4', 'm4v', 'mov', 'webm', 'mkv']
+export const SUPPORTED_EXT = [...AUDIO_EXT, ...VIDEO_EXT]
 
 export function isAudioFile(name: string): boolean {
   const ext = name.split('.').pop()?.toLowerCase() || ''
@@ -37,11 +42,7 @@ async function ensureConfigDir(): Promise<string> {
 async function ensureCoversDir(): Promise<string> {
   const dir = await ensureConfigDir()
   const covers = await join(dir, 'covers')
-  try {
-    await mkdir(covers, { recursive: true })
-  } catch {
-    // уже есть
-  }
+  await mkdir(covers, { recursive: true }).catch(() => {})
   return covers
 }
 
@@ -102,6 +103,81 @@ async function persistCover(
   }
 }
 
+/** Сохранить обложку из уже прочитанных байтов (например, GIF, собранный из видео) */
+export async function saveCoverFromBytes(
+  key: string,
+  bytes: Uint8Array,
+  ext: string
+): Promise<{ coverFile: string; coverUrl: string } | null> {
+  try {
+    if (bytes.length === 0) return null
+    const name = `${key}.${ext}`
+    await writeFile(await join(await ensureCoversDir(), name), bytes)
+    return { coverFile: name, coverUrl: bytesToObjectUrl(bytes, mimeFromExt(name)) }
+  } catch (e) {
+    console.error('Не удалось сохранить обложку:', e)
+    return null
+  }
+}
+
+/*
+ * При запуске обложки не читаются в память: WebView загружает их сам по asset-ссылке —
+ * лениво (только видимые), с кешем и без сотен вызовов IPC. Метка сессии в ссылке нужна,
+ * чтобы после замены файла с тем же именем не показалась старая картинка из кеша.
+ */
+const SESSION_STAMP = Date.now().toString(36)
+
+/** Имена файлов в папке обложек — одним вызовом вместо exists() на каждый трек */
+async function listCoverFiles(dir: string): Promise<Set<string>> {
+  try {
+    const files = await invoke<Array<{ name: string }>>('list_dir_sizes', { path: dir })
+    return new Set(files.map((f) => f.name))
+  } catch {
+    return new Set()
+  }
+}
+
+function coverAssetUrl(dir: string, file: string): string {
+  return `${convertFileSrc(`${dir}${sep()}${file}`)}?v=${SESSION_STAMP}`
+}
+
+/** Загрузить файл из папки covers как blob-url (null — файла нет) */
+export async function loadCoverUrl(coverFile: string | null | undefined): Promise<string | null> {
+  if (!coverFile) return null
+  try {
+    const abs = await join(await ensureCoversDir(), coverFile)
+    if (!(await exists(abs))) return null
+    return bytesToObjectUrl(await readFile(abs), mimeFromExt(coverFile))
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Длительность файла без чтения целиком: браузер сам берёт её из заголовка
+ * (нужно для форматов, которые не разбирают теги, — например, WebM и MKV).
+ */
+export function probeDuration(path: string, timeoutMs = 5000): Promise<number> {
+  return new Promise((resolve) => {
+    const el = document.createElement('video')
+    el.preload = 'metadata'
+    el.muted = true
+    let done = false
+    const finish = (v: number) => {
+      if (done) return
+      done = true
+      clearTimeout(timer)
+      el.removeAttribute('src')
+      el.load()
+      resolve(isFinite(v) && v > 0 ? v : 0)
+    }
+    const timer = setTimeout(() => finish(0), timeoutMs)
+    el.onloadedmetadata = () => finish(el.duration)
+    el.onerror = () => finish(0)
+    el.src = convertFileSrc(path)
+  })
+}
+
 /** Скопировать уже сохранённую обложку (например, другого трека) под новым именем */
 export async function copyCover(
   key: string,
@@ -154,6 +230,7 @@ export async function loadTracksFromConfig(
     onProgress?.(0, total)
 
     const coversDir = await ensureCoversDir()
+    const coverFiles = await listCoverFiles(coversDir)
     const BATCH = 25
 
     for (let i = 0; i < total; i += BATCH) {
@@ -163,13 +240,7 @@ export async function loadTracksFromConfig(
         batch.map(async (t) => {
           try {
             if (t.coverFile) {
-              const abs = await join(coversDir, t.coverFile)
-              if (await exists(abs)) {
-                const bytes = await readFile(abs)
-                t.cover = bytesToObjectUrl(bytes, mimeFromExt(t.coverFile))
-              } else {
-                t.cover = null
-              }
+              t.cover = coverFiles.has(t.coverFile) ? coverAssetUrl(coversDir, t.coverFile) : null
             } else if (typeof t.cover === 'string' && t.cover.startsWith('data:')) {
               const saved = await persistCover(t.cover, String(t.id))
               if (saved) {
@@ -245,33 +316,16 @@ export async function loadPlaylists(): Promise<PlaylistData[]> {
 
     const lists = data as PlaylistData[]
     const coversDir = await ensureCoversDir()
+    const coverFiles = await listCoverFiles(coversDir)
 
     await Promise.all(
       lists.map(async (pl) => {
         pl.cover = null
-        if (pl.coverFile) {
-          try {
-            const abs = await join(coversDir, pl.coverFile)
-            if (await exists(abs)) {
-              const bytes = await readFile(abs)
-              pl.cover = bytesToObjectUrl(bytes, mimeFromExt(pl.coverFile))
-            }
-          } catch {
-            // ignore
-          }
-        }
+        if (pl.coverFile && coverFiles.has(pl.coverFile)) pl.cover = coverAssetUrl(coversDir, pl.coverFile)
         if (pl.banner?.file) {
           pl.banner.url = null
           pl.banner.frame = normalizeFrame(pl.banner.frame)
-          try {
-            const abs = await join(coversDir, pl.banner.file)
-            if (await exists(abs)) {
-              const bytes = await readFile(abs)
-              pl.banner.url = bytesToObjectUrl(bytes, mimeFromExt(pl.banner.file))
-            }
-          } catch {
-            // ignore
-          }
+          if (coverFiles.has(pl.banner.file)) pl.banner.url = coverAssetUrl(coversDir, pl.banner.file)
         }
       })
     )
@@ -344,6 +398,9 @@ export async function parseAudioFiles(filePaths: string[], opts: ParseOptions = 
       }
     }
 
+    /* Видео и редкие контейнеры: тегов нет, но длительность можно узнать у самого движка */
+    const durationSecs = meta?.durationSecs || (await probeDuration(path))
+
     if (meta) {
       opts.onTrack?.({
         id: trackId,
@@ -351,7 +408,7 @@ export async function parseAudioFiles(filePaths: string[], opts: ParseOptions = 
         artist: meta.artist || 'Неизвестный исполнитель',
         album: meta.album || 'Неизвестный альбом',
         genre: meta.genre || '',
-        duration: formatDuration(meta.durationSecs),
+        duration: formatDuration(durationSecs),
         liked: false,
         cover,
         coverFile,
@@ -366,7 +423,7 @@ export async function parseAudioFiles(filePaths: string[], opts: ParseOptions = 
         artist: 'Неизвестный исполнитель',
         album: 'Неизвестный альбом',
         genre: '',
-        duration: '0:00',
+        duration: formatDuration(durationSecs),
         liked: false,
         cover: null,
         coverFile: null,
@@ -420,6 +477,10 @@ export interface AppSettings {
   crossfadeCurve: CrossfadeCurveSetting
   outputDevice: string
   discordRpc?: boolean
+  discordParts?: DiscordParts
+  appBackdrop?: AppBackdrop
+  particles?: ParticleSettings
+  autoUpdate?: boolean
   /* Визуализатор в расширенном режиме */
   visualizer?: boolean
   /* Эквалайзер: включён ли, id пресета, свои пресеты */

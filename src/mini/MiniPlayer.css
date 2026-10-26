@@ -1,0 +1,478 @@
+/* ===== Мини-плеер (отдельное прозрачное окно у трея) ===== */
+/* В мини-плеере нет шапки окна */
+html.mini-window { --titlebar-h: 0px; }
+
+html.mini-window,
+html.mini-window body,
+html.mini-window #root {
+  background: transparent !important;
+  overflow: hidden;
+}
+
+.mini {
+  --tint: 120, 120, 140;
+  position: relative;
+  isolation: isolate;
+  width: 100vw;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border-radius: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: #121214;
+  color: #f2f2f4;
+  user-select: none;
+  animation: miniIn 0.28s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+:root[data-theme='light'] .mini { border-color: rgba(0, 0, 0, 0.12); }
+
+@keyframes miniIn {
+  from { opacity: 0; transform: translateY(8px) scale(0.98); }
+  to   { opacity: 1; transform: none; }
+}
+
+/* Фон: размытая обложка в цвет трека */
+.mini-bg {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background:
+    radial-gradient(120% 140% at 0% 0%, rgba(var(--tint), 0.55), transparent 65%),
+    linear-gradient(160deg, rgba(var(--tint), 0.28), #0c0c0e 75%);
+  transition: background 0.6s ease;
+}
+
+.mini-bg img {
+  position: absolute;
+  inset: -30px;
+  width: calc(100% + 60px);
+  height: calc(100% + 60px);
+  object-fit: cover;
+  filter: blur(34px) saturate(1.4);
+  opacity: 0.35;
+}
+
+.mini-bg::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(0, 0, 0, 0.15), rgba(0, 0, 0, 0.45));
+}
+
+/* ===== Шапка: за неё окно перетаскивается ===== */
+.mini-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 8px 0 14px;
+  height: 34px;
+  flex-shrink: 0;
+  cursor: grab;
+}
+
+.mini-head:active { cursor: grabbing; }
+
+.mini-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.mini-head-actions { display: flex; gap: 2px; cursor: default; }
+
+.mini-icon {
+  width: 26px;
+  height: 26px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background-color 0.15s ease, color 0.15s ease, transform 0.15s ease;
+}
+
+.mini-icon svg { width: 13px; height: 13px; }
+.mini-icon:hover { background: rgba(255, 255, 255, 0.1); color: #fff; }
+.mini-icon:active { transform: scale(0.9); }
+.mini-icon.on { color: #fff; background: rgba(255, 255, 255, 0.14); }
+
+/* ===== Меню «⋯» ===== */
+.mini-menu-wrap { position: relative; }
+
+/* Меню привязано к окну, а не к кнопке: в маленьком окне оно не должно уходить за край */
+.mini-menu {
+  position: fixed;
+  top: 38px;
+  right: 8px;
+  z-index: 20;
+  min-width: 190px;
+  max-width: calc(100vw - 16px);
+  max-height: calc(100vh - 46px);
+  overflow-y: auto;
+  padding: 5px;
+  border-radius: 12px;
+  background: rgba(24, 24, 28, 0.96);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(16px);
+  transform-origin: top right;
+  animation: miniMenuIn 0.18s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@keyframes miniMenuIn {
+  from { opacity: 0; transform: scale(0.94) translateY(-4px); }
+  to   { opacity: 1; transform: none; }
+}
+
+.mini-menu button {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 7px 9px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.85);
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  text-align: left;
+  cursor: pointer;
+  transition: background-color 0.12s ease, color 0.12s ease;
+}
+
+.mini-menu button svg { width: 14px; height: 14px; flex-shrink: 0; opacity: 0.8; }
+.mini-menu button:hover { background: rgba(255, 255, 255, 0.08); color: #fff; }
+.mini-menu button.on { color: #7ee0a3; }
+.mini-menu button.danger { color: #ff7b7b; }
+.mini-menu button.danger:hover { background: rgba(255, 90, 90, 0.14); color: #ff9b9b; }
+.mini-menu-sep { height: 1px; margin: 4px 6px; background: rgba(255, 255, 255, 0.08); }
+
+/* ===== Основная часть ===== */
+.mini-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  gap: 14px;
+  padding: 6px 16px 14px;
+}
+
+/* Обложка растёт вместе с окном, но не съедает место под управление */
+.mini-cover {
+  position: relative;
+  height: 100%;
+  aspect-ratio: 1;
+  max-width: 44%;
+  flex-shrink: 0;
+  align-self: center;
+  border-radius: 14px;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.07);
+  color: rgba(255, 255, 255, 0.4);
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.45);
+}
+
+.mini-cover img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  animation: miniCoverIn 0.35s ease both;
+}
+
+@keyframes miniCoverIn { from { opacity: 0; transform: scale(1.04); } to { opacity: 1; transform: none; } }
+
+.mini-cover > svg { width: 40%; height: 40%; }
+
+.mini-volume-flash {
+  position: absolute;
+  inset: auto 8px 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 5px;
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(8px);
+  font-size: 11px;
+  font-weight: 700;
+  color: #fff;
+  font-variant-numeric: tabular-nums;
+  animation: miniMenuIn 0.15s ease both;
+}
+
+.mini-volume-flash svg { width: 13px; height: 13px; }
+
+/* Колонка держится по центру: в большом окне элементы не разъезжаются по краям */
+.mini-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 8px;
+}
+
+.mini.wide .mini-main { gap: 16px; }
+
+.mini-text { min-width: 0; }
+
+.mini-title {
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.mini.wide .mini-title { font-size: 18px; }
+
+.mini-artist {
+  margin-top: 2px;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.6);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ===== Перемотка ===== */
+.mini-bar {
+  position: relative;
+  height: 14px;
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  touch-action: none;
+}
+
+.mini-bar::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 4px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.16);
+}
+
+.mini-bar-fill {
+  position: absolute;
+  left: 0;
+  height: 4px;
+  border-radius: 2px;
+  background: #fff;
+}
+
+.mini-bar-thumb {
+  position: absolute;
+  width: 11px;
+  height: 11px;
+  margin-left: -5.5px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+  transform: scale(0);
+  transition: transform 0.15s ease;
+}
+
+.mini-bar:hover .mini-bar-thumb,
+.mini-bar.scrubbing .mini-bar-thumb { transform: scale(1); }
+
+.mini-times {
+  display: flex;
+  justify-content: space-between;
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.5);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ===== Управление ===== */
+.mini-controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 2px;
+}
+
+.mini.wide .mini-controls { max-width: 380px; }
+
+.mini-ctl {
+  position: relative;
+  width: 32px;
+  height: 32px;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.85);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background-color 0.15s ease, color 0.15s ease, transform 0.15s ease;
+}
+
+.mini-ctl svg { width: 17px; height: 17px; }
+.mini-ctl.small svg { width: 14px; height: 14px; }
+.mini-ctl:hover:not(:disabled) { background: rgba(255, 255, 255, 0.1); color: #fff; }
+.mini-ctl:active:not(:disabled) { transform: scale(0.9); }
+.mini-ctl:disabled { opacity: 0.35; cursor: default; }
+.mini-ctl.small { color: rgba(255, 255, 255, 0.5); }
+.mini-ctl.on { color: #7ee0a3; }
+.mini-ctl.like svg { fill: none; }
+.mini-ctl.like.on { color: #ff5c7a; }
+.mini-ctl.like.on svg { fill: currentColor; }
+
+.mini-ctl.play {
+  width: 40px;
+  height: 40px;
+  background: #fff;
+  color: #0a0a0c;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.35);
+}
+
+.mini-ctl.play:hover:not(:disabled) { background: #fff; color: #0a0a0c; transform: scale(1.05); }
+.mini-ctl.play svg { width: 18px; height: 18px; }
+
+.mini.wide .mini-ctl.play { width: 46px; height: 46px; }
+
+.mini-badge {
+  position: absolute;
+  top: 3px;
+  right: 3px;
+  font-size: 8px;
+  font-style: normal;
+  font-weight: 800;
+}
+
+/* ===== Микшер (громкость) ===== */
+.mini-volume-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  animation: miniMenuIn 0.2s ease both;
+}
+
+.mini-volume-row .mini-ctl { flex-shrink: 0; width: 26px; height: 26px; }
+
+.mini-volume-slider {
+  flex: 1;
+  min-width: 0;
+  height: 4px;
+  appearance: none;
+  -webkit-appearance: none;
+  border-radius: 2px;
+  background: linear-gradient(to right, #fff var(--val, 50%), rgba(255, 255, 255, 0.16) var(--val, 50%));
+  cursor: pointer;
+}
+
+.mini-volume-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+  transition: transform 0.15s ease;
+}
+
+.mini-volume-slider:hover::-webkit-slider-thumb { transform: scale(1.2); }
+
+.mini-volume-value {
+  width: 26px;
+  text-align: right;
+  font-size: 10px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.6);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Маленькое окно: громкость во всплывающей панели над кнопкой */
+.mini-volume-pop-wrap { position: relative; }
+
+.mini-volume-pop {
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + 6px);
+  width: 190px;
+  padding: 8px 10px;
+  border-radius: 12px;
+  background: rgba(24, 24, 28, 0.96);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.5);
+  transform-origin: bottom right;
+  animation: miniMenuIn 0.18s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.mini.wide .mini-volume-row { max-width: 380px; }
+
+/* ===== Узкое окно ===== */
+.mini.narrow .mini-body { gap: 12px; padding-left: 12px; padding-right: 12px; }
+.mini.narrow .mini-cover { max-width: 40%; }
+
+/* ===== Низкое окно: название и кнопки рядом с обложкой, тонкая полоса прогресса по низу ===== */
+.mini.compact .mini-body { padding-bottom: 16px; }
+.mini.compact .mini-main { gap: 4px; }
+.mini.compact .mini-title { font-size: 14px; }
+.mini.compact .mini-artist { margin-top: 0; }
+.mini.compact .mini-times { display: none; }
+.mini.compact .mini-ctl { width: 30px; height: 30px; }
+.mini.compact .mini-ctl.play { width: 34px; height: 34px; }
+.mini.compact .mini-ctl.play svg { width: 15px; height: 15px; }
+
+.mini.compact .mini-progress {
+  position: absolute;
+  left: 16px;
+  right: 22px;
+  bottom: 2px;
+}
+
+.mini.compact .mini-bar { height: 12px; }
+.mini.compact .mini-bar::before,
+.mini.compact .mini-bar-fill { height: 3px; }
+
+.mini-menu button span { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+
+/* В низком окне меню раскладывается в две колонки, чтобы влезть без прокрутки */
+.mini.compact .mini-menu {
+  left: 8px;
+  min-width: 0;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1px 2px;
+  padding: 4px;
+}
+
+.mini.compact .mini-menu button { padding: 5px 7px; gap: 7px; font-size: 11.5px; }
+.mini.compact .mini-menu-sep { display: none; }
+
+/* ===== Уголок изменения размера ===== */
+.mini-resize {
+  position: absolute;
+  right: 3px;
+  bottom: 3px;
+  width: 14px;
+  height: 14px;
+  cursor: nwse-resize;
+  opacity: 0.35;
+  transition: opacity 0.15s ease;
+  background:
+    linear-gradient(135deg, transparent 50%, rgba(255, 255, 255, 0.7) 50%, rgba(255, 255, 255, 0.7) 58%, transparent 58%, transparent 70%, rgba(255, 255, 255, 0.7) 70%, rgba(255, 255, 255, 0.7) 78%, transparent 78%);
+}
+
+.mini-resize:hover { opacity: 0.9; }

@@ -1,6 +1,7 @@
 .cp-overlay {
   position: fixed;
-  inset: 0;
+  /* Шапка окна с кнопками управления остаётся доступной */
+  inset: var(--titlebar-h, 0px) 0 0;
   background: rgba(0, 0, 0, 0.55);
   backdrop-filter: blur(4px);
   display: flex;

@@ -8,13 +8,16 @@ import {
   loadTracksFromConfig,
   parseAudioFiles,
   isAudioFile,
-  saveCoverFromFile,
+  saveCoverFromBytes,
+  SUPPORTED_EXT,
   savePlayHistory,
   savePlaylists,
   saveTracksToConfig,
 } from '../lib/trackLoader'
 import { readSettingsRaw, writeSettingsRaw } from '../components/views/settings/helpers'
+import { pickVisual } from '../lib/media'
 import type { CoverPick, Playlist, Track, ViewType } from '../App'
+import type { TrackUpdates } from '../components/views/TrackEditModal'
 
 export interface UploadState {
   files: { name: string }[]
@@ -30,6 +33,10 @@ export interface LoadProgress {
 }
 
 export type SyncMode = 'auto' | 'manual'
+
+/* Обложки и баннеры (GIF бывают тяжёлыми) */
+const COVER_MAX_BYTES = 15 * 1024 * 1024
+const BANNER_MAX_BYTES = 25 * 1024 * 1024
 
 interface UseLibraryOptions {
   navigate: (view: ViewType) => void
@@ -149,12 +156,7 @@ export default function useLibrary({
     try {
       const selected = await open({
         multiple: true,
-        filters: [
-          {
-            name: 'Аудио',
-            extensions: ['mp3', 'wav', 'm4a', 'flac', 'ogg', 'aac', 'opus', 'wma'],
-          },
-        ],
+        filters: [{ name: 'Аудио и видео', extensions: SUPPORTED_EXT }],
       })
       if (!selected) return []
       return await addTracksFromPaths(Array.isArray(selected) ? selected : [selected])
@@ -265,13 +267,7 @@ export default function useLibrary({
   const handleEditTrack = useCallback(
     (
       trackId: number,
-      updates: {
-        title?: string
-        artist?: string
-        cover?: string | null
-        coverFile?: string | null
-        playbackRate?: number
-      }
+      updates: TrackUpdates
     ) => {
       setTracks((prev) => prev.map((t) => (t.id === trackId ? { ...t, ...updates } : t)))
     },
@@ -331,12 +327,9 @@ export default function useLibrary({
 
   const handleChangePlaylistCover = useCallback(async (id: number) => {
     try {
-      const selected = await open({
-        multiple: false,
-        filters: [{ name: 'Изображения', extensions: ['png', 'jpg', 'jpeg', 'webp', 'gif', 'bmp'] }],
-      })
-      if (!selected || Array.isArray(selected)) return
-      const saved = await saveCoverFromFile(`pl-${id}`, selected)
+      const picked = await pickVisual({ filterName: 'Изображения', purpose: 'cover', maxBytes: COVER_MAX_BYTES })
+      if (!picked) return
+      const saved = await saveCoverFromBytes(`pl-${id}-${Date.now()}`, picked.bytes, picked.ext)
       if (saved) {
         setPlaylists((prev) =>
           prev.map((pl) =>
@@ -351,12 +344,9 @@ export default function useLibrary({
 
   const handlePickImage = useCallback(async (): Promise<CoverPick | null> => {
     try {
-      const selected = await open({
-        multiple: false,
-        filters: [{ name: 'Изображения', extensions: ['png', 'jpg', 'jpeg', 'webp', 'gif', 'bmp'] }],
-      })
-      if (!selected || Array.isArray(selected)) return null
-      return await saveCoverFromFile(`pl-${Date.now()}`, selected)
+      const picked = await pickVisual({ filterName: 'Изображения', purpose: 'cover', maxBytes: COVER_MAX_BYTES })
+      if (!picked) return null
+      return await saveCoverFromBytes(`pl-${Date.now()}`, picked.bytes, picked.ext)
     } catch (e) {
       console.error('Ошибка выбора изображения:', e)
       return null
@@ -366,12 +356,9 @@ export default function useLibrary({
   /* Картинка для баннера: GIF тоже подходит, поэтому лимит размера выше, чем у обложек */
   const handlePickBanner = useCallback(async (): Promise<CoverPick | null> => {
     try {
-      const selected = await open({
-        multiple: false,
-        filters: [{ name: 'Изображения', extensions: ['png', 'jpg', 'jpeg', 'webp', 'gif', 'bmp'] }],
-      })
-      if (!selected || Array.isArray(selected)) return null
-      return await saveCoverFromFile(`plb-${Date.now()}`, selected, 25 * 1024 * 1024)
+      const picked = await pickVisual({ filterName: 'Изображения', purpose: 'banner', maxBytes: BANNER_MAX_BYTES })
+      if (!picked) return null
+      return await saveCoverFromBytes(`plb-${Date.now()}`, picked.bytes, picked.ext)
     } catch (e) {
       console.error('Ошибка выбора баннера:', e)
       return null

@@ -1,7 +1,8 @@
 /* ===== Окно «Добавить треки» в плейлист ===== */
 .atm-overlay {
   position: fixed;
-  inset: 0;
+  /* Шапка окна с кнопками управления остаётся доступной */
+  inset: var(--titlebar-h, 0px) 0 0;
   z-index: 10002;
   display: flex;
   align-items: center;
@@ -20,7 +21,7 @@
 .atm-modal {
   width: 100%;
   max-width: 620px;
-  height: min(720px, calc(100vh - 48px));
+  height: min(720px, calc(100vh - var(--titlebar-h, 0px) - 48px));
   /* В совсем невысоком окне прокручивается всё окно, а не сплющивается содержимое */
   overflow-y: auto;
   display: flex;

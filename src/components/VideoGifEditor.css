@@ -1,0 +1,267 @@
+/* ===== Окно «Анимация из видео» ===== */
+.vg-overlay { z-index: 10010; }
+.vg-modal { max-width: 720px; }
+
+.vg-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-height: 220px;
+  border-radius: 16px;
+  background: var(--element);
+  border: 1px dashed var(--dashed);
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.vg-spinner {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 2px solid var(--border);
+  border-top-color: var(--text);
+  animation: vgSpin 0.8s linear infinite;
+}
+
+@keyframes vgSpin { to { transform: rotate(360deg); } }
+
+.vg-error { text-align: center; }
+
+.vg-stage {
+  display: flex;
+  justify-content: center;
+  padding: 16px;
+  border-radius: 16px;
+  background: #050506;
+  border: 1px solid var(--border-soft);
+}
+
+.vg-frame {
+  height: auto;
+  border-radius: 12px;
+  background: #000;
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.08), 0 16px 40px rgba(0, 0, 0, 0.6);
+}
+
+.vg-video { position: absolute; inset: 0; }
+
+/* ===== Шкала времени ===== */
+.vg-timeline-wrap { display: flex; flex-direction: column; gap: 4px; }
+
+.vg-timeline {
+  position: relative;
+  height: 46px;
+  border-radius: 12px;
+  background:
+    repeating-linear-gradient(90deg, var(--element-strong) 0 1px, transparent 1px 18px),
+    var(--element);
+  border: 1px solid var(--border-soft);
+  cursor: pointer;
+  touch-action: none;
+  user-select: none;
+}
+
+.vg-timeline.dragging { cursor: grabbing; }
+
+.vg-seg {
+  position: absolute;
+  top: 5px;
+  bottom: 5px;
+  min-width: 14px;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--success) 30%, transparent);
+  border: 1.5px solid var(--success);
+  cursor: grab;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.vg-seg:hover,
+.vg-seg.active { background: color-mix(in srgb, var(--success) 42%, transparent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--success) 18%, transparent); }
+
+.vg-seg-label {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+/* Ручки начала и конца фрагмента */
+.vg-handle {
+  position: absolute;
+  top: -1px;
+  bottom: -1px;
+  width: 10px;
+  cursor: ew-resize;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--success);
+}
+
+.vg-handle.start { left: -6px; border-radius: 6px 2px 2px 6px; }
+.vg-handle.end { right: -6px; border-radius: 2px 6px 6px 2px; }
+
+.vg-handle::after {
+  content: "";
+  width: 2px;
+  height: 14px;
+  border-radius: 1px;
+  background: rgba(0, 0, 0, 0.45);
+}
+
+.vg-handle:hover { filter: brightness(1.15); }
+
+.vg-playhead {
+  position: absolute;
+  top: -4px;
+  bottom: -4px;
+  width: 2px;
+  margin-left: -1px;
+  background: var(--text);
+  box-shadow: 0 0 6px var(--shadow);
+  cursor: ew-resize;
+}
+
+.vg-playhead::before {
+  content: "";
+  position: absolute;
+  top: -3px;
+  left: 50%;
+  width: 11px;
+  height: 11px;
+  margin-left: -5.5px;
+  border-radius: 50%;
+  background: var(--text);
+  box-shadow: 0 2px 6px var(--shadow);
+  transition: transform 0.15s ease;
+}
+
+.vg-timeline.drag-playhead .vg-playhead::before,
+.vg-playhead:hover::before { transform: scale(1.25); }
+
+.vg-poster-mark {
+  position: absolute;
+  bottom: -2px;
+  width: 16px;
+  height: 18px;
+  margin-left: -8px;
+  color: #ffcf5a;
+  cursor: ew-resize;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.5));
+  transition: transform 0.15s ease;
+}
+
+.vg-poster-mark svg { width: 100%; height: 100%; }
+.vg-poster-mark:hover,
+.vg-timeline.drag-poster .vg-poster-mark { transform: translateY(-2px) scale(1.1); }
+
+.vg-ticks { position: relative; height: 14px; }
+
+.vg-ticks span {
+  position: absolute;
+  transform: translateX(-50%);
+  font-size: 10px;
+  color: var(--text-faint);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.vg-ticks span:first-child { transform: none; }
+
+/* ===== Блокировка во время сборки GIF ===== */
+.vg-edit { display: flex; flex-direction: column; gap: 18px; transition: opacity 0.25s ease, filter 0.25s ease; }
+.vg-edit.locked > :not(.vg-stage) { opacity: 0.45; filter: grayscale(0.4); }
+.vg-stage { position: relative; }
+
+.vg-stage-busy {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  border-radius: 16px;
+  background: rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(4px);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  animation: frameOverlayIn 0.2s ease;
+}
+
+.vg-stage-busy .vg-spinner { border-color: rgba(255, 255, 255, 0.25); border-top-color: #fff; }
+
+/* ===== Фрагменты ===== */
+.vg-segments { display: flex; flex-direction: column; gap: 6px; }
+
+.vg-seg-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px;
+  border-radius: 10px;
+  background: var(--element);
+  border: 1px solid var(--border-soft);
+  font-size: 12px;
+}
+
+.vg-seg-name { min-width: 84px; font-weight: 600; color: var(--text-secondary); }
+
+.vg-time-field input {
+  width: 74px;
+  padding: 5px 8px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--panel);
+  color: var(--text);
+  font: inherit;
+  font-variant-numeric: tabular-nums;
+}
+
+.vg-mini-btn { height: 28px; padding: 0 8px; }
+.vg-dash { color: var(--text-faint); }
+.vg-seg-len { margin-left: auto; color: var(--text-muted); font-variant-numeric: tabular-nums; }
+.vg-seg-remove { width: 26px; height: 26px; }
+.vg-seg-remove svg { width: 13px; height: 13px; }
+.vg-add { align-self: flex-start; }
+
+.vg-summary {
+  padding: 10px 12px;
+  border-radius: 10px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  background: var(--element);
+  border: 1px solid var(--border-soft);
+}
+
+.vg-summary.warn { color: var(--danger); background: var(--danger-soft); border-color: var(--danger-border); }
+
+.vg-progress { display: flex; align-items: center; gap: 12px; font-size: 12px; color: var(--text-muted); }
+
+.vg-progress-bar {
+  flex: 1;
+  height: 6px;
+  border-radius: 3px;
+  background: var(--element-strong);
+  overflow: hidden;
+}
+
+.vg-progress-bar i {
+  display: block;
+  height: 100%;
+  border-radius: 3px;
+  background: var(--success);
+  transition: width 0.15s ease;
+}
+
+@media (max-width: 640px) {
+  .vg-seg-row { flex-wrap: wrap; }
+  .vg-seg-len { margin-left: 0; }
+}

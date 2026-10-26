@@ -39,9 +39,9 @@
   .playlists-title { display: none; }
   .playlists-empty span { display: none; }
 
-  .playlist-item { justify-content: center; padding: 6px; }
-  .playlist-item .playlist-info,
-  .playlist-item .sb-grip { display: none; }
+  .sidebar .playlist-item { justify-content: center; padding: 6px; }
+  .sidebar .playlist-item .playlist-info,
+  .sidebar .playlist-item .sb-grip { display: none; }
 
   .player {
     grid-template-columns: minmax(0, 1fr) auto minmax(0, auto);

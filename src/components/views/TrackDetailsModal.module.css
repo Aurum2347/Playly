@@ -1,7 +1,8 @@
 /* ===== Окно «Подробнее о треке» ===== */
 .overlay {
   position: fixed;
-  inset: 0;
+  /* Шапка окна с кнопками управления остаётся доступной */
+  inset: var(--titlebar-h, 0px) 0 0;
   z-index: 10001;
   display: flex;
   align-items: center;
@@ -22,7 +23,7 @@
   position: relative;
   width: 100%;
   max-width: 620px;
-  max-height: calc(100vh - 48px);
+  max-height: calc(100vh - var(--titlebar-h, 0px) - 48px);
   display: flex;
   flex-direction: column;
   overflow: hidden;

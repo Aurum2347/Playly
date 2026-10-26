@@ -511,7 +511,8 @@ pointer-events: auto;
 
 .modalOverlay {
   position: fixed;
-  inset: 0;
+  /* Шапка окна с кнопками управления остаётся доступной */
+  inset: var(--titlebar-h, 0px) 0 0;
   background: rgba(0, 0, 0, 0.6);
   backdrop-filter: blur(4px);
   display: flex;
@@ -891,7 +892,7 @@ border-color: var(--border);
   padding: 24px;
   width: 90%;
   max-width: 460px;
-  max-height: calc(100vh - 48px);
+  max-height: calc(100vh - var(--titlebar-h, 0px) - 48px);
   overflow-y: auto;
   box-shadow: 0 20px 60px var(--shadow);
   transform: scale(0.95) translateY(10px);

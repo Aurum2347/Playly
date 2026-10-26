@@ -1,0 +1,39 @@
+/* ===== Аватарка по умолчанию ===== */
+.default-avatar {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border-radius: inherit;
+}
+
+/* Мягкий блик сверху — аватарка не выглядит плоской заливкой */
+.default-avatar::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(120% 90% at 30% 10%, rgba(255, 255, 255, 0.28), transparent 60%);
+  pointer-events: none;
+}
+
+.default-avatar-art { width: 74%; height: 74%; }
+
+.default-avatar .da-band {
+  fill: none;
+  stroke: rgba(255, 255, 255, 0.92);
+  stroke-width: 4.5;
+  stroke-linecap: round;
+}
+
+.default-avatar .da-cup { fill: rgba(255, 255, 255, 0.92); }
+
+.default-avatar .da-letter {
+  font-family: inherit;
+  font-size: 17px;
+  font-weight: 800;
+  fill: rgba(255, 255, 255, 0.95);
+  letter-spacing: -0.02em;
+}

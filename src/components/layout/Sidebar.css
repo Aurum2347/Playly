@@ -15,6 +15,9 @@ body.is-dragging { user-select: none; -webkit-user-select: none; }
 body.is-dragging, body.is-dragging .playlist-item, body.is-dragging .sb-grip { cursor: grabbing !important; }
 
 .profile-card {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
   display: flex;
   align-items: center;
   gap: 12px;
@@ -22,9 +25,11 @@ body.is-dragging, body.is-dragging .playlist-item, body.is-dragging .sb-grip { c
   background: linear-gradient(135deg, var(--panel-solid), var(--panel));
   border: 1px solid var(--border-soft);
   border-radius: 14px;
-  transition: all 0.2s ease;
-  cursor: default;
+  transition: background 0.2s ease, border-color 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
+  cursor: pointer;
   flex-shrink: 0;
+  user-select: none;
+  outline: none;
 }
 
 .profile-card:hover {
@@ -34,18 +39,28 @@ body.is-dragging, body.is-dragging .playlist-item, body.is-dragging .sb-grip { c
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
 }
 
+.profile-card:active { transform: translateY(0) scale(0.985); }
+.profile-card:focus-visible { box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--dashed); }
+
+/* Аватарка и текст — над мини-баннером */
+.profile-card > .profile-avatar,
+.profile-card > .profile-info { position: relative; z-index: 1; }
+
 .profile-avatar {
   width: 42px;
   height: 42px;
   border-radius: 50%;
+  overflow: hidden;
   background: linear-gradient(135deg, var(--element-strong), var(--panel));
   border: 2px solid var(--border);
   flex-shrink: 0;
-  transition: all 0.2s ease;
+  transition: border-color 0.2s ease, transform 0.2s ease;
 }
 
+.profile-avatar.square { border-radius: 12px; }
+
 .profile-card:hover .profile-avatar { border-color: var(--dashed); transform: scale(1.05); }
-.profile-info { display: flex; flex-direction: column; gap: 4px; min-width: 0; flex: 1; }
+.profile-info { display: flex; flex-direction: column; gap: 5px; min-width: 0; flex: 1; }
 
 .profile-nickname {
   font-size: 14px;
@@ -58,33 +73,27 @@ body.is-dragging, body.is-dragging .playlist-item, body.is-dragging .sb-grip { c
   line-height: 1.2;
 }
 
-.profile-edit-btn {
+/* ===== Таймер текущей сессии ===== */
+.session-clock {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  background: none;
-  border: none;
-  padding: 0;
-  cursor: pointer;
-  color: var(--text-faint);
+  gap: 5px;
+  color: var(--success);
   font-size: 11px;
-  font-weight: 500;
-  font-family: inherit;
-  transition: color 0.15s ease;
-  white-space: nowrap;
+  font-weight: 600;
   line-height: 1;
+  white-space: nowrap;
 }
 
-.profile-edit-btn:hover { color: var(--text-muted); }
-.profile-edit-btn svg { width: 11px; height: 11px; flex-shrink: 0; }
+.session-clock svg { width: 12px; height: 12px; flex-shrink: 0; }
+.session-clock-time { font-variant-numeric: tabular-nums; letter-spacing: 0.02em; }
 
-.profile-edit-btn .edit-icon {
-  stroke: currentColor;
-  fill: none;
-  stroke-width: 2;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-}
+/* Мини-баннер: текст всегда светлый и с тенью, как на баннерах плейлистов */
+.profile-card.has-look { border-color: rgba(255, 255, 255, 0.08); background: #111; }
+.profile-card.has-look:hover { background: #111; }
+.profile-card.has-look .profile-nickname { color: #fff; text-shadow: 0 1px 8px rgba(0, 0, 0, 0.55); }
+.profile-card.has-look .profile-avatar { border-color: rgba(255, 255, 255, 0.28); }
+.profile-card.has-look .session-clock { color: #8ff0b4; filter: drop-shadow(0 1px 4px rgba(0, 0, 0, 0.6)); }
 
 .sidebar-nav { display: flex; flex-direction: column; gap: 4px; flex-shrink: 0; }
 
@@ -203,10 +212,12 @@ body.is-dragging, body.is-dragging .playlist-item, body.is-dragging .sb-grip { c
   to   { opacity: 1; transform: translateY(0); }
 }
 
-.playlist-item {
+/* Правила с .sidebar: в окнах «Добавить в плейлист» те же классы, и их глобальные стили
+   (LikedView.css) раньше перебивали оформление и переходы плейлистов в сайдбаре */
+.sidebar .playlist-item {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
   padding: 10px 12px;
   border-radius: 10px;
   cursor: pointer;
@@ -214,7 +225,7 @@ body.is-dragging, body.is-dragging .playlist-item, body.is-dragging .sb-grip { c
   -webkit-user-select: none;
   -webkit-touch-callout: none;
   background: var(--element);
-  border: 1px solid transparent;
+  border: 1px solid var(--border-faint);
   position: relative;
   will-change: transform;
   animation: sbSlideIn 0.25s ease backwards;
@@ -230,9 +241,9 @@ body.is-dragging, body.is-dragging .playlist-item, body.is-dragging .sb-grip { c
   to   { opacity: 1; transform: translateX(0); }
 }
 
-.playlist-item:hover { background: var(--hover); border-color: var(--border); }
+.sidebar .playlist-item:hover { background: var(--hover); border-color: var(--border); }
 
-.playlist-item.dragging {
+.sidebar .playlist-item.dragging {
   z-index: 10;
   background: var(--menu);
   border-color: var(--border);
@@ -241,7 +252,7 @@ body.is-dragging, body.is-dragging .playlist-item, body.is-dragging .sb-grip { c
   transition: background 0.15s ease, border-color 0.15s ease, box-shadow 0.2s ease;
 }
 
-.playlist-item.dropping {
+.sidebar .playlist-item.dropping {
   z-index: 10;
   transition:
     transform 0.28s cubic-bezier(0.22, 1, 0.36, 1),
@@ -250,9 +261,9 @@ body.is-dragging, body.is-dragging .playlist-item, body.is-dragging .sb-grip { c
     box-shadow 0.2s ease;
 }
 
-.playlist-cover {
-  width: 36px;
-  height: 36px;
+.sidebar .playlist-cover {
+  width: 40px;
+  height: 40px;
   border-radius: 8px;
   background: var(--element-strong);
   flex-shrink: 0;
@@ -264,10 +275,10 @@ body.is-dragging, body.is-dragging .playlist-item, body.is-dragging .sb-grip { c
   pointer-events: none;
 }
 
-.playlist-cover svg { width: 18px; height: 18px; color: var(--text-faint); }
-.playlist-cover img { width: 100%; height: 100%; object-fit: cover; }
+.sidebar .playlist-cover svg { width: 18px; height: 18px; color: var(--text-faint); }
+.sidebar .playlist-cover img { width: 100%; height: 100%; object-fit: cover; }
 
-.playlist-info {
+.sidebar .playlist-info {
   flex: 1;
   min-width: 0;
   display: flex;
@@ -276,18 +287,18 @@ body.is-dragging, body.is-dragging .playlist-item, body.is-dragging .sb-grip { c
   pointer-events: none;
 }
 
-.playlist-name {
-  font-size: 13px;
-  font-weight: 500;
-  color: var(--text-secondary);
+.sidebar .playlist-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
   transition: color 0.15s ease;
 }
 
-.playlist-item:hover .playlist-name { color: var(--text); }
-.playlist-count { font-size: 11px; color: var(--text-faint); }
+.sidebar .playlist-item:hover .playlist-name { color: var(--text); }
+.sidebar .playlist-count { font-size: 12px; color: var(--text-muted); }
 
 .sb-grip {
   display: grid;
@@ -314,8 +325,8 @@ body.is-dragging, body.is-dragging .playlist-item, body.is-dragging .sb-grip { c
   transition: background 0.15s ease;
 }
 
-.playlist-item:hover .sb-grip i { background: var(--text-muted); }
-.playlist-item.dragging .sb-grip i { background: var(--text-muted); }
+.sidebar .playlist-item:hover .sb-grip i { background: var(--text-muted); }
+.sidebar .playlist-item.dragging .sb-grip i { background: var(--text-muted); }
 
 
 .sb-context-menu {
@@ -375,7 +386,8 @@ body.is-dragging, body.is-dragging .playlist-item, body.is-dragging .sb-grip { c
 
 .sb-modal-overlay {
   position: fixed;
-  inset: 0;
+  /* Шапка окна с кнопками управления остаётся доступной */
+  inset: var(--titlebar-h, 0px) 0 0;
   background: rgba(0, 0, 0, 0.65);
   backdrop-filter: blur(4px);
   -webkit-backdrop-filter: blur(4px);

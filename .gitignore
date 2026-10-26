@@ -25,3 +25,10 @@ dist-ssr
 
 # Список изменений ведётся локально
 changelog.md
+plans.md
+
+# Инструкция по релизам — личная
+autoupd.md
+
+# Собранные файлы релиза (npm run release)
+release/

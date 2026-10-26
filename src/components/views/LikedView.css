@@ -396,9 +396,9 @@
   background: var(--danger-hover);
 }
 
-.tr-like-btn.pop { animation: likePop 0.3s cubic-bezier(0.34, 1.4, 0.64, 1); }
+.tr-like-btn.pop { animation: likedLikePop 0.3s cubic-bezier(0.34, 1.4, 0.64, 1); }
 
-@keyframes likePop {
+@keyframes likedLikePop {
   0%   { transform: scale(1); }
   40%  { transform: scale(1.25); }
   100% { transform: scale(1); }
@@ -552,7 +552,8 @@
 
 .modal-overlay {
   position: fixed;
-  inset: 0;
+  /* Шапка окна с кнопками управления остаётся доступной */
+  inset: var(--titlebar-h, 0px) 0 0;
   background: rgba(0, 0, 0, 0.6);
   backdrop-filter: blur(4px);
   display: flex;

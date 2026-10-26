@@ -1,15 +1,18 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "Capability for the main window",
-  "windows": ["main"],
+  "description": "Capability for the main window and the mini player",
+  "windows": ["main", "mini"],
   "permissions": [
     "core:default",
     "core:window:allow-close",
     "core:window:allow-minimize",
     "core:window:allow-toggle-maximize",
     "core:window:allow-start-dragging",
+    "core:window:allow-start-resize-dragging",
+    "core:window:allow-set-size",
     "core:webview:allow-set-webview-zoom",
+    "core:webview:allow-clear-all-browsing-data",
 
     "fs:default",
     "fs:allow-read-file",
@@ -42,6 +45,9 @@
     "dialog:allow-save",
 
     "shell:default",
-    "shell:allow-open"
+    "shell:allow-open",
+
+    "updater:default",
+    "process:default"
   ]
 }

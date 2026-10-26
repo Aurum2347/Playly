@@ -1,0 +1,70 @@
+/* ===== Фон профиля (мини-баннер карточки и баннер окна профиля) ===== */
+.look-layers {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  border-radius: inherit;
+  /* Для масок и backdrop-filter: размывается только сама картинка, а не всё, что под карточкой */
+  isolation: isolate;
+}
+
+.look-layers > img,
+.look-gradient {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.look-blur {
+  position: absolute;
+  inset: 0;
+}
+
+.look-shade {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, var(--dim, 0));
+}
+
+/* ===== Шапка окна профиля ===== */
+.profile-banner {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+}
+
+.profile-banner-default {
+  position: absolute;
+  inset: 0;
+}
+
+/* Узор поверх градиента: полупрозрачная волна и ноты, слегка «плавают» */
+.profile-banner-art {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.pba-wave {
+  fill: none;
+  stroke: rgba(255, 255, 255, 0.22);
+  stroke-width: 3;
+  stroke-linecap: round;
+  stroke-dasharray: 14 10;
+  animation: pbaFlow 18s linear infinite;
+}
+
+.pba-wave.soft { stroke: rgba(255, 255, 255, 0.12); stroke-width: 2; animation-duration: 26s; animation-direction: reverse; }
+
+.pba-note { fill: rgba(255, 255, 255, 0.2); animation: pbaFloat 6s ease-in-out infinite; transform-box: fill-box; }
+.pba-note.small { fill: rgba(255, 255, 255, 0.14); animation-delay: -3s; }
+
+@keyframes pbaFlow { to { stroke-dashoffset: -480; } }
+@keyframes pbaFloat { 0%, 100% { translate: 0 0; } 50% { translate: 0 -8px; } }
+
+@media (prefers-reduced-motion: reduce) {
+  .pba-wave, .pba-note { animation: none; }
+}

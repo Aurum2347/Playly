@@ -8,7 +8,10 @@ import CoverPicker from '../CoverPicker'
 import BannerEditor from '../BannerEditor'
 import { usePresence } from '../views/shared'
 import { useI18n } from '../../i18n'
-import { frameStyle, type ImageFrame } from '../../lib/imageFrame'
+import type { ImageFrame } from '../../lib/imageFrame'
+import { lookVisible, type ProfileLook } from '../../lib/profile'
+import { LookLayers } from '../ProfileLook'
+import ProfileCardBody from '../ProfileCardBody'
 import './Sidebar.css'
 
 type AvatarShape = 'circle' | 'square'
@@ -16,13 +19,15 @@ type AvatarShape = 'circle' | 'square'
 interface SidebarProps {
   currentView: ViewType
   onViewChange: (view: ViewType) => void
-  /* Открыть настройки сразу на вкладке «Профиль» */
+  /* Открыть окно профиля */
   onOpenProfile?: () => void
   nickname: string
   playlists: Playlist[]
   avatarUrl?: string | null
   avatarShape?: AvatarShape
   avatarFrame?: ImageFrame
+  /* Мини-баннер на фоне карточки профиля */
+  cardLook?: ProfileLook | null
   onCreatePlaylist: (name: string, cover?: CoverPick | null) => number
   onRenamePlaylist: (id: number, name: string) => void
   onUpdatePlaylist: (id: number, patch: Partial<Pick<Playlist, 'cover' | 'coverFile' | 'color' | 'banner'>>) => void
@@ -93,6 +98,7 @@ export default function Sidebar({
   avatarUrl,
   avatarShape,
   avatarFrame,
+  cardLook,
   onCreatePlaylist,
   onRenamePlaylist,
   onUpdatePlaylist,
@@ -442,38 +448,27 @@ export default function Sidebar({
   return (
     <>
       <aside className="sidebar">
-        <div className="profile-card">
-          <div
-            className="profile-avatar"
-            style={{
-              borderRadius: displayAvatarShape === 'square' ? '12px' : '50%',
-              overflow: 'hidden',
-            }}
-          >
-            {displayAvatarUrl ? (
-              <img
-                src={displayAvatarUrl}
-                alt="Avatar"
-                draggable={false}
-                style={frameStyle(avatarFrame)}
-              />
-            ) : null}
-          </div>
-
-          <div className="profile-info">
-            <div className="profile-nickname">{nickname}</div>
-
-            <button className="profile-edit-btn" onClick={() => (onOpenProfile ? onOpenProfile() : onViewChange('settings'))}>
-              <svg viewBox="0 0 24 24">
-                <path className="edit-icon" d="M12 20h9" />
-                <path
-                  className="edit-icon"
-                  d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z"
-                />
-              </svg>
-              {t('layout.sidebar.edit')}
-            </button>
-          </div>
+        <div
+          className={`profile-card ${lookVisible(cardLook) ? 'has-look' : ''}`}
+          role="button"
+          tabIndex={0}
+          title={t('layout.sidebar.openProfile')}
+          onClick={() => (onOpenProfile ? onOpenProfile() : onViewChange('settings'))}
+          onKeyDown={(e) => {
+            if (e.key !== 'Enter' && e.key !== ' ') return
+            e.preventDefault()
+            if (onOpenProfile) onOpenProfile()
+            else onViewChange('settings')
+          }}
+        >
+          <LookLayers look={cardLook} />
+          <ProfileCardBody
+            nickname={nickname}
+            avatarUrl={displayAvatarUrl}
+            avatarShape={displayAvatarShape}
+            avatarFrame={avatarFrame}
+            clockTitle={t('layout.sidebar.session')}
+          />
         </div>
 
         <nav className="sidebar-nav">
@@ -773,7 +768,14 @@ export default function Sidebar({
                   <div className="sb-color-row">
                     <span className="sb-color-label">{t('banner.title')}</span>
                     <div className="sb-banner-thumb">
-                      {editPlaylist?.banner?.url ? <img src={editPlaylist.banner.url} alt="" /> : null}
+                      {editPlaylist?.banner?.mode === 'gradient' && editPlaylist.banner.gradient ? (
+                        <span
+                          className="sb-banner-gradient"
+                          style={{ background: `linear-gradient(${editPlaylist.banner.gradient.angle}deg, ${editPlaylist.banner.gradient.from}, ${editPlaylist.banner.gradient.to})` }}
+                        />
+                      ) : editPlaylist?.banner?.url ? (
+                        <img src={editPlaylist.banner.url} alt="" />
+                      ) : null}
                     </div>
                     <button className="sb-modal-btn sb-modal-btn-cancel" onClick={() => setBannerFor(editState.id)}>
                       {editPlaylist?.banner ? t('banner.edit') : t('banner.add')}

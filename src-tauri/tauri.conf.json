@@ -1,6 +1,6 @@
 {
   "productName": "Playly",
-  "version": "2.0.3",
+  "version": "2.0.4",
   "identifier": "com.playly.player",
   "build": {
     "beforeDevCommand": "npm run dev",
@@ -21,14 +21,17 @@
         "titleBarStyle": "Overlay",
         "hiddenTitle": true,
         "backgroundColor": "#0a0a0c",
-        "dragDropEnabled": false
+        "dragDropEnabled": true,
+        "label": "main"
       }
     ],
     "security": {
       "csp": null,
       "assetProtocol": {
         "enable": true,
-        "scope": ["**"]
+        "scope": [
+          "**"
+        ]
       }
     }
   },
@@ -46,6 +49,15 @@
   "plugins": {
     "shell": {
       "open": "^(https://github\\.com/.*|https://t\\.me/.*|https://www\\.google\\.com/.*)$"
+    },
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEYzNTVGMzQxQTgyRDFEMUEKUldRYUhTMm9RZk5WOCsvd2tYRnNTWno3SUo5MTc4MjBGWjI2ZHZ3Vy9ETE9mR0RWOHBRL0NlSFIK",
+      "endpoints": [
+        "https://github.com/Aurum2347/Playly/releases/latest/download/latest.json"
+      ],
+      "windows": {
+        "installMode": "passive"
+      }
     }
   }
 }

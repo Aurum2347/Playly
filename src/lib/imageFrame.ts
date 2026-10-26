@@ -45,20 +45,28 @@ export function frameStyle(frame: ImageFrame | null | undefined): CSSProperties 
   }
 }
 
+/** Собственный размер картинки или кадра видео */
+export function mediaSize(el: HTMLImageElement | HTMLVideoElement): { w: number; h: number } {
+  return el instanceof HTMLVideoElement
+    ? { w: el.videoWidth, h: el.videoHeight }
+    : { w: el.naturalWidth, h: el.naturalHeight }
+}
+
 /**
  * Рисует кадр в canvas точно так же, как его показывает frameStyle
- * (пригодится, если нужен готовый файл, а не параметры).
+ * (пригодится, если нужен готовый файл, а не параметры). Подходит и для видео.
  */
 export function drawFrame(
   ctx: CanvasRenderingContext2D,
-  img: HTMLImageElement,
+  img: HTMLImageElement | HTMLVideoElement,
   frame: ImageFrame,
   boxW: number,
   boxH: number
 ) {
-  const s0 = Math.max(boxW / img.naturalWidth, boxH / img.naturalHeight)
-  const dw = img.naturalWidth * s0
-  const dh = img.naturalHeight * s0
+  const { w: nw, h: nh } = mediaSize(img)
+  const s0 = Math.max(boxW / nw, boxH / nh)
+  const dw = nw * s0
+  const dh = nh * s0
   const px = frame.x / 100
   const py = frame.y / 100
   const ox = boxW * px
@@ -88,16 +96,17 @@ export function usePanZoom(
     (e: React.PointerEvent) => {
       if (e.button !== 0) return
       const box = boxRef.current
-      /* Картинка ищется внутри рамки: слоёв поверх неё может быть сколько угодно */
-      const img = box?.querySelector('img') ?? null
-      if (!box || !img || !img.naturalWidth) return
+      /* Картинка (или видео) ищется внутри рамки: слоёв поверх неё может быть сколько угодно */
+      const img = box?.querySelector<HTMLImageElement | HTMLVideoElement>('img, video') ?? null
+      const natural = img ? mediaSize(img) : { w: 0, h: 0 }
+      if (!box || !img || !natural.w) return
       e.preventDefault()
       const rect = box.getBoundingClientRect()
       const W = rect.width
       const H = rect.height
-      const s0 = Math.max(W / img.naturalWidth, H / img.naturalHeight)
-      const overX = img.naturalWidth * s0 - W
-      const overY = img.naturalHeight * s0 - H
+      const s0 = Math.max(W / natural.w, H / natural.h)
+      const overX = natural.w * s0 - W
+      const overY = natural.h * s0 - H
       const start = { x: e.clientX, y: e.clientY, frame: frameRef.current }
       const target = e.currentTarget as HTMLElement
       try { target.setPointerCapture(e.pointerId) } catch { /* окно потеряло фокус */ }

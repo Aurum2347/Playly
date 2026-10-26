@@ -2,6 +2,7 @@ import { useMemo, useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import type { Track, Playlist } from '../../App'
 import { BannerLayers } from '../PlaylistBanner'
+import { bannerVisible } from '../../lib/banner'
 import AddTracksModal from '../AddTracksModal'
 import TrackEditModal from './TrackEditModal'
 import TrackDetailsModal from './TrackDetailsModal'
@@ -42,7 +43,7 @@ export default function PlaylistView({
 }: PlaylistViewProps) {
   const { t } = useI18n()
   const [isAddTracksOpen, setIsAddTracksOpen] = useState(false)
-  const hasBanner = !!playlist?.banner?.url
+  const hasBanner = bannerVisible(playlist?.banner)
   const contextMenu = useContextMenu<number>()
   const [animatingLikeId, setAnimatingLikeId] = useState<number | null>(null)
   const [editingTrack, setEditingTrack] = useState<Track | null>(null)

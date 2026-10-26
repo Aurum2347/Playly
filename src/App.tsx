@@ -5,12 +5,11 @@ import {
   useCallback,
   useRef,
   useMemo,
-  type MouseEvent as ReactMouseEvent,
 } from 'react'
 import { appDataDir, join } from '@tauri-apps/api/path'
-import { exists, readTextFile, writeTextFile, readFile, mkdir } from '@tauri-apps/plugin-fs'
-import { getCurrentWindow } from '@tauri-apps/api/window'
-import { listen } from '@tauri-apps/api/event'
+import { exists, readTextFile, writeTextFile, mkdir } from '@tauri-apps/plugin-fs'
+import { getCurrentWebview } from '@tauri-apps/api/webview'
+import { emitTo, listen } from '@tauri-apps/api/event'
 import { invoke } from '@tauri-apps/api/core'
 import Sidebar from './components/layout/Sidebar'
 import PlayerBar from './components/layout/PlayerBar'
@@ -21,13 +20,36 @@ import LikedView from './components/views/LikedView'
 import PlaylistView from './components/views/PlaylistView'
 import NowPlayingView from './components/views/NowPlayingView'
 import Onboarding from './components/Onboarding'
+import TitleBar from './components/layout/TitleBar'
+import ProfileModal from './components/ProfileModal'
 import Logo from './components/Logo'
 import useLibrary from './hooks/useLibrary'
-import { loadSettings, saveSettings, isAudioFile, type AppSettings } from './lib/trackLoader'
+import { formatDuration, loadCoverUrl, loadSettings, saveSettings, isAudioFile, type AppSettings } from './lib/trackLoader'
+import VideoGifHost from './components/VideoGifEditor'
+import AppBackdrop from './components/AppBackdrop'
+import UpdateToast from './components/UpdateToast'
+import { startUpdater } from './lib/updater'
+import {
+  activeParticleKind,
+  customIdOf,
+  DEFAULT_BACKDROP,
+  DEFAULT_PARTICLES,
+  loadBackdropUrl,
+  normalizeBackdrop,
+  normalizeParticles,
+  type AppBackdrop as AppBackdropSettings,
+  type ParticleSettings,
+} from './lib/appearance'
 import { AudioEngine, type CrossfadeCurve, type EngineEvents } from './lib/audioEngine'
 import { applyUiScale, clampUiScale, UI_SCALE_DEFAULT } from './lib/uiScale'
 import { DEFAULT_FRAME, normalizeFrame, type ImageFrame } from './lib/imageFrame'
 import { normalizeCustomPresets, presetGains, type EqPreset } from './lib/equalizer'
+import { initListeningStats, useListeningTracker } from './lib/listeningStats'
+import { loadProfileImage, normalizeLook, readProfileFile, type AvatarShape, type ProfileLook } from './lib/profile'
+import { versionLabel } from './lib/version'
+import type { TrackUpdates } from './components/views/TrackEditModal'
+import { MINI_COMMAND_EVENT, MINI_HELLO_EVENT, MINI_STATE_EVENT, type MiniCommand, type MiniState } from './lib/miniBridge'
+import { DEFAULT_DISCORD_PARTS, normalizeDiscordParts, type DiscordParts } from './lib/discord'
 import { I18nProvider, useI18n } from './i18n'
 import './App.css'
 import './styles/buttons.css'
@@ -50,6 +72,10 @@ export interface Track {
   addedAt: number
   fileModifiedAt: number
   playbackRate?: number
+  /* Анимированная обложка (GIF в папке covers): видна, пока трек играет; в списках — обычная cover */
+  animCoverFile?: string | null
+  /* Не показывать этот трек в статусе Discord */
+  discordHidden?: boolean
 }
 
 export interface Playlist {
@@ -68,6 +94,9 @@ export interface Playlist {
 export type BannerBlur = 'none' | 'left' | 'right' | 'both' | 'all'
 
 export interface PlaylistBanner {
+  /* Картинка (по умолчанию) или градиент — у градиента file пустой */
+  mode?: 'image' | 'gradient'
+  gradient?: { from: string; to: string; angle: number }
   file: string
   /* Загруженная картинка (blob-url); в playlists.json не сохраняется */
   url?: string | null
@@ -88,8 +117,6 @@ export interface CoverPick {
 
 export type RepeatMode = 'off' | 'all' | 'one'
 
-type AvatarShape = 'circle' | 'square'
-
 /* За сколько секунд до начала кроссфейда подгружать следующий трек */
 const CROSSFADE_PRELOAD_LEAD = 12
 /* Ручное переключение не должно тянуться так же долго, как автоматический переход */
@@ -104,25 +131,6 @@ interface CrossfadePlan {
   failed: boolean
 }
 
-function imageMime(path: string): string {
-  const ext = path.split('.').pop()?.toLowerCase() || ''
-  switch (ext) {
-    case 'png':
-      return 'image/png'
-    case 'jpg':
-    case 'jpeg':
-      return 'image/jpeg'
-    case 'webp':
-      return 'image/webp'
-    case 'gif':
-      return 'image/gif'
-    case 'bmp':
-      return 'image/bmp'
-    default:
-      return 'application/octet-stream'
-  }
-}
-
 const SidebarM = memo(Sidebar)
 const HomeViewM = memo(HomeView)
 const NowPlayingViewM = memo(NowPlayingView)
@@ -132,15 +140,17 @@ const LikedViewM = memo(LikedView)
 const PlaylistViewM = memo(PlaylistView)
 
 function AppInner() {
-  const { t } = useI18n()
+  const { t, lang } = useI18n()
   const [appState, setAppState] = useState<'splash' | 'onboarding' | 'main'>('splash')
   const [userNickname, setUserNickname] = useState('Aurum2347')
   const [userAvatar, setUserAvatar] = useState<string | null>(null)
   const [avatarShape, setAvatarShape] = useState<AvatarShape>('circle')
   const [avatarFrame, setAvatarFrame] = useState<ImageFrame>(DEFAULT_FRAME)
+  const [cardLook, setCardLook] = useState<ProfileLook | null>(null)
+  const [bannerLook, setBannerLook] = useState<ProfileLook | null>(null)
+  const [isProfileOpen, setIsProfileOpen] = useState(false)
   const [currentView, setCurrentView] = useState<ViewType>('home')
   const [settingsSection, setSettingsSection] = useState<SettingsSection>('appearance')
-  const [isMaximized, setIsMaximized] = useState(false)
   const [queue, setQueue] = useState<number[]>([])
   const [queueIndex, setQueueIndex] = useState(-1)
   const [isPlaying, setIsPlaying] = useState(false)
@@ -163,7 +173,9 @@ function AppInner() {
   const engineEventsRef = useRef<EngineEvents | null>(null)
   const skipLoadRef = useRef(false)
   const pendingPlayRef = useRef(false)
-  const userAvatarUrlRef = useRef<string | null>(null)
+  /* blob-url картинок профиля (аватарка, фон карточки, баннер) — освобождаются при перезагрузке профиля */
+  const profileUrlsRef = useRef<string[]>([])
+  const profileLoadSeqRef = useRef(0)
   const historyRef = useRef<number[]>([])
   const queueRef = useRef<number[]>([])
   const queueIndexRef = useRef(-1)
@@ -277,8 +289,6 @@ function AppInner() {
   useEffect(() => {
     outputDeviceRef.current = outputDevice
   }, [outputDevice])
-
-  const appWindow = getCurrentWindow()
 
   const selectedTrack = useMemo(() => {
     if (queueIndex < 0 || queueIndex >= queue.length) return null
@@ -452,6 +462,13 @@ function AppInner() {
     }
   }, [maybeAutoCrossfade, handleEnded])
 
+  /* У видео и редких форматов длительность из тегов не читается — берём её у движка, когда трек загрузится */
+  useEffect(() => {
+    if (selectedTrack && duration > 0 && selectedTrack.duration === '0:00') {
+      libraryEditTrack(selectedTrack.id, { duration: formatDuration(duration) })
+    }
+  }, [selectedTrack, duration, libraryEditTrack])
+
   useEffect(() => {
     const eng = new AudioEngine({
       onTime: (t) => engineEventsRef.current?.onTime(t),
@@ -542,12 +559,17 @@ function AppInner() {
   )
 
   const [discordRpc, setDiscordRpc] = useState(true)
+  const [discordParts, setDiscordParts] = useState<DiscordParts>(DEFAULT_DISCORD_PARTS)
   const [visualizerEnabled, setVisualizerEnabled] = useState(true)
   const [eqEnabled, setEqEnabled] = useState(false)
   const [eqPresetId, setEqPresetId] = useState('flat')
   const [eqCustomPresets, setEqCustomPresets] = useState<EqPreset[]>([])
   /* Усиления из открытого редактора пресета — слышны сразу, пока его двигают */
   const [eqPreview, setEqPreview] = useState<number[] | null>(null)
+
+  /* ===== Фон приложения и частицы ===== */
+  const [backdrop, setBackdrop] = useState<AppBackdropSettings>(DEFAULT_BACKDROP)
+  const [particles, setParticles] = useState<ParticleSettings>(DEFAULT_PARTICLES)
 
   const handleDiscordRpcChange = useCallback(
     (v: boolean) => {
@@ -560,69 +582,109 @@ function AppInner() {
     [scheduleSettingsSave]
   )
 
+  const handleDiscordPartsChange = useCallback(
+    (parts: DiscordParts) => {
+      setDiscordParts(parts)
+      scheduleSettingsSave({ discordParts: parts })
+    },
+    [scheduleSettingsSave]
+  )
+
+  /* Пока настройки не прочитаны (заставка, онбординг), статус не трогаем: RPC мог быть выключен */
+  const rpcReady = appState === 'main'
+  const rpcTitle = selectedTrack?.title
+  const rpcArtist = selectedTrack?.artist
+  const rpcAlbum = selectedTrack?.album
+  const rpcRate = selectedTrack?.playbackRate ?? 1
+  /* Трек, скрытый в его настройках, в Discord не раскрывается */
+  const rpcHidden = selectedTrack?.discordHidden === true
+
   useEffect(() => {
+    if (!rpcReady) return
     if (!discordRpc) {
       invoke('discord_clear_presence').catch(() => {})
       return
     }
-    if (selectedTrack) {
-      const artist = selectedTrack.artist || '—'
-      invoke('discord_update_presence', {
-        title: selectedTrack.title,
-        artist,
-        durationSecs: Math.max(1, Math.round(duration)),
-        isPlaying,
-        positionSecs: Math.max(0, Math.round(currentTime)),
-        status: isPlaying
-          ? `${t('discord.author')}: ${artist}`
-          : `${t('discord.author')}: ${artist} · ${t('discord.pause')}`,
-        searchLabel: t('discord.search'),
-      }).catch(() => {})
-    } else {
-      invoke('discord_idle_presence', {
-        details: t('discord.idleTitle'),
-        status: t('discord.idleState'),
-      }).catch(() => {})
+    const parts = discordParts
+    const idle = () => {
+      if (parts.idle) {
+        invoke('discord_idle_presence', {
+          details: t('discord.idleTitle'),
+          status: t('discord.idleState'),
+          showButtons: parts.buttons,
+        }).catch(() => {})
+      } else {
+        invoke('discord_clear_presence').catch(() => {})
+      }
     }
-  }, [discordRpc, isPlaying, selectedTrack?.id, duration, seekTick, t])
+
+    if (rpcTitle === undefined) {
+      idle()
+      return
+    }
+    if (!isPlaying && !parts.paused) {
+      invoke('discord_clear_presence').catch(() => {})
+      return
+    }
+    if (rpcHidden) {
+      invoke('discord_idle_presence', {
+        details: t('discord.privateTitle'),
+        status: isPlaying ? t('discord.privateState') : t('discord.pause'),
+        showButtons: parts.buttons,
+      }).catch(() => {})
+      return
+    }
+
+    const artist = rpcArtist?.trim() || t('views.nowPlaying.unknownArtist')
+    const pause = isPlaying ? '' : ` · ${t('discord.pause')}`
+    const status = parts.artist ? `${t('discord.author')}: ${artist}${pause}` : isPlaying ? 'Playly' : t('discord.pause')
+    /* Discord ведёт полосу по реальному времени, поэтому учитываем скорость воспроизведения */
+    const rate = rpcRate > 0 ? rpcRate : 1
+    const position = engineRef.current?.currentTime ?? currentTime
+    invoke('discord_update_presence', {
+      title: parts.title ? rpcTitle : t('discord.privateTitle'),
+      artist: parts.artist ? artist : '',
+      album: parts.album ? rpcAlbum ?? '' : '',
+      durationSecs: Math.max(1, duration) / rate,
+      isPlaying,
+      positionSecs: Math.max(0, position) / rate,
+      status,
+      searchLabel: t('discord.search'),
+      showProgress: parts.progress,
+      showButtons: parts.buttons,
+      /* Поиск без названия и исполнителя бессмысленен */
+      showLinks: parts.buttons && parts.title && parts.artist,
+    }).catch(() => {})
+    /* currentTime намеренно не в зависимостях: позиция обновляется по seekTick, а не каждый кадр */
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rpcReady, discordRpc, discordParts, isPlaying, selectedTrack?.id, rpcTitle, rpcArtist, rpcAlbum, rpcRate, rpcHidden, duration, seekTick, t])
 
   const loadProfile = useCallback(async () => {
+    /* Две быстрые перезагрузки подряд: применяется только последняя */
+    const seq = ++profileLoadSeqRef.current
     try {
-      const appDir = await appDataDir()
-      const playlyDir = await join(appDir, 'playly')
-      const profileDir = await join(playlyDir, 'profile')
-      const profileFile = await join(profileDir, 'profile.json')
-      if (!(await exists(profileFile))) {
-        if (userAvatarUrlRef.current) {
-          URL.revokeObjectURL(userAvatarUrlRef.current)
-          userAvatarUrlRef.current = null
-        }
-        setUserAvatar(null)
-        setAvatarShape('circle')
+      const data = await readProfileFile()
+      const card = normalizeLook(data.card, 'card')
+      const banner = normalizeLook(data.banner, 'banner')
+      const [avatarUrl, cardUrl, bannerUrl] = await Promise.all([
+        loadProfileImage(data.avatarFile),
+        card.mode === 'image' ? loadProfileImage(card.file) : null,
+        banner.mode === 'image' ? loadProfileImage(banner.file) : null,
+      ])
+      if (seq !== profileLoadSeqRef.current) {
+        ;[avatarUrl, cardUrl, bannerUrl].forEach((u) => u && URL.revokeObjectURL(u))
         return
       }
-      const raw = await readTextFile(profileFile)
-      const data = JSON.parse(raw) as { avatarFile?: string; avatarShape?: AvatarShape; avatarFrame?: unknown }
+      /* Старые картинки освобождаем чуть позже: иначе до перерисовки они на миг пропадают */
+      const stale = profileUrlsRef.current
+      setTimeout(() => stale.forEach((u) => URL.revokeObjectURL(u)), 1000)
+      profileUrlsRef.current = [avatarUrl, cardUrl, bannerUrl].filter((u): u is string => !!u)
+
       setAvatarShape(data.avatarShape === 'square' ? 'square' : 'circle')
       setAvatarFrame(normalizeFrame(data.avatarFrame))
-      let nextUrl: string | null = null
-      if (data.avatarFile) {
-        const filePath =
-          data.avatarFile.includes('/') || data.avatarFile.includes('\\')
-            ? data.avatarFile
-            : await join(profileDir, data.avatarFile)
-        if (await exists(filePath)) {
-          const bytes = await readFile(filePath)
-          nextUrl = URL.createObjectURL(
-            new Blob([bytes as unknown as BlobPart], { type: imageMime(filePath) })
-          )
-        }
-      }
-      if (userAvatarUrlRef.current && userAvatarUrlRef.current !== nextUrl) {
-        URL.revokeObjectURL(userAvatarUrlRef.current)
-      }
-      userAvatarUrlRef.current = nextUrl
-      setUserAvatar(nextUrl)
+      setUserAvatar(avatarUrl)
+      setCardLook({ ...card, url: cardUrl })
+      setBannerLook({ ...banner, url: bannerUrl })
     } catch (e) {
       console.error('Ошибка загрузки профиля:', e)
     }
@@ -633,10 +695,8 @@ function AppInner() {
     window.addEventListener('playly-profile-updated', loadProfile)
     return () => {
       window.removeEventListener('playly-profile-updated', loadProfile)
-      if (userAvatarUrlRef.current) {
-        URL.revokeObjectURL(userAvatarUrlRef.current)
-        userAvatarUrlRef.current = null
-      }
+      profileUrlsRef.current.forEach((u) => URL.revokeObjectURL(u))
+      profileUrlsRef.current = []
     }
   }, [loadProfile])
 
@@ -644,6 +704,8 @@ function AppInner() {
     const init = async () => {
       const startTime = Date.now()
       try {
+        /* До онбординга: иначе только что созданный профиль примет себя за давний */
+        await initListeningStats()
         const appDir = await appDataDir()
         const playlyDir = await join(appDir, 'playly')
         const userFile = await join(playlyDir, 'user.json')
@@ -669,6 +731,9 @@ function AppInner() {
           try {
             const raw = JSON.parse(await readTextFile(settingsFile)) as Record<string, unknown>
             if (raw.discordRpc === false) setDiscordRpc(false)
+            setBackdrop(normalizeBackdrop(raw.appBackdrop))
+            setParticles(normalizeParticles(raw.particles))
+            setDiscordParts(normalizeDiscordParts(raw.discordParts))
             if (raw.visualizer === false) setVisualizerEnabled(false)
             if (raw.eqEnabled === true) setEqEnabled(true)
             if (typeof raw.eq === 'string') setEqPresetId(raw.eq)
@@ -698,20 +763,25 @@ function AppInner() {
     init()
   }, [applyMasterGain, applyOutputDevice, loadLibraryData, maybeAutoScan])
 
+  /* Перетаскивание файлов в окно (API Tauri v2: события tauri://file-drop* из v1 больше не приходят) */
   useEffect(() => {
-    const unHover = listen<string[]>('tauri://file-drop-hover', () => setIsDragging(true))
-    const unCancel = listen('tauri://file-drop-cancelled', () => setIsDragging(false))
-    const unDrop = listen<string[]>('tauri://file-drop', async (event) => {
-      setIsDragging(false)
-      const paths = (event.payload || []).filter((p) => isAudioFile(p))
-      if (paths.length > 0) await addTracksFromPaths(paths)
+    const unlisten = getCurrentWebview().onDragDropEvent((event) => {
+      const p = event.payload
+      if (p.type === 'enter') {
+        /* Подсказку показываем, только если среди файлов есть музыка */
+        setIsDragging(p.paths.some((path) => isAudioFile(path)))
+      } else if (p.type === 'leave') {
+        setIsDragging(false)
+      } else if (p.type === 'drop') {
+        setIsDragging(false)
+        const paths = p.paths.filter((path) => isAudioFile(path))
+        if (paths.length > 0) void addTracksFromPaths(paths)
+      }
     })
     return () => {
-      unHover.then((f) => f())
-      unCancel.then((f) => f())
-      unDrop.then((f) => f())
+      unlisten.then((f) => f())
     }
-  }, [])
+  }, [addTracksFromPaths])
 
   useEffect(() => {
     /* Системное меню браузера (Назад / Обновить / Проверить элемент) не нужно нигде.
@@ -779,8 +849,9 @@ function AppInner() {
     [tracks]
   )
 
+  /** autoplay: false — трек встаёт в плеер на паузе (например, при открытии расширенного режима) */
   const handleTrackSelect = useCallback(
-    (track: Track, ctx?: Track[]) => {
+    (track: Track, ctx?: Track[], autoplay = true) => {
       let ids: number[]
       if (ctx && ctx.length > 0) {
         ids = ctx.map((t) => t.id)
@@ -795,8 +866,8 @@ function AppInner() {
       markTrackFade(manualFadeSec())
       setQueueIndex(idx)
       historyRef.current = []
-      pendingPlayRef.current = true
-      recordPlay(track.id)
+      pendingPlayRef.current = autoplay
+      if (autoplay) recordPlay(track.id)
     },
     [recordPlay, tracksRef, markTrackFade, manualFadeSec]
   )
@@ -892,13 +963,7 @@ function AppInner() {
   const handleEditTrack = useCallback(
     (
       trackId: number,
-      updates: {
-        title?: string
-        artist?: string
-        cover?: string | null
-        coverFile?: string | null
-        playbackRate?: number
-      }
+      updates: TrackUpdates
     ) => {
       libraryEditTrack(trackId, updates)
       if (typeof updates.playbackRate === 'number') {
@@ -907,16 +972,6 @@ function AppInner() {
     },
     [libraryEditTrack]
   )
-
-  const handleMaximize = useCallback(async () => {
-    await appWindow.toggleMaximize()
-    setIsMaximized((v) => !v)
-  }, [appWindow])
-
-  const handleTitleBarDoubleClick = (e: ReactMouseEvent) => {
-    if ((e.target as HTMLElement).closest('.control-btn')) return
-    handleMaximize()
-  }
 
   const handleSaveNickname = useCallback(async (newNickname: string) => {
     setUserNickname(newNickname)
@@ -1029,10 +1084,127 @@ function AppInner() {
     []
   )
 
+  /* ===== Мини-плеер: состояние уходит в окно у трея, команды приходят обратно ===== */
+  const miniStateRef = useRef<() => MiniState>(() => ({}) as MiniState)
+  const miniHandlersRef = useRef<(cmd: MiniCommand) => void>(() => {})
+  /* Свежие замыкания кладём в ref после каждого рендера — подписки на события остаются постоянными */
+  useEffect(() => {
+    miniStateRef.current = () => ({
+    track: selectedTrack
+      ? {
+          id: selectedTrack.id,
+          title: selectedTrack.title,
+          artist: selectedTrack.artist,
+          coverFile: selectedTrack.coverFile ?? null,
+          animCoverFile: selectedTrack.animCoverFile ?? null,
+          liked: selectedTrack.liked,
+        }
+      : null,
+    isPlaying,
+    position: engineRef.current?.currentTime ?? currentTimeRef.current,
+    at: Date.now(),
+    duration,
+    rate: selectedTrack?.playbackRate ?? 1,
+    volume,
+    muted: isMuted,
+    shuffle: isShuffle,
+    repeat: repeatMode,
+    lang,
+  })
+    miniHandlersRef.current = (cmd: MiniCommand) => {
+      switch (cmd.type) {
+        case 'toggle':
+          handlePlayPause()
+          break
+        case 'next':
+          handleNext()
+          break
+        case 'prev':
+          handlePrev()
+          break
+        case 'like':
+          if (selectedTrack) handleToggleLike(selectedTrack.id, !selectedTrack.liked)
+          break
+        case 'shuffle':
+          handleShuffleToggle()
+          break
+        case 'repeat':
+          handleRepeatToggle()
+          break
+        case 'mute':
+          handleMuteToggle()
+          break
+        case 'seek':
+          handleSeek(Math.max(0, Math.min(durationRef.current || cmd.time, cmd.time)))
+          break
+        case 'volume':
+          handleVolumeChange(cmd.value)
+          break
+      }
+    }
+  })
+
+  const sendMiniState = useCallback(() => {
+    emitTo('mini', MINI_STATE_EVENT, miniStateRef.current()).catch(() => {})
+  }, [])
+
+  useEffect(() => {
+    if (appState !== 'main') return
+    sendMiniState()
+    /* Пока играет музыка, изредка сверяем позицию: мини-плеер досчитывает её сам и может немного уплыть */
+    if (!isPlaying) return
+    const timer = setInterval(sendMiniState, 5000)
+    return () => clearInterval(timer)
+  }, [
+    appState,
+    sendMiniState,
+    selectedTrack?.id,
+    selectedTrack?.title,
+    selectedTrack?.artist,
+    selectedTrack?.liked,
+    selectedTrack?.coverFile,
+    selectedTrack?.animCoverFile,
+    selectedTrack?.playbackRate,
+    isPlaying,
+    duration,
+    seekTick,
+    volume,
+    isMuted,
+    isShuffle,
+    repeatMode,
+    lang,
+  ])
+
+  useEffect(() => {
+    const unCommand = listen<MiniCommand>(MINI_COMMAND_EVENT, (e) => miniHandlersRef.current(e.payload))
+    const unHello = listen(MINI_HELLO_EVENT, () => sendMiniState())
+    return () => {
+      unCommand.then((f) => f())
+      unHello.then((f) => f())
+    }
+  }, [sendMiniState])
+
+  /* Фоновая проверка обновлений — только когда приложение уже загрузилось */
+  useEffect(() => {
+    if (appState === 'main') void startUpdater()
+  }, [appState])
+
+
   const openProfileSettings = useCallback(() => {
+    setIsProfileOpen(false)
     setSettingsSection('profile')
     setCurrentView('settings')
   }, [])
+
+  const openProfile = useCallback(() => setIsProfileOpen(true), [])
+
+  const pageTitle =
+    currentView === 'playlist'
+      ? activePlaylist?.name ?? t('views.playlist.label')
+      : currentView === 'nowplaying'
+        ? t('views.nowPlaying.title')
+        : t(`layout.sidebar.${currentView}`)
+  const closeProfile = useCallback(() => setIsProfileOpen(false), [])
 
   /* ===== Расширенный режим ===== */
   const viewBeforeNowPlayingRef = useRef<ViewType>('home')
@@ -1048,6 +1220,9 @@ function AppInner() {
 
   const getAnalyser = useCallback(() => engineRef.current?.analyser ?? null, [])
   const getEngineTime = useCallback(() => engineRef.current?.currentTime ?? 0, [])
+
+  /* Статистика прослушиваний для окна профиля */
+  useListeningTracker(isPlaying, selectedTrack?.id ?? null, duration, getEngineTime)
   const getPlayback = useCallback(
     () => ({ time: engineRef.current?.currentTime ?? 0, duration: engineRef.current?.duration ?? 0 }),
     []
@@ -1116,6 +1291,131 @@ function AppInner() {
     [scheduleSettingsSave]
   )
 
+  /* Для предпросмотра в настройках профиля; стабильная ссылка, чтобы memo(SettingsView) не перерисовывался зря */
+  const profileLooks = useMemo(
+    () => ({ card: cardLook, banner: bannerLook, avatarUrl: userAvatar, avatarShape, avatarFrame }),
+    [cardLook, bannerLook, userAvatar, avatarShape, avatarFrame]
+  )
+
+  /* ===== Анимированная обложка играющего трека (в списках остаётся статичная) ===== */
+  const [animCover, setAnimCover] = useState<{ file: string; url: string } | null>(null)
+  const animFile = selectedTrack?.animCoverFile ?? null
+  useEffect(() => {
+    if (!animFile) return
+    let alive = true
+    let url: string | null = null
+    loadCoverUrl(animFile).then((u) => {
+      if (!alive) {
+        if (u) URL.revokeObjectURL(u)
+        return
+      }
+      url = u
+      setAnimCover(u ? { file: animFile, url: u } : null)
+    })
+    return () => {
+      alive = false
+      /* Освобождаем чуть позже, чтобы обложка не мигала при смене трека */
+      if (url) setTimeout(() => URL.revokeObjectURL(url as string), 1500)
+    }
+  }, [animFile])
+  const displayTrack = useMemo(
+    () => (selectedTrack && animCover && animCover.file === animFile ? { ...selectedTrack, cover: animCover.url } : selectedTrack),
+    [selectedTrack, animCover, animFile]
+  )
+
+  /* Картинка фона читается из файла; blob освобождается при смене */
+  const [backdropUrl, setBackdropUrl] = useState<{ file: string; url: string } | null>(null)
+  const backdropFile = backdrop.mode === 'image' ? backdrop.file : null
+  useEffect(() => {
+    if (!backdropFile) return
+    let alive = true
+    let url: string | null = null
+    loadBackdropUrl(backdropFile).then((u) => {
+      if (!alive) {
+        if (u) URL.revokeObjectURL(u)
+        return
+      }
+      url = u
+      setBackdropUrl(u ? { file: backdropFile, url: u } : null)
+    })
+    return () => {
+      alive = false
+      if (url) setTimeout(() => URL.revokeObjectURL(url as string), 1500)
+    }
+  }, [backdropFile])
+  const backdropWithUrl = useMemo<AppBackdropSettings>(
+    () => ({ ...backdrop, url: backdropUrl && backdropUrl.file === backdropFile ? backdropUrl.url : null }),
+    [backdrop, backdropUrl, backdropFile]
+  )
+
+  const particleKind = activeParticleKind(particles, selectedTrack?.id ?? null, isPlaying)
+  const particleCustomId = customIdOf(particleKind)
+  const particleCustom = useMemo(
+    () => (particleCustomId ? particles.custom.find((c) => c.id === particleCustomId) ?? null : null),
+    [particleCustomId, particles.custom]
+  )
+  const particleOptions = useMemo(
+    () => ({
+      kind: particleKind,
+      density: particles.density,
+      speed: particles.speed,
+      size: particles.size,
+      opacity: particles.opacity,
+      blur: particles.blur,
+      custom: particleCustom,
+    }),
+    [particleKind, particles.density, particles.speed, particles.size, particles.opacity, particles.blur, particleCustom]
+  )
+  /* Фон рисуется, если выбран свой фон или вообще настроены частицы (хотя бы в правилах) */
+  const hasBackdrop =
+    appState === 'main' && (backdrop.mode !== 'none' || particles.kind !== 'none' || particles.rules.length > 0)
+
+  useEffect(() => {
+    const root = document.documentElement
+    root.classList.toggle('has-backdrop', hasBackdrop)
+    /* Без картинки фона панели плотнее: частицы видны, но текст читается легко */
+    root.style.setProperty('--ui-alpha', String(backdrop.mode === 'none' ? 0.72 : backdrop.uiOpacity))
+  }, [hasBackdrop, backdrop.mode, backdrop.uiOpacity])
+
+  const handleBackdropChange = useCallback(
+    (next: AppBackdropSettings) => {
+      const { url: _url, ...stored } = next
+      void _url
+      setBackdrop(stored)
+      scheduleSettingsSave({ appBackdrop: stored })
+    },
+    [scheduleSettingsSave]
+  )
+
+  const handleParticlesChange = useCallback(
+    (next: ParticleSettings) => {
+      setParticles(next)
+      scheduleSettingsSave({ particles: next })
+    },
+    [scheduleSettingsSave]
+  )
+
+  /* Обложки, на которые ссылаются треки и плейлисты, — очистка кеша их не трогает */
+  const playlistsRef = useRef(playlists)
+  useEffect(() => {
+    playlistsRef.current = playlists
+  }, [playlists])
+  const getReferencedCovers = useCallback(() => {
+    const used = new Set<string>()
+    const add = (f?: string | null) => {
+      if (f) used.add(f.split(/[\\/]/).pop() as string)
+    }
+    tracksRef.current.forEach((tr) => {
+      add(tr.coverFile)
+      add(tr.animCoverFile)
+    })
+    playlistsRef.current.forEach((pl) => {
+      add(pl.coverFile)
+      add(pl.banner?.file)
+    })
+    return used
+  }, [tracksRef])
+
   /* Стабильная ссылка: иначе memo(LikedView) перерисовывается на каждом тике плеера */
   const likedTracks = useMemo(() => tracks.filter((t) => t.liked), [tracks])
 
@@ -1124,7 +1424,7 @@ function AppInner() {
       tracks={tracks}
       nickname={userNickname}
       onSelectTrack={handleTrackSelect}
-      currentTrack={selectedTrack}
+      currentTrack={displayTrack}
       playHistory={playHistory}
       playingTrackId={selectedTrack?.id ?? null}
       isPlaying={isPlaying}
@@ -1151,7 +1451,7 @@ function AppInner() {
       case 'nowplaying':
         return (
           <NowPlayingViewM
-            track={selectedTrack}
+            track={displayTrack}
             isPlaying={isPlaying}
             currentTime={currentTime}
             duration={duration}
@@ -1184,6 +1484,7 @@ function AppInner() {
             onSectionChange={setSettingsSection}
             currentNickname={userNickname}
             onSaveNickname={handleSaveNickname}
+            profileLooks={profileLooks}
             crossfade={crossfade}
             onChangeCrossfade={handleCrossfadeChange}
             manualCrossfade={manualCrossfade}
@@ -1209,6 +1510,16 @@ function AppInner() {
             onClearLibrary={handleClearLibrary}
             discordRpc={discordRpc}
             onChangeDiscordRpc={handleDiscordRpcChange}
+            discordParts={discordParts}
+            onChangeDiscordParts={handleDiscordPartsChange}
+            getReferencedCovers={getReferencedCovers}
+            backdrop={backdrop}
+            onChangeBackdrop={handleBackdropChange}
+            backdropUrl={backdropWithUrl.url ?? null}
+            coverUrl={displayTrack?.cover ?? null}
+            particles={particles}
+            onChangeParticles={handleParticlesChange}
+            tracks={tracks}
           />
         )
       case 'tracks':
@@ -1224,7 +1535,6 @@ function AppInner() {
             onAddToPlaylist={handleAddToPlaylist}
             onCreatePlaylist={handleCreatePlaylist}
             onEditTrack={handleEditTrack}
-            // Новые пропсы для контекстного меню
             onCopyTitle={handleCopyTitle}
             onCopyArtist={handleCopyArtist}
             onCopyPath={handleCopyPath}
@@ -1243,7 +1553,6 @@ function AppInner() {
             onAddToPlaylist={handleAddToPlaylist}
             onCreatePlaylist={handleCreatePlaylist}
             onEditTrack={handleEditTrack}
-            // Новые пропсы для контекстного меню
             onCopyTitle={handleCopyTitle}
             onCopyArtist={handleCopyArtist}
             onCopyPath={handleCopyPath}
@@ -1308,7 +1617,7 @@ function AppInner() {
                 Playly
               </span>
             </div>
-            <div className="subtitle">Version 2.0.3</div>
+            <div className="subtitle">Version {versionLabel(t)}</div>
             <div className="loading-bar-container">
               <div
                 className="loading-bar-fill"
@@ -1342,123 +1651,26 @@ function AppInner() {
     : 0
 
   return (
+    <>
+    {hasBackdrop && <AppBackdrop backdrop={backdropWithUrl} coverUrl={displayTrack?.cover ?? null} particles={particleOptions} />}
     <div className={`app ${currentView === 'nowplaying' ? 'immersive' : ''}`}>
-      <div
-        className="titlebar"
-        data-tauri-drag-region
-        onDoubleClick={handleTitleBarDoubleClick}
-      >
-        <div></div>
-        <div className="titlebar-center">
-          <span className="titlebar-app-name">Playly</span>
-        </div>
-        <div className="titlebar-controls">
-          <button
-            className="control-btn minimize-btn"
-            onClick={() => appWindow.minimize()}
-            title={t('titlebar.minimize')}
-          >
-            <svg viewBox="0 0 14 14" fill="none">
-              <line
-                className="icon-stroke"
-                x1="3"
-                y1="7"
-                x2="11"
-                y2="7"
-                strokeWidth="1.4"
-                strokeLinecap="round"
-              />
-            </svg>
-          </button>
-          <button
-            className="control-btn maximize-btn"
-            onClick={handleMaximize}
-            title={isMaximized ? t('titlebar.restore') : t('titlebar.maximize')}
-          >
-            <svg viewBox="0 0 14 14" fill="none">
-              {isMaximized ? (
-                <>
-                  <rect
-                    className="icon-stroke"
-                    x="4.5"
-                    y="1.5"
-                    width="7"
-                    height="7"
-                    rx="1.2"
-                    strokeWidth="1.2"
-                    fill="none"
-                  />
-                  <rect
-                    className="icon-stroke"
-                    x="2.5"
-                    y="4.5"
-                    width="7"
-                    height="7"
-                    rx="1.2"
-                    strokeWidth="1.2"
-                    fill="#161618"
-                  />
-                  <rect
-                    className="icon-stroke"
-                    x="2.5"
-                    y="4.5"
-                    width="7"
-                    height="7"
-                    rx="1.2"
-                    strokeWidth="1.2"
-                    fill="none"
-                  />
-                </>
-              ) : (
-                <rect
-                  className="icon-stroke"
-                  x="3"
-                  y="3"
-                  width="8"
-                  height="8"
-                  rx="1.5"
-                  strokeWidth="1.3"
-                />
-              )}
-            </svg>
-          </button>
-          <button
-            className="control-btn close-btn"
-            onClick={() => appWindow.close()}
-            title={t('titlebar.close')}
-          >
-            <svg viewBox="0 0 14 14" fill="none">
-              <line
-                className="icon-stroke"
-                x1="4"
-                y1="4"
-                x2="10"
-                y2="10"
-                strokeWidth="1.4"
-                strokeLinecap="round"
-              />
-              <line
-                className="icon-stroke"
-                x1="10"
-                y1="4"
-                x2="4"
-                y2="10"
-                strokeWidth="1.4"
-                strokeLinecap="round"
-              />
-            </svg>
-          </button>
-        </div>
-      </div>
+      <TitleBar
+        pageTitle={pageTitle}
+        track={selectedTrack ? { title: selectedTrack.title, artist: selectedTrack.artist } : null}
+        isPlaying={isPlaying}
+        onOpenNowPlaying={openNowPlaying}
+        versionLabel={`Playly ${versionLabel(t)}`}
+      />
       <SidebarM
         currentView={currentView}
         onViewChange={setCurrentView}
-        onOpenProfile={openProfileSettings}
+        onOpenProfile={openProfile}
         nickname={userNickname}
         playlists={playlists}
         avatarUrl={userAvatar}
         avatarShape={avatarShape}
         avatarFrame={avatarFrame}
+        cardLook={cardLook}
         onCreatePlaylist={handleCreatePlaylist}
         onRenamePlaylist={handleRenamePlaylist}
         onUpdatePlaylist={handleUpdatePlaylist}
@@ -1481,7 +1693,7 @@ function AppInner() {
         {renderView()}
       </main>
       <PlayerBar
-        track={selectedTrack}
+        track={displayTrack}
         isNowPlayingOpen={currentView === 'nowplaying'}
         onToggleNowPlaying={currentView === 'nowplaying' ? closeNowPlaying : openNowPlaying}
         isPlaying={isPlaying}
@@ -1517,6 +1729,21 @@ function AppInner() {
                 )
             : undefined
         }
+      />
+      <VideoGifHost />
+      <UpdateToast />
+      <ProfileModal
+        open={isProfileOpen}
+        onClose={closeProfile}
+        nickname={userNickname}
+        avatarUrl={userAvatar}
+        avatarShape={avatarShape}
+        avatarFrame={avatarFrame}
+        bannerLook={bannerLook}
+        tracks={tracks}
+        playlistsCount={playlists.length}
+        onEditProfile={openProfileSettings}
+        onPlayTrack={handleTrackSelect}
       />
       <div className={`drag-overlay ${isDragging || upload ? 'active' : ''}`}>
         {!upload ? (
@@ -1600,6 +1827,7 @@ function AppInner() {
         )}
       </div>
     </div>
+    </>
   )
 }
 

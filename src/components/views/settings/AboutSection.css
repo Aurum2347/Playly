@@ -100,42 +100,59 @@
   border-color: var(--accent);
 }
 
-.about2-features {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 12px;
+/* ===== Кнопка «Последние изменения» ===== */
+.about2-changes {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  width: 100%;
+  padding: 18px 20px;
+  border-radius: 18px;
+  border: 1px solid var(--border);
+  background:
+    radial-gradient(120% 180% at 0% 0%, rgba(160, 160, 255, 0.12), transparent 60%),
+    linear-gradient(135deg, var(--element-strong), var(--panel));
+  color: inherit;
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+  overflow: hidden;
+  transition: border-color 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
   animation: about2In 0.5s cubic-bezier(0.16, 1, 0.3, 1) 0.06s both;
 }
 
-.about2-feature {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  padding: 16px;
-  border-radius: 16px;
-  background: var(--element);
-  border: 1px solid var(--border-soft);
-  transition: border-color 0.2s ease, transform 0.2s ease, background-color 0.2s ease;
+.about2-changes:hover {
+  border-color: var(--dashed);
+  transform: translateY(-2px);
+  box-shadow: 0 12px 28px var(--shadow);
 }
 
-.about2-feature:hover { border-color: var(--border); background: var(--element-strong); transform: translateY(-2px); }
+.about2-changes:active { transform: translateY(0); }
+.about2-changes:focus-visible { outline: 2px solid var(--dashed); outline-offset: 2px; }
 
-.about2-feature-icon {
-  width: 34px;
-  height: 34px;
-  border-radius: 10px;
+.about2-changes-icon {
+  width: 46px;
+  height: 46px;
+  flex-shrink: 0;
+  border-radius: 14px;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: var(--panel);
-  border: 1px solid var(--border-soft);
-  color: var(--text);
-  margin-bottom: 4px;
+  color: var(--accent-text);
+  background: var(--accent);
+  box-shadow: 0 8px 20px var(--shadow);
 }
 
-.about2-feature-icon svg { width: 17px; height: 17px; }
-.about2-feature-title { font-size: 13px; font-weight: 700; color: var(--text); }
-.about2-feature-text { font-size: 12px; line-height: 1.5; color: var(--text-muted); }
+.about2-changes-icon svg { width: 22px; height: 22px; }
+
+.about2-changes-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.about2-changes-title { font-size: 15px; font-weight: 700; color: var(--text); }
+.about2-changes-sub { font-size: 12px; color: var(--text-muted); }
+
+.about2-changes-arrow { display: flex; color: var(--text-faint); transition: transform 0.2s ease, color 0.2s ease; }
+.about2-changes-arrow svg { width: 18px; height: 18px; }
+.about2-changes:hover .about2-changes-arrow { color: var(--text); transform: translateX(3px); }
 
 .about2-section-title {
   font-size: 12px;
@@ -145,23 +162,6 @@
   color: var(--text-muted);
   margin-bottom: 12px;
 }
-
-.about2-story {
-  padding: 20px 22px;
-  border-radius: 18px;
-  background: var(--panel);
-  border: 1px solid var(--border-soft);
-  animation: about2In 0.5s cubic-bezier(0.16, 1, 0.3, 1) 0.12s both;
-}
-
-.about2-story p {
-  font-size: 14px;
-  line-height: 1.7;
-  color: var(--text-secondary);
-}
-
-.about2-story p + p { margin-top: 12px; }
-.about2-story strong { color: var(--text); font-weight: 600; }
 
 .about2-links {
   display: grid;
@@ -232,7 +232,281 @@
 }
 
 @media (max-width: 760px) {
-  .about2-features, .about2-links { grid-template-columns: 1fr; }
+  .about2-links { grid-template-columns: 1fr; }
   .about2-hero { flex-direction: column; text-align: center; }
   .about2-badges { justify-content: center; }
+}
+
+/* ===== Подстраница «Последние изменения» ===== */
+.changelog { gap: 18px; }
+
+.changelog-top { animation: about2In 0.4s cubic-bezier(0.16, 1, 0.3, 1) both; }
+.changelog-back { margin-left: -10px; padding: 7px 12px 7px 8px; }
+
+.changelog-head { animation: about2In 0.45s cubic-bezier(0.16, 1, 0.3, 1) 0.03s both; }
+
+/* Лента версий: точки на вертикальной линии */
+.changelog-list {
+  position: relative;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding-left: 26px;
+}
+
+.changelog-list::before {
+  content: '';
+  position: absolute;
+  left: 7px;
+  top: 22px;
+  bottom: 22px;
+  width: 2px;
+  border-radius: 1px;
+  background: linear-gradient(180deg, var(--border), var(--border-faint));
+}
+
+.changelog-entry {
+  position: relative;
+  border-radius: 18px;
+  background: var(--panel);
+  border: 1px solid var(--border-soft);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  animation: about2In 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.changelog-entry.open { border-color: var(--border); box-shadow: 0 12px 30px var(--shadow); }
+
+.changelog-dot {
+  position: absolute;
+  left: -25px;
+  top: 22px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--bg);
+  border: 2px solid var(--text-faint);
+}
+
+.changelog-entry.current .changelog-dot {
+  border-color: var(--success);
+  background: var(--success);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--success) 22%, transparent);
+}
+
+.changelog-entry-head {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  padding: 14px 16px;
+  border: none;
+  border-radius: 18px;
+  background: transparent;
+  color: inherit;
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.changelog-entry-head:hover { background: var(--element); }
+.changelog-entry-head:focus-visible { outline: 2px solid var(--dashed); outline-offset: -2px; }
+
+.changelog-version {
+  flex-shrink: 0;
+  padding: 5px 10px;
+  border-radius: 9px;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.01em;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+  background: var(--element-strong);
+  border: 1px solid var(--border-soft);
+}
+
+.changelog-entry.current .changelog-version { color: var(--accent-text); background: var(--accent); border-color: var(--accent); }
+
+.changelog-entry-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.changelog-entry-title { font-size: 14px; font-weight: 700; color: var(--text); line-height: 1.35; }
+
+.changelog-entry-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  font-size: 12px;
+  color: var(--text-faint);
+}
+
+.changelog-current {
+  padding: 1px 7px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--success);
+  background: color-mix(in srgb, var(--success) 14%, transparent);
+}
+
+.changelog-count {
+  min-width: 26px;
+  padding: 2px 7px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  text-align: center;
+  color: var(--text-muted);
+  background: var(--element-strong);
+  font-variant-numeric: tabular-nums;
+}
+
+.changelog-chevron { display: flex; color: var(--text-faint); transition: transform 0.25s ease; }
+.changelog-chevron svg { width: 18px; height: 18px; }
+.changelog-entry.open .changelog-chevron { transform: rotate(180deg); color: var(--text); }
+
+.changelog-body {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding: 4px 20px 20px;
+}
+
+.changelog-section .about2-section-title { margin-bottom: 8px; }
+
+.changelog-group + .changelog-group { margin-top: 12px; }
+
+.changelog-group-title { font-size: 13px; font-weight: 700; color: var(--text); margin-bottom: 6px; }
+
+.changelog-group ul { list-style: none; display: flex; flex-direction: column; gap: 6px; }
+
+.changelog-group li {
+  position: relative;
+  padding-left: 16px;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--text-secondary);
+}
+
+.changelog-group li::before {
+  content: '';
+  position: absolute;
+  left: 2px;
+  top: 0.68em;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--text-faint);
+}
+
+.changelog-group strong { color: var(--text); font-weight: 600; }
+
+/* Снапшот — пунктирная рамка, чтобы отличать от релизов */
+.changelog-version.snapshot { border-style: dashed; }
+.changelog-entry.current .changelog-version.snapshot { border-style: solid; }
+
+/* ===== Обновления ===== */
+.about2-updates {
+  padding: 20px 22px;
+  border-radius: 18px;
+  background: var(--panel);
+  border: 1px solid var(--border-soft);
+  animation: about2In 0.5s cubic-bezier(0.16, 1, 0.3, 1) 0.12s both;
+}
+
+.about2-updates-main { display: flex; align-items: center; gap: 14px; }
+
+.about2-updates-icon {
+  width: 40px;
+  height: 40px;
+  flex-shrink: 0;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--element-strong);
+  color: var(--text-secondary);
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+.about2-updates-icon svg { width: 19px; height: 19px; }
+.status-latest .about2-updates-icon { color: var(--success); background: color-mix(in srgb, var(--success) 14%, transparent); }
+.status-ready .about2-updates-icon,
+.status-available .about2-updates-icon { color: var(--accent-text); background: var(--accent); }
+.status-error .about2-updates-icon { color: var(--danger); background: var(--danger-soft); }
+.status-manual .about2-updates-icon { color: var(--accent-text); background: var(--accent); }
+.status-unknown .about2-updates-icon { color: var(--warning, #f5b14c); background: color-mix(in srgb, var(--warning, #f5b14c) 14%, transparent); }
+
+/* «Установить релиз поверх этой сборки?» */
+.about2-updates-confirm {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-top: 12px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--text-secondary);
+  background: var(--element);
+  border: 1px solid var(--border-soft);
+}
+
+.about2-updates-confirm > span:first-child { flex: 1; min-width: 200px; }
+
+.spin-slow { animation: about2Spin 1.1s linear infinite; }
+@keyframes about2Spin { to { transform: rotate(360deg); } }
+
+.about2-updates-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.about2-updates-title { font-size: 14px; font-weight: 700; color: var(--text); }
+.about2-updates-sub { font-size: 12px; color: var(--text-muted); font-variant-numeric: tabular-nums; }
+.about2-updates-actions { display: flex; gap: 8px; flex-shrink: 0; }
+
+.about2-updates-progress {
+  height: 6px;
+  margin-top: 14px;
+  border-radius: 3px;
+  background: var(--element-strong);
+  overflow: hidden;
+}
+
+.about2-updates-progress i {
+  display: block;
+  height: 100%;
+  border-radius: 3px;
+  background: var(--text);
+  transition: width 0.25s ease;
+}
+
+.about2-updates-notes {
+  margin-top: 14px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: var(--element);
+  border: 1px solid var(--border-faint);
+}
+
+.about2-updates-notes-title { font-size: 11px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-faint); margin-bottom: 6px; }
+.about2-updates-notes p { font-size: 13px; line-height: 1.6; color: var(--text-secondary); white-space: pre-line; max-height: 180px; overflow-y: auto; }
+
+.about2-updates-auto {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border-faint);
+  cursor: pointer;
+}
+
+.about2-updates-auto > span:first-child { display: flex; flex-direction: column; gap: 2px; }
+.about2-updates-auto-title { font-size: 13px; font-weight: 600; color: var(--text); }
+.about2-updates-auto-sub { font-size: 12px; color: var(--text-faint); line-height: 1.4; }
+.about2-updates-auto .toggle { flex-shrink: 0; }
+.about2-updates-checked { margin-top: 10px; font-size: 11px; color: var(--text-faint); }
+
+@media (max-width: 760px) {
+  .about2-updates-main { flex-wrap: wrap; }
+  .about2-updates-actions { width: 100%; }
 }

@@ -1,0 +1,41 @@
+/* ===== Уведомление об обновлении ===== */
+.update-toast {
+  position: fixed;
+  right: 20px;
+  bottom: 104px;
+  z-index: 9000;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  max-width: min(520px, calc(100vw - 40px));
+  padding: 12px 12px 12px 14px;
+  border-radius: 16px;
+  background: linear-gradient(160deg, var(--panel-solid), var(--panel));
+  border: 1px solid var(--border);
+  box-shadow: 0 20px 50px var(--shadow);
+  animation: updateToastIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@keyframes updateToastIn {
+  from { opacity: 0; transform: translateY(14px) scale(0.97); }
+  to   { opacity: 1; transform: none; }
+}
+
+.update-toast-icon {
+  width: 36px;
+  height: 36px;
+  flex-shrink: 0;
+  border-radius: 11px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--accent-text);
+  background: var(--accent);
+}
+
+.update-toast-icon svg { width: 18px; height: 18px; }
+.update-toast-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.update-toast-title { font-size: 13px; font-weight: 700; color: var(--text); }
+.update-toast-sub { font-size: 12px; color: var(--text-muted); }
+.update-toast-actions { display: flex; gap: 6px; flex-shrink: 0; }
+.update-toast .btn { padding: 8px 12px; }

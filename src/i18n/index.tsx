@@ -81,6 +81,8 @@ interface I18nContextValue {
   lang: string
   setLang: (lang: string) => void
   t: (key: string, vars?: Record<string, unknown>) => string
+  /* Структурированное значение перевода (например, список изменений), без подстановок */
+  tm: <T = unknown>(key: string) => T | undefined
   customLangs: CustomLangMeta[]
   refreshCustomLangs: () => Promise<void>
   createTemplate: (base: 'ru' | 'en') => Promise<void>
@@ -249,8 +251,9 @@ export function I18nProvider({ children }: { children: ReactNode }) {
     }
   }, [applyCustom, refreshCustomLangs])
 
-  const t = useCallback(
-    (key: string, vars?: Record<string, unknown>) => {
+  /* Цепочка словарей: свой перевод → его базовый язык → русский */
+  const resolve = useCallback(
+    (key: string) => {
       const isCustomActive = !!custom && custom.lang === lang
       const rawBase = isCustomActive ? custom.base : lang
       const baseLang = builtIn[rawBase] ? rawBase : 'ru' // защита от неизвестного языка
@@ -261,6 +264,16 @@ export function I18nProvider({ children }: { children: ReactNode }) {
         value = lookup(d, key)
         if (value !== undefined) break
       }
+      return { value, baseLang }
+    },
+    [lang, custom]
+  )
+
+  const tm = useCallback(<T,>(key: string) => resolve(key).value as T | undefined, [resolve])
+
+  const t = useCallback(
+    (key: string, vars?: Record<string, unknown>) => {
+      const { value, baseLang } = resolve(key)
 
       if (value !== null && typeof value === 'object') {
         const obj = value as Record<string, string>
@@ -279,7 +292,7 @@ export function I18nProvider({ children }: { children: ReactNode }) {
       if (typeof value === 'string') return interpolate(value, vars)
       return key
     },
-    [lang, custom]
+    [resolve]
   )
 
   const value = useMemo<I18nContextValue>(
@@ -287,6 +300,7 @@ export function I18nProvider({ children }: { children: ReactNode }) {
       lang,
       setLang,
       t,
+      tm,
       customLangs,
       refreshCustomLangs,
       createTemplate,
@@ -294,7 +308,7 @@ export function I18nProvider({ children }: { children: ReactNode }) {
       openLanguagesFolder,
       langError,
     }),
-    [lang, setLang, t, customLangs, refreshCustomLangs, createTemplate, selectCustom, openLanguagesFolder, langError]
+    [lang, setLang, t, tm, customLangs, refreshCustomLangs, createTemplate, selectCustom, openLanguagesFolder, langError]
   )
 
   return <I18nContext.Provider value={value}>{children}</I18nContext.Provider>

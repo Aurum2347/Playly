@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { open } from '@tauri-apps/plugin-dialog'
-import { copyCover, saveCoverFromFile } from '../../lib/trackLoader'
+import { copyCover, loadCoverUrl, saveCoverFromBytes } from '../../lib/trackLoader'
+import { isVideoPath, pickVisual, requestVideoGif } from '../../lib/media'
 import CoverPicker from '../CoverPicker'
 import type { Track } from '../../App'
 import { useI18n } from '../../i18n'
@@ -13,6 +13,10 @@ export interface TrackUpdates {
   cover?: string | null
   coverFile?: string | null
   playbackRate?: number
+  animCoverFile?: string | null
+  discordHidden?: boolean
+  /* Длительность, когда её не удалось прочитать из тегов (например, у видео) */
+  duration?: string
 }
 
 interface TrackEditModalProps {
@@ -43,6 +47,11 @@ function TrackEditForm({ track, onClose, onSave, tracks }: TrackEditModalProps &
   const [cover, setCover] = useState<string | null>(track.cover ?? null)
   const [coverFile, setCoverFile] = useState<string | null>(track.coverFile ?? null)
   const [speed, setSpeed] = useState(track.playbackRate ?? 1)
+  /* Анимированная обложка: видна, пока трек играет; в списках — статичная cover */
+  const [animFile, setAnimFile] = useState<string | null>(track.animCoverFile ?? null)
+  const [animUrl, setAnimUrl] = useState<string | null>(null)
+  const [discordHidden, setDiscordHidden] = useState(track.discordHidden === true)
+  const [isMakingGif, setIsMakingGif] = useState(false)
   const [isPickingCover, setIsPickingCover] = useState(false)
   const [isBorrowOpen, setIsBorrowOpen] = useState(false)
   const mountedRef = useRef(true)
@@ -52,29 +61,75 @@ function TrackEditForm({ track, onClose, onSave, tracks }: TrackEditModalProps &
     return () => { mountedRef.current = false }
   }, [])
 
+  /* Превью анимации: файл уже лежит в covers, читаем его как blob */
+  useEffect(() => {
+    let alive = true
+    let url: string | null = null
+    loadCoverUrl(animFile).then((u) => {
+      if (!alive) {
+        if (u) URL.revokeObjectURL(u)
+        return
+      }
+      url = u
+      setAnimUrl(u)
+    })
+    return () => {
+      alive = false
+      if (url) URL.revokeObjectURL(url)
+    }
+  }, [animFile])
+
+  /* GIF и заставка из него сохраняются как пара: анимация + статичная обложка */
+  const applyVisual = async (bytes: Uint8Array, ext: string, poster?: Uint8Array) => {
+    const stamp = Date.now()
+    if (ext === 'gif' && poster) {
+      const [gif, still] = await Promise.all([
+        saveCoverFromBytes(`tra-${track.id}-${stamp}`, bytes, 'gif'),
+        saveCoverFromBytes(`tr-${track.id}-${stamp}`, poster, 'jpg'),
+      ])
+      if (!gif || !still || !mountedRef.current) return
+      setCover(still.coverUrl)
+      setCoverFile(still.coverFile)
+      setAnimFile(gif.coverFile)
+    } else {
+      const saved = await saveCoverFromBytes(`tr-${track.id}-${stamp}`, bytes, ext)
+      if (!saved || !mountedRef.current) return
+      setCover(saved.coverUrl)
+      setCoverFile(saved.coverFile)
+      setAnimFile(null)
+    }
+  }
+
+  const makeFromTrackVideo = async () => {
+    if (isMakingGif) return
+    setIsMakingGif(true)
+    try {
+      const result = await requestVideoGif(track.filePath, 'track')
+      if (result) await applyVisual(result.gif, 'gif', result.poster)
+    } finally {
+      if (mountedRef.current) setIsMakingGif(false)
+    }
+  }
+
   /* Capture-фаза на window: Escape закрывает только модалку и не доходит до списка треков */
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key !== 'Escape' || isBorrowOpen) return
+      if (e.key !== 'Escape' || isBorrowOpen || isMakingGif || isPickingCover) return
       e.preventDefault()
       e.stopPropagation()
       onClose()
     }
     window.addEventListener('keydown', onKey, true)
     return () => window.removeEventListener('keydown', onKey, true)
-  }, [onClose, isBorrowOpen])
+  }, [onClose, isBorrowOpen, isMakingGif, isPickingCover])
 
   const pickCover = async () => {
     if (isPickingCover) return
     setIsPickingCover(true)
     try {
-      const selected = await open({
-        multiple: false,
-        filters: [{ name: t('settings.profile.imagesFilter'), extensions: ['png', 'jpg', 'jpeg', 'webp', 'gif', 'bmp'] }],
-      })
-      if (!selected || Array.isArray(selected)) return
-      const saved = await saveCoverFromFile(`tr-${track.id}`, selected)
-      if (saved && mountedRef.current) { setCover(saved.coverUrl); setCoverFile(saved.coverFile) }
+      /* Видео сразу открывает окно «Анимация из видео», GIF становится анимацией с заставкой */
+      const picked = await pickVisual({ filterName: t('settings.profile.imagesFilter'), purpose: 'track', maxBytes: 25 * 1024 * 1024 })
+      if (picked) await applyVisual(picked.bytes, picked.ext, picked.poster)
     } catch (e) {
       console.error('Ошибка выбора обложки:', e)
     } finally {
@@ -86,7 +141,7 @@ function TrackEditForm({ track, onClose, onSave, tracks }: TrackEditModalProps &
     setIsBorrowOpen(false)
     if (!source.coverFile) return
     const copied = await copyCover(`tr-${track.id}`, source.coverFile)
-    if (copied && mountedRef.current) { setCover(copied.coverUrl); setCoverFile(copied.coverFile) }
+    if (copied && mountedRef.current) { setCover(copied.coverUrl); setCoverFile(copied.coverFile); setAnimFile(null) }
   }
 
   const handleSave = () => {
@@ -98,6 +153,8 @@ function TrackEditForm({ track, onClose, onSave, tracks }: TrackEditModalProps &
     if (a && a !== track.artist) updates.artist = a
     if (cover !== (track.cover ?? null)) { updates.cover = cover; updates.coverFile = coverFile }
     if (speed !== (track.playbackRate ?? 1)) updates.playbackRate = speed
+    if (animFile !== (track.animCoverFile ?? null)) updates.animCoverFile = animFile
+    if (discordHidden !== (track.discordHidden === true)) updates.discordHidden = discordHidden
     onSave(track.id, updates)
     onClose()
   }
@@ -118,8 +175,9 @@ function TrackEditForm({ track, onClose, onSave, tracks }: TrackEditModalProps &
         </div>
 
         <div className="tem-cover-row">
-          <div className="tem-cover" key={cover ?? 'none'}>
-            {cover ? <img src={cover} alt="" /> : <MusicIcon />}
+          <div className="tem-cover" key={(animUrl ?? cover) ?? 'none'}>
+            {animUrl ? <img src={animUrl} alt="" /> : cover ? <img src={cover} alt="" /> : <MusicIcon />}
+            {animFile && <span className="tem-gif-badge">GIF</span>}
           </div>
           <div className="tem-cover-actions">
             <button className="tem-btn" onClick={pickCover} disabled={isPickingCover}>
@@ -132,10 +190,21 @@ function TrackEditForm({ track, onClose, onSave, tracks }: TrackEditModalProps &
                 {t('coverPicker.fromTrack')}
               </button>
             )}
-            <button className="tem-btn" onClick={() => { setCover(null); setCoverFile(null) }} disabled={!cover}>
+            {isVideoPath(track.filePath) && (
+              <button className="tem-btn" onClick={makeFromTrackVideo} disabled={isMakingGif}>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="5" width="15" height="14" rx="2" /><polygon points="22 7 17 11 17 13 22 17 22 7" /></svg>
+                {t('views.trackEdit.fromVideo')}
+              </button>
+            )}
+            {animFile && (
+              <button className="tem-btn" onClick={() => setAnimFile(null)}>
+                {t('views.trackEdit.removeAnim')}
+              </button>
+            )}
+            <button className="tem-btn" onClick={() => { setCover(null); setCoverFile(null); setAnimFile(null) }} disabled={!cover && !animFile}>
               {t('views.trackEdit.removeCover')}
             </button>
-            <div className="tem-hint">{t('views.trackEdit.hint')}</div>
+            <div className="tem-hint">{t(animFile ? 'views.trackEdit.animHint' : 'views.trackEdit.hint')}</div>
           </div>
         </div>
 
@@ -173,6 +242,17 @@ function TrackEditForm({ track, onClose, onSave, tracks }: TrackEditModalProps &
             </button>
           ))}
         </div>
+
+        <label className="tem-switch">
+          <span className="tem-switch-text">
+            <span className="tem-label">{t('views.trackEdit.discordHidden')}</span>
+            <span className="tem-hint">{t('views.trackEdit.discordHiddenDesc')}</span>
+          </span>
+          <span className="toggle">
+            <input type="checkbox" checked={discordHidden} onChange={(e) => setDiscordHidden(e.target.checked)} />
+            <span className="toggle-slider"></span>
+          </span>
+        </label>
 
         <div className="tem-actions">
           <button className="tem-btn" onClick={onClose}>{t('common.cancel')}</button>

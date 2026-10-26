@@ -1,11 +1,15 @@
 import { useEffect, useRef, useState } from 'react'
 import { appDataDir, join } from '@tauri-apps/api/path'
 import { exists, readFile, readTextFile, writeTextFile, writeFile, remove, mkdir } from '@tauri-apps/plugin-fs'
-import { open } from '@tauri-apps/plugin-dialog'
+import { pickVisual } from '../../../lib/media'
 import { imageMime } from './helpers'
 import { useI18n } from '../../../i18n'
 import AvatarCropModal from '../../AvatarCropModal'
 import { DEFAULT_FRAME, frameStyle, normalizeFrame, type ImageFrame } from '../../../lib/imageFrame'
+import { LOOK_DEFAULTS, type LookKind, type ProfileLook, type ProfileLooks } from '../../../lib/profile'
+import { LookLayers, ProfileBanner } from '../../ProfileLook'
+import ProfileLookEditor from '../../ProfileLookEditor'
+import DefaultAvatar from '../../DefaultAvatar'
 
 type AvatarShape = 'circle' | 'square'
 
@@ -26,9 +30,12 @@ interface CropState {
 interface ProfileSectionProps {
   currentNickname: string
   onSaveNickname: (nickname: string) => void
+  looks?: ProfileLooks
 }
 
-export default function ProfileSection({ currentNickname, onSaveNickname }: ProfileSectionProps) {
+const lookModeKey = (look: ProfileLook | null | undefined) => `look.mode_${look?.mode ?? 'none'}`
+
+export default function ProfileSection({ currentNickname, onSaveNickname, looks }: ProfileSectionProps) {
   const { t } = useI18n()
   const [nickname, setNickname] = useState(currentNickname)
   const [isSaved, setIsSaved] = useState(false)
@@ -39,6 +46,7 @@ export default function ProfileSection({ currentNickname, onSaveNickname }: Prof
   const [isSavingAvatar, setIsSavingAvatar] = useState(false)
   const [avatarFrame, setAvatarFrame] = useState<ImageFrame>(DEFAULT_FRAME)
   const [crop, setCrop] = useState<CropState | null>(null)
+  const [lookEditor, setLookEditor] = useState<LookKind | null>(null)
 
   const profileDirRef = useRef<string | null>(null)
   const avatarUrlRef = useRef<string | null>(null)
@@ -188,16 +196,11 @@ export default function ProfileSection({ currentNickname, onSaveNickname }: Prof
     setIsSavingAvatar(true)
 
     try {
-      const selected = await open({
-        multiple: false,
-        filters: [{ name: t('settings.profile.imagesFilter'), extensions: ['png', 'jpg', 'jpeg', 'webp', 'gif', 'bmp'] }],
-      })
+      /* Видео сразу превращается в GIF в отдельном окне */
+      const picked = await pickVisual({ filterName: t('settings.profile.imagesFilter'), purpose: 'avatar' })
+      if (!picked) return
 
-      if (!selected || Array.isArray(selected)) return
-
-      const extRaw = selected.split('.').pop()?.toLowerCase() || 'png'
-      const ext = extRaw === 'jpeg' ? 'jpg' : extRaw
-      const bytes = await readFile(selected)
+      const { bytes, ext } = picked
       const src = URL.createObjectURL(
         new Blob([bytes as unknown as BlobPart], { type: imageMime(`a.${ext}`) })
       )
@@ -327,10 +330,7 @@ export default function ProfileSection({ currentNickname, onSaveNickname }: Prof
                 {avatarUrl ? (
                   <img src={avatarUrl} alt={t('settings.profile.avatarImage')} style={frameStyle(avatarFrame)} />
                 ) : (
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2" />
-                    <circle cx="12" cy="7" r="4" />
-                  </svg>
+                  <DefaultAvatar seed={currentNickname} />
                 )}
               </div>
 
@@ -412,6 +412,64 @@ export default function ProfileSection({ currentNickname, onSaveNickname }: Prof
           </div>
         </div>
       </div>
+
+      <div className="settings-section">
+        <div className="section-title">{t('settings.profile.looks')}</div>
+
+        <div className="setting-row">
+          <div className="setting-info">
+            <div className="setting-name">{t('settings.profile.card')}</div>
+            <div className="setting-desc">{t('settings.profile.cardDesc')}</div>
+          </div>
+
+          <div className="setting-control look-setting">
+            <button
+              className="look-thumb is-card"
+              onClick={() => setLookEditor('card')}
+              title={t(lookModeKey(looks?.card))}
+            >
+              <LookLayers look={looks?.card} />
+              <span className={`look-thumb-avatar ${avatarShape}`}>
+                {avatarUrl ? <img src={avatarUrl} alt="" draggable={false} style={frameStyle(avatarFrame)} /> : <DefaultAvatar seed={currentNickname} />}
+              </span>
+              <span className="look-thumb-lines"><i /><i /></span>
+            </button>
+            <button className="btn" onClick={() => setLookEditor('card')}>
+              {t('settings.profile.customize')}
+            </button>
+          </div>
+        </div>
+
+        <div className="setting-row">
+          <div className="setting-info">
+            <div className="setting-name">{t('settings.profile.banner')}</div>
+            <div className="setting-desc">{t('settings.profile.bannerDesc')}</div>
+          </div>
+
+          <div className="setting-control look-setting">
+            <button
+              className="look-thumb is-banner"
+              onClick={() => setLookEditor('banner')}
+              title={t(lookModeKey(looks?.banner))}
+            >
+              <ProfileBanner look={looks?.banner} avatarUrl={looks?.avatarUrl ?? avatarUrl} seed={currentNickname} className="look-thumb-banner" />
+            </button>
+            <button className="btn" onClick={() => setLookEditor('banner')}>
+              {t('settings.profile.customize')}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <ProfileLookEditor
+        kind={lookEditor}
+        look={(lookEditor && looks?.[lookEditor]) || LOOK_DEFAULTS[lookEditor ?? 'card']}
+        nickname={currentNickname}
+        avatarUrl={looks?.avatarUrl ?? avatarUrl}
+        avatarShape={avatarShape}
+        avatarFrame={avatarFrame}
+        onClose={() => setLookEditor(null)}
+      />
 
       <AvatarCropModal
         src={crop?.src ?? null}

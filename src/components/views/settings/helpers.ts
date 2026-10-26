@@ -34,11 +34,7 @@ export const sliderPercent = (val: number, min: number, max: number) =>
 export async function getSettingsPath(): Promise<string> {
   const appDir = await appDataDir()
   const playlyDir = await join(appDir, 'playly')
-  try {
-    await mkdir(playlyDir, { recursive: true })
-  } catch {
-    // папка уже может существовать
-  }
+  await mkdir(playlyDir, { recursive: true }).catch(() => {})
   return await join(playlyDir, 'settings.json')
 }
 
@@ -99,7 +95,7 @@ export function applyTheme(theme: ThemeMode): void {
   try {
     localStorage.setItem('playly-theme-cache', theme)
   } catch {
-    // ignore
+    /* Хранилище недоступно — тема просто не запомнится до следующего запуска */
   }
   document.documentElement.dataset.theme = getResolvedTheme(theme)
 }

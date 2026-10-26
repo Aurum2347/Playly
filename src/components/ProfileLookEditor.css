@@ -1,0 +1,193 @@
+/* ===== Окно настройки фона карточки и баннера профиля ===== */
+.look-editor { max-width: 640px; }
+
+.look-editor-stage {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 26px 22px;
+  border-radius: 16px;
+  background:
+    radial-gradient(120% 120% at 50% 0%, var(--element-strong), transparent 70%),
+    var(--element);
+  border: 1px solid var(--border-soft);
+}
+
+.look-editor-stage.is-banner { padding: 18px; }
+
+.look-editor-hint { text-align: center; margin-top: -6px; }
+
+.look-editor-error {
+  padding: 10px 12px;
+  border-radius: 10px;
+  font-size: 12px;
+  color: var(--danger);
+  background: var(--danger-soft);
+  border: 1px solid var(--danger-border);
+}
+
+/* Карточка в предпросмотре — такая же, как в сайдбаре, только без «прыжка» при наведении */
+.look-editor-card {
+  width: 260px;
+  box-shadow: 0 14px 34px var(--shadow);
+}
+
+.look-editor-card.frame-box {
+  background: linear-gradient(135deg, var(--panel-solid), var(--panel));
+}
+
+.look-editor-card:hover { transform: none; }
+
+/* ===== Предпросмотр шапки окна профиля ===== */
+.look-editor-profile {
+  width: 100%;
+  max-width: 460px;
+  border-radius: 16px;
+  overflow: hidden;
+  background: var(--panel-solid);
+  border: 1px solid var(--border);
+  box-shadow: 0 14px 34px var(--shadow);
+}
+
+.look-editor-banner {
+  width: 100%;
+  aspect-ratio: 3 / 1;
+}
+
+.look-editor-profile-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+  padding: 0 16px 14px;
+  margin-top: -30px;
+  position: relative;
+  pointer-events: none;
+}
+
+.look-editor-profile-row strong {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text);
+  padding-bottom: 4px;
+}
+
+.look-editor-avatar {
+  width: 64px;
+  height: 64px;
+  flex-shrink: 0;
+  overflow: hidden;
+  border: 4px solid var(--panel-solid);
+  background: linear-gradient(135deg, var(--element-strong), var(--panel));
+}
+
+.look-editor-avatar.circle { border-radius: 50%; }
+.look-editor-avatar.square { border-radius: 18px; }
+
+/* ===== Градиент ===== */
+.look-editor-gradient {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px 14px;
+}
+
+.look-editor-color {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.look-editor-swatch {
+  position: relative;
+  width: 38px;
+  height: 38px;
+  border-radius: 11px;
+  border: 1px solid var(--border);
+  box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.08);
+  overflow: hidden;
+  transition: transform 0.15s ease;
+}
+
+.look-editor-color:hover .look-editor-swatch { transform: scale(1.06); }
+
+.look-editor-swatch input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.look-editor-swap { width: 32px; height: 32px; }
+.look-editor-swap svg { width: 15px; height: 15px; }
+
+.look-editor-angle { flex: 1; min-width: 180px; }
+
+/* ===== Миниатюры в «Настройки → Профиль» ===== */
+.look-setting { display: flex; align-items: center; gap: 10px; }
+
+.look-thumb {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  flex-shrink: 0;
+  padding: 0;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: linear-gradient(135deg, var(--panel-solid), var(--panel));
+  cursor: pointer;
+  transition: border-color 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.look-thumb:hover { border-color: var(--dashed); transform: translateY(-1px); box-shadow: 0 6px 16px var(--shadow); }
+.look-thumb:active { transform: none; }
+
+.look-thumb.is-card {
+  width: 128px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 0 9px;
+}
+
+.look-thumb-avatar {
+  position: relative;
+  z-index: 1;
+  width: 24px;
+  height: 24px;
+  flex-shrink: 0;
+  overflow: hidden;
+  border-radius: 50%;
+  background: var(--element-strong);
+  border: 1.5px solid rgba(255, 255, 255, 0.25);
+}
+
+.look-thumb-avatar.square { border-radius: 7px; }
+.look-thumb-avatar img { width: 100%; height: 100%; object-fit: cover; display: block; }
+
+.look-thumb-lines { position: relative; z-index: 1; display: flex; flex-direction: column; gap: 5px; }
+.look-thumb-lines i { display: block; height: 4px; border-radius: 2px; background: rgba(255, 255, 255, 0.55); }
+.look-thumb-lines i:first-child { width: 52px; }
+.look-thumb-lines i:last-child { width: 34px; background: var(--success); }
+
+:root[data-theme='light'] .look-thumb.is-card:not(:has(.look-layers)) .look-thumb-lines i:first-child { background: rgba(0, 0, 0, 0.25); }
+
+.look-thumb.is-banner { width: 128px; height: 44px; }
+.look-thumb-banner { width: 100%; height: 100%; }
+
+/* Пять вариантов размытия должны помещаться в половину окна */
+.look-editor .segmented button {
+  min-width: 0;
+  padding: 0 4px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Кнопка «Случайный градиент»: кубик подпрыгивает и крутится */
+.look-editor-random .dice-icon { width: 15px; height: 15px; transition: transform 0.45s cubic-bezier(0.34, 1.56, 0.64, 1); }
+.look-editor-random:hover .dice-icon { transform: rotate(-12deg) scale(1.08); }
+.look-editor-random:active .dice-icon { transform: rotate(200deg) scale(0.9); transition-duration: 0.2s; }

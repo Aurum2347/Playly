@@ -12,7 +12,8 @@ interface HomeViewProps extends TrackActionHandlers {
   tracks: Track[]
   playlists?: Playlist[]
   nickname?: string
-  onSelectTrack: (track: Track, queue?: Track[]) => void
+  /* autoplay: false — только поставить трек в плеер, не запуская его */
+  onSelectTrack: (track: Track, queue?: Track[], autoplay?: boolean) => void
   currentTrack?: Track | null
   playHistory?: Record<number, number>
   playingTrackId?: number | null
@@ -59,10 +60,16 @@ function HeroProgress({ getPlayback }: { getPlayback: () => { time: number; dura
   useEffect(() => {
     let raf = 0
     let lastSec = -1
+    let lastFrac = -1
     const tick = () => {
       raf = requestAnimationFrame(tick)
       const { time, duration } = getPlayback()
-      if (fillRef.current) fillRef.current.style.width = `${duration > 0 ? Math.min(100, (time / duration) * 100) : 0}%`
+      /* На паузе значение не меняется — и DOM не трогаем */
+      const frac = duration > 0 ? Math.min(1, time / duration) : 0
+      if (frac !== lastFrac && fillRef.current) {
+        lastFrac = frac
+        fillRef.current.style.transform = `scaleX(${frac})`
+      }
       const sec = Math.floor(time)
       if (sec !== lastSec) {
         lastSec = sec
@@ -346,8 +353,9 @@ export default function HomeView({
   }
 
   const handleOpenNowPlaying = () => {
-    /* Если ничего не играет, сначала включаем трек из карточки — иначе в расширенном режиме будет пусто */
-    if (!currentTrack && heroTrack) onSelectTrack(heroTrack, recentlyPlayed.length ? recentlyPlayed : tracks)
+    /* Если ничего не выбрано, ставим трек из карточки на паузе — иначе в расширенном режиме будет пусто,
+       а запускать музыку без нажатия на «Play» нельзя */
+    if (!currentTrack && heroTrack) onSelectTrack(heroTrack, recentlyPlayed.length ? recentlyPlayed : tracks, false)
     onOpenNowPlaying?.()
   }
 

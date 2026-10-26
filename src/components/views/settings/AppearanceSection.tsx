@@ -21,6 +21,10 @@ import {
   type ThemeMode,
 } from './helpers'
 import { useI18n } from '../../../i18n'
+import type { Track } from '../../../App'
+import type { AppBackdrop, ParticleSettings } from '../../../lib/appearance'
+import BackdropSettings from './BackdropSettings'
+import ParticleSettingsSection from './ParticleSettingsSection'
 import {
   applyUiScale,
   clampUiScale,
@@ -45,15 +49,36 @@ const RESETTABLE_KEYS = [
   'eqEnabled',
   'eq',
   'discordRpc',
+  'discordParts',
   'visualizer',
+  'appBackdrop',
+  'particles',
 ]
 
 interface AppearanceSectionProps {
   theme?: ThemeMode
   onChangeTheme?: (theme: ThemeMode) => void
+  backdrop?: AppBackdrop
+  onChangeBackdrop?: (b: AppBackdrop) => void
+  /* blob-url картинки фона и обложка играющего трека — для предпросмотра */
+  backdropUrl?: string | null
+  coverUrl?: string | null
+  particles?: ParticleSettings
+  onChangeParticles?: (p: ParticleSettings) => void
+  tracks?: Track[]
 }
 
-export default function AppearanceSection({ theme, onChangeTheme }: AppearanceSectionProps) {
+export default function AppearanceSection({
+  theme,
+  onChangeTheme,
+  backdrop,
+  onChangeBackdrop,
+  backdropUrl = null,
+  coverUrl = null,
+  particles,
+  onChangeParticles,
+  tracks = [],
+}: AppearanceSectionProps) {
   const { t } = useI18n()
   const [localTheme, setLocalTheme] = useState<ThemeMode>('dark')
   const [isThemeOpen, setIsThemeOpen] = useState(false)
@@ -335,6 +360,17 @@ export default function AppearanceSection({ theme, onChangeTheme }: AppearanceSe
           </div>
         </div>
       </div>
+
+      {backdrop && onChangeBackdrop && (
+        <div className="settings-section">
+          <div className="section-title">{t('settings.appearance.backdropSection')}</div>
+          <BackdropSettings backdrop={backdrop} onChange={onChangeBackdrop} imageUrl={backdropUrl} coverUrl={coverUrl} />
+        </div>
+      )}
+
+      {particles && onChangeParticles && (
+        <ParticleSettingsSection value={particles} onChange={onChangeParticles} tracks={tracks} />
+      )}
 
       <div className="settings-section">
         <div className="section-title">{t('settings.appearance.resetSection')}</div>

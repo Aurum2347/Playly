@@ -1,21 +1,11 @@
-import { Fragment, type ReactNode } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { open } from '@tauri-apps/plugin-shell'
 import Logo from '../../Logo'
 import { useI18n } from '../../../i18n'
+import { versionLabel } from '../../../lib/version'
+import ChangelogPage from './ChangelogPage'
+import UpdatesCard from './UpdatesCard'
 import './AboutSection.css'
-
-const APP_VERSION = '2.0.3'
-
-/**
- * Переводы могут прийти из пользовательских файлов языков, поэтому HTML не вставляем как есть:
- * поддерживается только <strong>…</strong>, всё остальное выводится как обычный текст.
- */
-function renderBold(text: string) {
-  return text.split(/(<strong>[\s\S]*?<\/strong>)/g).map((part, i) => {
-    const m = part.match(/^<strong>([\s\S]*)<\/strong>$/)
-    return m ? <strong key={i}>{m[1]}</strong> : <Fragment key={i}>{part}</Fragment>
-  })
-}
 
 /* В окне Tauri ссылки с target="_blank" не открываются — отдаём их системному браузеру */
 const openExternal = (e: React.MouseEvent<HTMLAnchorElement>) => {
@@ -62,21 +52,20 @@ function LinkCard({ href, kind, title, sub, featured }: LinkCardProps) {
   )
 }
 
-function Feature({ icon, title, text }: { icon: ReactNode; title: string; text: string }) {
-  return (
-    <div className="about2-feature">
-      <span className="about2-feature-icon">{icon}</span>
-      <span className="about2-feature-title">{title}</span>
-      <span className="about2-feature-text">{text}</span>
-    </div>
-  )
-}
-
 export default function AboutSection() {
   const { t } = useI18n()
+  const [page, setPage] = useState<'main' | 'changelog'>('main')
+  const rootRef = useRef<HTMLDivElement>(null)
+
+  /* Возврат из списка изменений — тоже к началу страницы */
+  useEffect(() => {
+    if (page === 'main') rootRef.current?.closest('.settings-main-content')?.scrollTo({ top: 0 })
+  }, [page])
+
+  if (page === 'changelog') return <ChangelogPage onBack={() => setPage('main')} />
 
   return (
-    <div className="about2">
+    <div ref={rootRef} className="about2">
       {/* ===== Шапка ===== */}
       <section className="about2-hero">
         <div className="about2-hero-glow" aria-hidden="true" />
@@ -87,38 +76,35 @@ export default function AboutSection() {
           <h1 className="about2-name">Playly</h1>
           <p className="about2-tagline">{t('settings.about.tagline')}</p>
           <div className="about2-badges">
-            <span className="about2-badge strong">v{APP_VERSION}</span>
+            <span className="about2-badge strong">v{versionLabel(t)}</span>
             <span className="about2-badge">{t('settings.about.badgeOffline')}</span>
             <span className="about2-badge">Tauri · React</span>
           </div>
         </div>
       </section>
 
-      {/* ===== Чем хорош ===== */}
-      <section className="about2-features">
-        <Feature
-          title={t('settings.about.f1Title')}
-          text={t('settings.about.f1Text')}
-          icon={<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="1" y1="1" x2="23" y2="23" /><path d="M16.72 11.06A10.94 10.94 0 0 1 19 12.55" /><path d="M5 12.55a10.94 10.94 0 0 1 5.17-2.39" /><path d="M10.71 5.05A16 16 0 0 1 22.58 9" /><path d="M1.42 9a15.91 15.91 0 0 1 4.7-2.88" /><path d="M8.53 16.11a6 6 0 0 1 6.95 0" /><line x1="12" y1="20" x2="12.01" y2="20" /></svg>}
-        />
-        <Feature
-          title={t('settings.about.f2Title')}
-          text={t('settings.about.f2Text')}
-          icon={<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 12h4l3-8 4 16 3-8h4" /></svg>}
-        />
-        <Feature
-          title={t('settings.about.f3Title')}
-          text={t('settings.about.f3Text')}
-          icon={<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="7" height="7" rx="1.5" /><rect x="14" y="3" width="7" height="7" rx="1.5" /><rect x="3" y="14" width="7" height="7" rx="1.5" /><rect x="14" y="14" width="7" height="7" rx="1.5" /></svg>}
-        />
-      </section>
+      {/* ===== Последние изменения ===== */}
+      <button className="about2-changes" onClick={() => setPage('changelog')}>
+        <span className="about2-changes-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M12 8v4l3 2" />
+            <path d="M3.05 11a9 9 0 1 1 .5 4" />
+            <polyline points="3 4 3 11 10 11" />
+          </svg>
+        </span>
+        <span className="about2-changes-text">
+          <span className="about2-changes-title">{t('settings.about.changesTitle')}</span>
+          <span className="about2-changes-sub">{t('settings.about.changesSub', { v: versionLabel(t) })}</span>
+        </span>
+        <span className="about2-changes-arrow">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <polyline points="9 18 15 12 9 6" />
+          </svg>
+        </span>
+      </button>
 
-      {/* ===== История ===== */}
-      <section className="about2-story">
-        <div className="about2-section-title">{t('settings.about.storyTitle')}</div>
-        <p>{renderBold(t('settings.about.p1'))}</p>
-        <p>{renderBold(t('settings.about.p2'))}</p>
-      </section>
+      {/* ===== Обновления ===== */}
+      <UpdatesCard />
 
       {/* ===== Ссылки ===== */}
       <section>

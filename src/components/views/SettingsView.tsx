@@ -3,6 +3,10 @@ import { DEBUG_DIAGNOSTICS_SCREEN, type ThemeMode } from './settings/helpers'
 import { useI18n } from '../../i18n'
 import type { CrossfadeCurve } from '../../lib/audioEngine'
 import type { EqPreset } from '../../lib/equalizer'
+import type { ProfileLooks } from '../../lib/profile'
+import type { DiscordParts } from '../../lib/discord'
+import type { AppBackdrop, ParticleSettings } from '../../lib/appearance'
+import type { Track } from '../../App'
 import AppearanceSection from './settings/AppearanceSection'
 import PlaybackSection from './settings/PlaybackSection'
 import LibrarySection from './settings/LibrarySection'
@@ -10,6 +14,7 @@ import SystemSection from './settings/SystemSection'
 import ProfileSection from './settings/ProfileSection'
 import AboutSection from './settings/AboutSection'
 import './SettingsView.css'
+import './settings/SettingsExtras.css'
 
 export type SettingsSection = 'appearance' | 'playback' | 'library' | 'system' | 'profile' | 'about'
 type Section = SettingsSection
@@ -20,6 +25,8 @@ interface SettingsViewProps {
   onSectionChange?: (s: SettingsSection) => void
   currentNickname: string
   onSaveNickname: (nickname: string) => void
+  /* Фон карточки, баннер и аватарка — для предпросмотра в разделе «Профиль» */
+  profileLooks?: ProfileLooks
   theme?: ThemeMode
   onChangeTheme?: (theme: ThemeMode) => void
   crossfade?: number
@@ -47,6 +54,16 @@ interface SettingsViewProps {
   onClearLibrary?: () => void
   discordRpc?: boolean
   onChangeDiscordRpc?: (v: boolean) => void
+  discordParts?: DiscordParts
+  onChangeDiscordParts?: (parts: DiscordParts) => void
+  getReferencedCovers?: () => Set<string>
+  backdrop?: AppBackdrop
+  onChangeBackdrop?: (b: AppBackdrop) => void
+  backdropUrl?: string | null
+  coverUrl?: string | null
+  particles?: ParticleSettings
+  onChangeParticles?: (p: ParticleSettings) => void
+  tracks?: Track[]
 }
 
 const navItems: Array<{ id: Section; icon: string }> = [
@@ -90,6 +107,7 @@ export default function SettingsView({
   onSectionChange,
   currentNickname,
   onSaveNickname,
+  profileLooks,
   theme,
   onChangeTheme,
   crossfade,
@@ -117,6 +135,16 @@ export default function SettingsView({
   onClearLibrary,
   discordRpc,
   onChangeDiscordRpc,
+  discordParts,
+  onChangeDiscordParts,
+  getReferencedCovers,
+  backdrop,
+  onChangeBackdrop,
+  backdropUrl,
+  coverUrl,
+  particles,
+  onChangeParticles,
+  tracks,
 }: SettingsViewProps) {
   const { t } = useI18n()
   const [localSection, setLocalSection] = useState<Section>('appearance')
@@ -179,7 +207,17 @@ export default function SettingsView({
       <div className="settings-main-content">
         <div key={activeSection} className="settings-page">
           {activeSection === 'appearance' && (
-            <AppearanceSection theme={theme} onChangeTheme={onChangeTheme} />
+            <AppearanceSection
+              theme={theme}
+              onChangeTheme={onChangeTheme}
+              backdrop={backdrop}
+              onChangeBackdrop={onChangeBackdrop}
+              backdropUrl={backdropUrl}
+              coverUrl={coverUrl}
+              particles={particles}
+              onChangeParticles={onChangeParticles}
+              tracks={tracks}
+            />
           )}
           {activeSection === 'playback' && (
             <PlaybackSection
@@ -213,10 +251,16 @@ export default function SettingsView({
             />
           )}
           {activeSection === 'system' && (
-            <SystemSection discordRpc={discordRpc} onChangeDiscordRpc={onChangeDiscordRpc} />
+            <SystemSection
+              discordRpc={discordRpc}
+              onChangeDiscordRpc={onChangeDiscordRpc}
+              discordParts={discordParts}
+              onChangeDiscordParts={onChangeDiscordParts}
+              getReferencedCovers={getReferencedCovers}
+            />
           )}
           {activeSection === 'profile' && (
-            <ProfileSection currentNickname={currentNickname} onSaveNickname={onSaveNickname} />
+            <ProfileSection currentNickname={currentNickname} onSaveNickname={onSaveNickname} looks={profileLooks} />
           )}
           {activeSection === 'about' && DEBUG_DIAGNOSTICS_SCREEN && <AboutSection />}
         </div>

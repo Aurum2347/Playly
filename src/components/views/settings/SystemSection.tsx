@@ -6,16 +6,27 @@ import {
   isEnabled as isAutostartEnabled,
 } from '@tauri-apps/plugin-autostart'
 import Twemoji from '../../../components/Twemoji'
+import Collapse from '../../Collapse'
 import { useI18n, LANGS } from '../../../i18n'
+import { DEFAULT_DISCORD_PARTS, DISCORD_PART_KEYS, type DiscordParts } from '../../../lib/discord'
+import DiscordPreview from './DiscordPreview'
+import CacheSettings from './CacheSettings'
 
 interface SystemSectionProps {
   discordRpc?: boolean
   onChangeDiscordRpc?: (v: boolean) => void
+  discordParts?: DiscordParts
+  onChangeDiscordParts?: (parts: DiscordParts) => void
+  /* Имена файлов обложек, которые сейчас используются, — их очистка кеша не трогает */
+  getReferencedCovers?: () => Set<string>
 }
 
 export default function SystemSection({
   discordRpc = true,
   onChangeDiscordRpc,
+  discordParts = DEFAULT_DISCORD_PARTS,
+  onChangeDiscordParts,
+  getReferencedCovers,
 }: SystemSectionProps) {
   const {
     lang,
@@ -148,7 +159,35 @@ export default function SystemSection({
             </label>
           </div>
         </div>
+
+        <Collapse open={discordRpc}>
+          <div className="rpc-panel">
+            <div className="rpc-panel-parts">
+              <div className="rpc-panel-title">{t('settings.system.discordParts')}</div>
+              <div className="rpc-panel-desc">{t('settings.system.discordPartsDesc')}</div>
+              <div className="rpc-chips">
+                {DISCORD_PART_KEYS.map((key) => (
+                  <label key={key} className={`rpc-chip ${discordParts[key] ? 'on' : ''}`}>
+                    <input
+                      type="checkbox"
+                      checked={discordParts[key]}
+                      onChange={(e) => onChangeDiscordParts?.({ ...discordParts, [key]: e.target.checked })}
+                    />
+                    <span className="rpc-chip-check" aria-hidden="true">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
+                    </span>
+                    {t(`settings.system.discordPart_${key}`)}
+                  </label>
+                ))}
+              </div>
+              <div className="rpc-panel-hint">{t('settings.system.discordHiddenHint')}</div>
+            </div>
+            <DiscordPreview parts={discordParts} />
+          </div>
+        </Collapse>
       </div>
+
+      <CacheSettings getReferencedCovers={getReferencedCovers} />
 
       {/* ===== Модалка языка: ВСЕГДА в DOM, класс open даёт анимации входа и выхода ===== */}
       {createPortal(

@@ -66,26 +66,12 @@ body,
 
 .titlebar {
   position: relative;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0 6px 0 16px;
+  /* Раскладка — в layout/TitleBar.css */
   background: var(--bg-elevated);
   border-bottom: 1px solid var(--border-faint);
   user-select: none;
   -webkit-user-select: none;
 }
-
-.titlebar-center {
-  position: absolute;
-  left: 50%;
-  transform: translateX(-50%);
-  font-size: 12px;
-  color: var(--text-muted);
-  pointer-events: none;
-}
-
-.titlebar-controls { display: flex; gap: 2px; }
 
 .control-btn {
   width: 42px;
@@ -224,7 +210,8 @@ body,
 
 .drag-overlay {
   position: fixed;
-  inset: 0;
+  /* Шапка окна с кнопками управления остаётся доступной */
+  inset: var(--titlebar-h, 0px) 0 0;
   z-index: 9999;
   background: var(--overlay);
   backdrop-filter: blur(12px);
@@ -400,7 +387,8 @@ img {
 
 .confirm-overlay {
   position: fixed;
-  inset: 0;
+  /* Шапка окна с кнопками управления остаётся доступной */
+  inset: var(--titlebar-h, 0px) 0 0;
   background: rgba(0, 0, 0, 0.7);
   backdrop-filter: blur(6px);
   display: flex;

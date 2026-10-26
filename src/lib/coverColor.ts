@@ -52,6 +52,8 @@ export function useCoverColor(src?: string | null): string | null {
       if (cache.size > 100) cache.delete(cache.keys().next().value as string)
       if (!cancelled) setColor({ src, value })
     }
+    /* Обложки из папки грузятся по asset-ссылке (другой origin): без CORS холст «испачкается» и цвет не прочитать */
+    img.crossOrigin = 'anonymous'
     img.src = src
     return () => {
       cancelled = true
