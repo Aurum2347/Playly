@@ -606,13 +606,14 @@ export const en = {
       {
         version: '2.0.5',
         date: '2026-10-26',
-        title: 'Hotfix: the mini player no longer hides from clicks',
+        title: 'Hotfix: the mini player is back in shape',
         sections: [
           {
             title: 'Mini player',
             groups: [
               {
                 items: [
+                  'In 2.0.4 the mini player opened without its styling: a huge icon and bare text. The bundler loaded the main window styles instead of its own — fixed.',
                   'The mini player no longer disappears when you press its buttons, drag its sliders or move it: it hides only when you switch to another window.',
                   'Because of this bug, clicks in the mini player sometimes got lost — playback from the mini player works again.',
                   'This version also tests auto-update: if it arrived by itself, everything works.',
