@@ -20,14 +20,18 @@ if (isMini) {
 }
 
 /* Мини-плееру не нужен код всего приложения — грузим только своё.
+   Два отдельных import(), а не один с «?:» внутри: сборщик склеивал такой вызов в один и подгружал
+   мини-плееру стили главного окна вместо его собственных (в релизе мини-плеер был без оформления).
    Это точка входа, горячая замена модулей ей не нужна. */
 // eslint-disable-next-line react-refresh/only-export-components
-const Root = lazy(() => (isMini ? import('./mini/MiniApp') : import('./App')))
+const MiniRoot = lazy(() => import('./mini/MiniApp'))
+// eslint-disable-next-line react-refresh/only-export-components
+const MainRoot = lazy(() => import('./App'))
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <Suspense fallback={null}>
-      <Root />
+      {isMini ? <MiniRoot /> : <MainRoot />}
     </Suspense>
   </StrictMode>,
 )
