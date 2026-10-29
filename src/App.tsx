@@ -171,8 +171,12 @@ function AppInner() {
 
   const engineRef = useRef<AudioEngine | null>(null)
   const engineEventsRef = useRef<EngineEvents | null>(null)
-  const skipLoadRef = useRef(false)
   const pendingPlayRef = useRef(false)
+  /* Принудительная перезагрузка того же трека (например, после ошибки чтения файла) */
+  const [loadTick, setLoadTick] = useState(0)
+  /* Сколько файлов подряд не прочиталось: битые пропускаются, но не по кругу бесконечно */
+  const loadFailStreakRef = useRef(0)
+  const normalizeRef = useRef(true)
   /* blob-url картинок профиля (аватарка, фон карточки, баннер) — освобождаются при перезагрузке профиля */
   const profileUrlsRef = useRef<string[]>([])
   const profileLoadSeqRef = useRef(0)
@@ -190,6 +194,21 @@ function AppInner() {
   /* Идёт загрузка трека для автоматического кроссфейда */
   const autoXfadeRef = useRef(false)
   const xfadePlanRef = useRef<CrossfadePlan | null>(null)
+
+  /*
+   * Очередь и позиция в ней меняются только через эти две функции: ref обновляется сразу, а не после
+   * перерисовки. Иначе два быстрых «Далее» подряд (или команда из мини-плеера, пришедшая до перерисовки)
+   * считали следующий трек от старой позиции, а флаги загрузки срабатывали не для того трека.
+   */
+  const applyQueue = useCallback((ids: number[]) => {
+    queueRef.current = ids
+    setQueue(ids)
+  }, [])
+
+  const applyIndex = useCallback((idx: number) => {
+    queueIndexRef.current = idx
+    setQueueIndex(idx)
+  }, [])
 
   const {
     tracks,
@@ -230,37 +249,35 @@ function AppInner() {
     navigate: (v) => setCurrentView(v),
     onTracksDeleted: (ids) => {
       const idSet = new Set(ids)
-      const curId = queueRef.current[queueIndexRef.current]
-      const newQueue = queueRef.current.filter((id) => !idSet.has(id))
-      if (curId !== undefined && idSet.has(curId)) {
-        if (newQueue.length > 0) {
-          setQueue(newQueue)
-          setQueueIndex(Math.min(queueIndexRef.current, newQueue.length - 1))
-          pendingPlayRef.current = true
-        } else {
-          setQueue([])
-          setQueueIndex(-1)
-          engineRef.current?.stop()
-        }
-      } else {
-        setQueue(newQueue)
-        if (curId !== undefined) setQueueIndex(Math.max(0, newQueue.indexOf(curId)))
+      const q = queueRef.current
+      const cur = queueIndexRef.current
+      const curId = q[cur]
+      const newQueue = q.filter((id) => !idSet.has(id))
+      /* Позиции в истории указывают на старую очередь — после удаления они ведут не туда */
+      historyRef.current = []
+      applyQueue(newQueue)
+      if (curId === undefined) return
+      if (!idSet.has(curId)) {
+        applyIndex(newQueue.indexOf(curId))
+        return
       }
+      /* Удалили играющий трек — встаём на следующий уцелевший; играет он, только если играл удалённый */
+      const nextId = q.slice(cur + 1).find((id) => !idSet.has(id)) ?? newQueue[0]
+      if (nextId === undefined) {
+        applyIndex(-1)
+        engineRef.current?.stop()
+        return
+      }
+      pendingPlayRef.current = isPlayingRef.current
+      applyIndex(newQueue.indexOf(nextId))
     },
     onLibraryCleared: () => {
-      setQueue([])
-      setQueueIndex(-1)
+      historyRef.current = []
+      applyQueue([])
+      applyIndex(-1)
       engineRef.current?.stop()
     },
   })
-
-  useEffect(() => {
-    queueRef.current = queue
-  }, [queue])
-
-  useEffect(() => {
-    queueIndexRef.current = queueIndex
-  }, [queueIndex])
 
   useEffect(() => {
     repeatRef.current = repeatMode
@@ -370,19 +387,69 @@ function AppInner() {
     []
   )
 
+  const pushHistory = useCallback((idx: number) => {
+    if (idx < 0) return
+    historyRef.current.push(idx)
+    if (historyRef.current.length > 50) historyRef.current.shift()
+  }, [])
+
+  /**
+   * Встать на позицию очереди idx (очередь уже в queueRef). prevId — трек, который был выбран до этого.
+   * Тот же трек не перезагружается: restart — начать его сначала (повтор очереди из одного трека,
+   * дубль в очереди), иначе только продолжить, если он на паузе (повторный клик по играющему треку).
+   */
+  const startIndex = useCallback(
+    (idx: number, prevId: number | undefined, opts: { autoplay: boolean; restart: boolean }) => {
+      const id = queueRef.current[idx]
+      const eng = engineRef.current
+      applyIndex(idx)
+      if (id === undefined) return
+      if (opts.autoplay) recordPlay(id)
+      if (id !== prevId) {
+        pendingPlayRef.current = opts.autoplay
+        return
+      }
+      if (eng && eng.currentTrackId === id) {
+        if (opts.restart) {
+          eng.seek(0)
+          setCurrentTime(0)
+          setSeekTick((v) => v + 1)
+        }
+        if (opts.autoplay && !eng.isPlaying) eng.play()
+        return
+      }
+      /* Трек тот же, но движок его не держит (файл не прочитался) — пробуем загрузить снова */
+      pendingPlayRef.current = opts.autoplay
+      setLoadTick((v) => v + 1)
+    },
+    [applyIndex, recordPlay]
+  )
+
+  /** Переход по очереди (далее / назад / трек доиграл) */
+  const goToIndex = useCallback(
+    (idx: number, opts: { autoplay: boolean; fadeSec: number; history: boolean }) => {
+      const q = queueRef.current
+      const cur = queueIndexRef.current
+      if (idx < 0 || idx >= q.length) return
+      if (opts.history) pushHistory(cur)
+      markTrackFade(opts.fadeSec)
+      startIndex(idx, q[cur], { autoplay: opts.autoplay, restart: true })
+    },
+    [pushHistory, markTrackFade, startIndex]
+  )
+
   /* Переключает интерфейс на трек, который движок уже играет */
   const commitQueueIndex = useCallback(
     (idx: number, fadeSec: number) => {
       markTrackFade(fadeSec)
       const q = queueRef.current
       const nextId = q[idx]
-      historyRef.current.push(queueIndexRef.current)
-      if (historyRef.current.length > 50) historyRef.current.shift()
-      if (nextId !== q[queueIndexRef.current]) skipLoadRef.current = true
-      setQueueIndex(idx)
+      pushHistory(queueIndexRef.current)
+      applyIndex(idx)
+      loadFailStreakRef.current = 0
       if (nextId !== undefined) recordPlay(nextId)
     },
-    [recordPlay, markTrackFade]
+    [recordPlay, markTrackFade, pushHistory, applyIndex]
   )
 
   /* ===== Автоматический кроссфейд: предзагрузка заранее, старт точно за N секунд до конца ===== */
@@ -405,10 +472,11 @@ function AppInner() {
     if (remaining < 0.2) return
     autoXfadeRef.current = true
     const fade = Math.min(cf, remaining)
-    eng.load(next, { autoplay: true, fade }).then((ok) => {
+    eng.load(next, { autoplay: true, fade }).then((res) => {
       autoXfadeRef.current = false
-      if (!ok) {
-        plan.failed = true
+      if (res !== 'ok') {
+        /* Не прочитался — трек доиграет, и переход пойдёт обычным путём (там битый файл пропустится) */
+        if (res === 'error') plan.failed = true
         return
       }
       let idx = plan.idx
@@ -421,31 +489,39 @@ function AppInner() {
   const handleEnded = useCallback(() => {
     const eng = engineRef.current
     if (!eng || autoXfadeRef.current) return
-    const q = queueRef.current
-    const idx = queueIndexRef.current
     if (repeatRef.current === 'one') {
       eng.seek(0)
       eng.play()
+      setSeekTick((v) => v + 1)
       return
     }
-    if (q.length === 0) return
-    const next = computeNextIndex()
-    if (next === null) {
+    if (queueRef.current.length === 0) return
+    /* Тот же план, что и для кроссфейда: при перемешивании включится именно предзагруженный трек */
+    const plan = getCrossfadePlan()
+    if (!plan) {
       eng.pause()
       return
     }
-    if (next === idx) {
-      eng.seek(0)
-      eng.play()
-      recordPlay(q[idx])
-      return
+    goToIndex(plan.idx, { autoplay: true, fadeSec: 0, history: true })
+  }, [getCrossfadePlan, goToIndex])
+
+  /* Файл не прочитался: пропускаем его и идём дальше по очереди, а если идти некуда — останавливаемся */
+  const handleLoadErrorRef = useRef<(trackId: number, autoplay: boolean) => void>(() => {})
+  useEffect(() => {
+    handleLoadErrorRef.current = (trackId, autoplay) => {
+      const eng = engineRef.current
+      const q = queueRef.current
+      if (!eng || q[queueIndexRef.current] !== trackId) return
+      loadFailStreakRef.current += 1
+      const next = computeNextIndex()
+      if (next !== null && loadFailStreakRef.current < q.length) {
+        goToIndex(next, { autoplay, fadeSec: 0, history: false })
+        return
+      }
+      loadFailStreakRef.current = 0
+      eng.stop()
     }
-    historyRef.current.push(idx)
-    if (historyRef.current.length > 50) historyRef.current.shift()
-    pendingPlayRef.current = true
-    markTrackFade(0)
-    setQueueIndex(next)
-  }, [computeNextIndex, recordPlay, markTrackFade])
+  }, [computeNextIndex, goToIndex])
 
   useEffect(() => {
     engineEventsRef.current = {
@@ -477,6 +553,7 @@ function AppInner() {
       onEnded: () => engineEventsRef.current?.onEnded(),
     })
     eng.setVolume(volumeRef.current / 100, mutedRef.current)
+    eng.setNormalize(normalizeRef.current)
     engineRef.current = eng
     return () => {
       eng.dispose()
@@ -485,28 +562,37 @@ function AppInner() {
   }, [])
 
   useEffect(() => {
-    if (skipLoadRef.current) {
-      skipLoadRef.current = false
-      return
-    }
+    /* Флаг относится только к этому переключению — сбрасываем всегда, чтобы не сработал позже не к месту */
+    const autoplay = pendingPlayRef.current
+    pendingPlayRef.current = false
     const eng = engineRef.current
     if (!eng) return
     if (!selectedTrack) {
+      /* Движок сам сообщит нулевые время и длительность */
       eng.stop()
-      setCurrentTime(0)
-      setDuration(0)
       return
     }
-    const autoplay = pendingPlayRef.current
-    pendingPlayRef.current = false
+    /* Движок уже играет этот трек: перешёл на него сам (автоматический кроссфейд) или к нему вернулись,
+       пока грузился другой («Далее» и сразу «Назад»). Перезагружать не нужно — только отменить чужую загрузку */
+    if (eng.currentTrackId === selectedTrack.id) {
+      eng.cancelLoad()
+      if (autoplay && !eng.isPlaying) eng.play()
+      return
+    }
+    const trackId = selectedTrack.id
     /* Ручное переключение: короткий кроссфейд, если включён, иначе мгновенно (но без щелчка) */
-    const cf = crossfadeRef.current
-    const fade = manualCrossfadeRef.current && cf > 0 ? Math.min(cf, MANUAL_CROSSFADE_MAX) : 0
+    const fade = manualFadeSec()
+    /* Сразу показываем начало нового трека, не дожидаясь чтения файла */
     setCurrentTime(0)
     setDuration(0)
     setSeekTick((v) => v + 1)
-    void eng.load(selectedTrack, { autoplay, fade })
-  }, [selectedTrack?.id])
+    void eng.load(selectedTrack, { autoplay, fade }).then((res) => {
+      if (res === 'ok') loadFailStreakRef.current = 0
+      else if (res === 'error') handleLoadErrorRef.current(trackId, autoplay)
+    })
+    /* Загружаем только при смене трека (или явной перезагрузке), а не при правке его тегов */
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedTrack?.id, loadTick])
 
   /* Патчи копятся, пока идёт задержка, — иначе быстрая смена двух разных настроек теряла первую */
   const pendingSettingsRef = useRef<Partial<AppSettings>>({})
@@ -640,7 +726,9 @@ function AppInner() {
     const status = parts.artist ? `${t('discord.author')}: ${artist}${pause}` : isPlaying ? 'Playly' : t('discord.pause')
     /* Discord ведёт полосу по реальному времени, поэтому учитываем скорость воспроизведения */
     const rate = rpcRate > 0 ? rpcRate : 1
-    const position = engineRef.current?.currentTime ?? currentTime
+    /* Пока новый трек грузится, движок ещё играет старый — его позиция сюда не подходит */
+    const eng = engineRef.current
+    const position = eng && eng.currentTrackId === selectedTrack?.id ? eng.currentTime : currentTime
     invoke('discord_update_presence', {
       title: parts.title ? rpcTitle : t('discord.privateTitle'),
       artist: parts.artist ? artist : '',
@@ -691,6 +779,8 @@ function AppInner() {
   }, [])
 
   useEffect(() => {
+    /* Профиль читается с диска асинхронно — состояние меняется уже после await */
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     loadProfile()
     window.addEventListener('playly-profile-updated', loadProfile)
     return () => {
@@ -735,6 +825,10 @@ function AppInner() {
             setParticles(normalizeParticles(raw.particles))
             setDiscordParts(normalizeDiscordParts(raw.discordParts))
             if (raw.visualizer === false) setVisualizerEnabled(false)
+            if (raw.normalization === false) {
+              normalizeRef.current = false
+              engineRef.current?.setNormalize(false)
+            }
             if (raw.eqEnabled === true) setEqEnabled(true)
             if (typeof raw.eq === 'string') setEqPresetId(raw.eq)
             setEqCustomPresets(normalizeCustomPresets(raw.eqCustomPresets))
@@ -742,6 +836,7 @@ function AppInner() {
               void applyUiScale(clampUiScale(raw.uiScale))
             }
           } catch {
+            /* Повреждённый settings.json — остаются значения по умолчанию */
           }
         }
         if (await exists(userFile)) {
@@ -762,6 +857,17 @@ function AppInner() {
     }
     init()
   }, [applyMasterGain, applyOutputDevice, loadLibraryData, maybeAutoScan])
+
+  /* Переключатель «Нормализация громкости» в настройках воспроизведения */
+  useEffect(() => {
+    const onNormalize = (e: Event) => {
+      const on = (e as CustomEvent<boolean>).detail !== false
+      normalizeRef.current = on
+      engineRef.current?.setNormalize(on)
+    }
+    window.addEventListener('playly-normalization', onNormalize)
+    return () => window.removeEventListener('playly-normalization', onNormalize)
+  }, [])
 
   /* Перетаскивание файлов в окно (API Tauri v2: события tauri://file-drop* из v1 больше не приходят) */
   useEffect(() => {
@@ -862,14 +968,14 @@ function AppInner() {
       }
       const idx = ids.indexOf(track.id)
       if (idx < 0) return
-      setQueue(ids)
-      markTrackFade(manualFadeSec())
-      setQueueIndex(idx)
+      const prevId = queueRef.current[queueIndexRef.current]
+      applyQueue(ids)
       historyRef.current = []
-      pendingPlayRef.current = autoplay
-      if (autoplay) recordPlay(track.id)
+      markTrackFade(manualFadeSec())
+      /* Клик по уже выбранному треку не перезапускает его, а снимает с паузы */
+      startIndex(idx, prevId, { autoplay, restart: false })
     },
-    [recordPlay, tracksRef, markTrackFade, manualFadeSec]
+    [tracksRef, markTrackFade, manualFadeSec, applyQueue, startIndex]
   )
 
   /* ===== Плеер ===== */
@@ -881,52 +987,37 @@ function AppInner() {
   }, [])
 
   const handleNext = useCallback(() => {
-    const q = queueRef.current
-    if (q.length === 0) return
-    let next: number
-    if (shuffleRef.current) {
-      if (q.length === 1) return
-      do {
-        next = Math.floor(Math.random() * q.length)
-      } while (next === queueIndexRef.current)
-    } else {
-      next = queueIndexRef.current + 1
-      if (next >= q.length) {
-        if (repeatRef.current === 'all') {
-          next = 0
-        } else {
-          return
-        }
-      }
-    }
-    historyRef.current.push(queueIndexRef.current)
-    if (historyRef.current.length > 50) historyRef.current.shift()
-    pendingPlayRef.current = true
-    markTrackFade(manualFadeSec())
-    setQueueIndex(next)
-  }, [markTrackFade, manualFadeSec])
+    if (queueRef.current.length === 0) return
+    /* Тот же выбор, что у кроссфейда: при перемешивании «Далее» включает уже предзагруженный трек */
+    const plan = getCrossfadePlan()
+    if (!plan) return
+    goToIndex(plan.idx, { autoplay: true, fadeSec: manualFadeSec(), history: true })
+  }, [getCrossfadePlan, goToIndex, manualFadeSec])
 
   const handlePrev = useCallback(() => {
     const eng = engineRef.current
-    if (eng && eng.currentTime > 3) {
+    if (eng && eng.currentTrackId === queueRef.current[queueIndexRef.current] && eng.currentTime > 3) {
       eng.seek(0)
+      setCurrentTime(0)
+      setSeekTick((v) => v + 1)
       return
     }
     const q = queueRef.current
     if (q.length === 0) return
-    if (historyRef.current.length > 0) {
+    while (historyRef.current.length > 0) {
       const prev = historyRef.current.pop() as number
-      pendingPlayRef.current = true
-      markTrackFade(manualFadeSec())
-      setQueueIndex(prev)
+      if (prev >= q.length) continue
+      goToIndex(prev, { autoplay: true, fadeSec: manualFadeSec(), history: false })
       return
     }
     if (!shuffleRef.current) {
-      pendingPlayRef.current = true
-      markTrackFade(manualFadeSec())
-      setQueueIndex((queueIndexRef.current - 1 + q.length) % q.length)
+      goToIndex((queueIndexRef.current - 1 + q.length) % q.length, {
+        autoplay: true,
+        fadeSec: manualFadeSec(),
+        history: false,
+      })
     }
-  }, [markTrackFade, manualFadeSec])
+  }, [goToIndex, manualFadeSec])
 
   const handleSeek = useCallback(
     (time: number) => {
@@ -1089,28 +1180,33 @@ function AppInner() {
   const miniHandlersRef = useRef<(cmd: MiniCommand) => void>(() => {})
   /* Свежие замыкания кладём в ref после каждого рендера — подписки на события остаются постоянными */
   useEffect(() => {
-    miniStateRef.current = () => ({
-    track: selectedTrack
-      ? {
-          id: selectedTrack.id,
-          title: selectedTrack.title,
-          artist: selectedTrack.artist,
-          coverFile: selectedTrack.coverFile ?? null,
-          animCoverFile: selectedTrack.animCoverFile ?? null,
-          liked: selectedTrack.liked,
-        }
-      : null,
-    isPlaying,
-    position: engineRef.current?.currentTime ?? currentTimeRef.current,
-    at: Date.now(),
-    duration,
-    rate: selectedTrack?.playbackRate ?? 1,
-    volume,
-    muted: isMuted,
-    shuffle: isShuffle,
-    repeat: repeatMode,
-    lang,
-  })
+    miniStateRef.current = () => {
+      /* Пока новый трек грузится, движок ещё играет старый: его позицию и длину мини-плееру не отдаём */
+      const eng = engineRef.current
+      const live = !!eng && !!selectedTrack && eng.currentTrackId === selectedTrack.id
+      return {
+        track: selectedTrack
+          ? {
+              id: selectedTrack.id,
+              title: selectedTrack.title,
+              artist: selectedTrack.artist,
+              coverFile: selectedTrack.coverFile ?? null,
+              animCoverFile: selectedTrack.animCoverFile ?? null,
+              liked: selectedTrack.liked,
+            }
+          : null,
+        isPlaying,
+        position: live ? eng.currentTime : 0,
+        at: Date.now(),
+        duration: live ? eng.duration : 0,
+        rate: selectedTrack?.playbackRate ?? 1,
+        volume,
+        muted: isMuted,
+        shuffle: isShuffle,
+        repeat: repeatMode,
+        lang,
+      }
+    }
     miniHandlersRef.current = (cmd: MiniCommand) => {
       switch (cmd.type) {
         case 'toggle':
@@ -1183,6 +1279,11 @@ function AppInner() {
       unHello.then((f) => f())
     }
   }, [sendMiniState])
+
+  /* Меню трея (есть только на Linux) — на языке интерфейса */
+  useEffect(() => {
+    invoke('set_tray_labels', { open: t('mini.openMain'), mini: t('mini.open'), quit: t('mini.quit') }).catch(() => {})
+  }, [t])
 
   /* Фоновая проверка обновлений — только когда приложение уже загрузилось */
   useEffect(() => {

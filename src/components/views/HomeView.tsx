@@ -204,6 +204,8 @@ function RecentlyPlayedRow({ tracks, onSelectTrack, playingTrackId, allTracks, o
     })
     prevLefts.current = newLefts
     sync()
+    /* Анимация нужна только при смене состава или порядка карточек (idsKey), а не на каждой перерисовке */
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [idsKey])
 
   return (

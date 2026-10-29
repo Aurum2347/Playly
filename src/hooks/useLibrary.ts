@@ -56,18 +56,24 @@ async function collectAudioFiles(dir: string): Promise<string[]> {
         else if (isAudioFile(p)) out.push(p)
       }
     } catch {
-
+      /* Папка недоступна (нет прав, удалена во время обхода) — пропускаем её */
     }
   }
   await walk(dir)
   return out
 }
 
-export default function useLibrary({
-  navigate,
-  onTracksDeleted,
-  onLibraryCleared,
-}: UseLibraryOptions) {
+export default function useLibrary(options: UseLibraryOptions) {
+  /* Колбэки приходят новыми на каждой перерисовке — держим их в ref, чтобы обработчики библиотеки
+     оставались стабильными и memo-страницы не перерисовывались на каждом тике плеера */
+  const optionsRef = useRef(options)
+  useEffect(() => {
+    optionsRef.current = options
+  })
+  const navigate = useCallback((view: ViewType) => optionsRef.current.navigate(view), [])
+  const onTracksDeleted = useCallback((ids: number[]) => optionsRef.current.onTracksDeleted(ids), [])
+  const onLibraryCleared = useCallback(() => optionsRef.current.onLibraryCleared(), [])
+
   const [tracks, setTracks] = useState<Track[]>([])
   const [playlists, setPlaylists] = useState<Playlist[]>([])
   const [playHistory, setPlayHistory] = useState<Record<number, number>>({})
@@ -87,6 +93,8 @@ export default function useLibrary({
   const libraryFolderRef = useRef('')
   const syncModeRef = useRef<SyncMode>('auto')
   const isScanningRef = useRef(false)
+  /* Файлы, которые прямо сейчас импортируются: перетаскивание во время сканирования папки не добавит их дважды */
+  const importingRef = useRef(new Set<string>())
 
   useEffect(() => {
     tracksRef.current = tracks
@@ -130,19 +138,25 @@ export default function useLibrary({
     cancelUploadRef.current = false
     const names = paths.map((p) => ({ name: p.split(/[\\/]/).pop() || p }))
     setUpload({ files: names, total: paths.length, current: 0, fileName: '', finished: false })
-    const existing = new Set(tracksRef.current.map((t) => t.filePath))
+    const existing = new Set([...tracksRef.current.map((t) => t.filePath), ...importingRef.current])
     const byPath = new Map(tracksRef.current.map((t) => [t.filePath, t.id]))
     const ids = paths.map((p) => byPath.get(p)).filter((id): id is number => id !== undefined)
-    await parseAudioFiles(paths, {
-      existingPaths: existing,
-      shouldStop: () => cancelUploadRef.current,
-      onProgress: (p) =>
-        setUpload((u) => (u ? { ...u, current: p.current, fileName: p.fileName } : u)),
-      onTrack: (track) => {
-        ids.push(track.id)
-        setTracks((prev) => [...prev, track])
-      },
-    })
+    const mine = paths.filter((p) => !existing.has(p))
+    mine.forEach((p) => importingRef.current.add(p))
+    try {
+      await parseAudioFiles(paths, {
+        existingPaths: existing,
+        shouldStop: () => cancelUploadRef.current,
+        onProgress: (p) =>
+          setUpload((u) => (u ? { ...u, current: p.current, fileName: p.fileName } : u)),
+        onTrack: (track) => {
+          ids.push(track.id)
+          setTracks((prev) => [...prev, track])
+        },
+      })
+    } finally {
+      mine.forEach((p) => importingRef.current.delete(p))
+    }
     if (cancelUploadRef.current) {
       setUpload(null)
     } else {

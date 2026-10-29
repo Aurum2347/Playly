@@ -48,7 +48,7 @@ fn get_track_metadata(path: String) -> Result<TrackMeta, String> {
         let pics = t.pictures();
         pics.first()
             .filter(|pic| pic.data().len() <= 2 * 1024 * 1024)
-            .and_then(|pic| {
+            .map(|pic| {
                 let mime_str = match pic.mime_type() {
                     Some(MimeType::Png) => "image/png",
                     Some(MimeType::Jpeg) => "image/jpeg",
@@ -58,7 +58,7 @@ fn get_track_metadata(path: String) -> Result<TrackMeta, String> {
                     _ => "image/jpeg",
                 };
                 let b64 = base64::engine::general_purpose::STANDARD.encode(pic.data());
-                Some(format!("data:{};base64,{}", mime_str, b64))
+                format!("data:{};base64,{}", mime_str, b64)
             })
     });
 
@@ -153,13 +153,27 @@ fn reveal_item_in_dir(path: String) -> Result<(), String> {
     }
     #[cfg(target_os = "linux")]
     {
-        if let Some(parent) = p.parent() {
+        /* Файловый менеджер с выделенным файлом (Nautilus, Dolphin, Nemo, Thunar поддерживают FileManager1);
+           если такого нет — просто открываем папку */
+        let uri = format!("file://{}", urlencoding::encode(&path).replace("%2F", "/"));
+        let selected = std::process::Command::new("dbus-send")
+            .args([
+                "--session",
+                "--dest=org.freedesktop.FileManager1",
+                "--type=method_call",
+                "/org/freedesktop/FileManager1",
+                "org.freedesktop.FileManager1.ShowItems",
+                &format!("array:string:{}", uri),
+                "string:",
+            ])
+            .status()
+            .is_ok_and(|s| s.success());
+        if !selected {
+            let parent = p.parent().ok_or("Не удалось определить родительскую папку")?;
             std::process::Command::new("xdg-open")
                 .arg(parent)
                 .spawn()
                 .map_err(|e| format!("Не удалось открыть папку: {}", e))?;
-        } else {
-            return Err("Не удалось определить родительскую папку".into());
         }
     }
     Ok(())
@@ -942,6 +956,16 @@ fn is_portable() -> bool {
         .unwrap_or(false)
 }
 
+/// Может ли Playly обновиться сам: на Windows — да (установщик или подмена .exe),
+/// на Linux — только AppImage; пакеты .deb и .rpm обновляются вручную
+#[command]
+fn can_self_update() -> bool {
+    if cfg!(target_os = "windows") {
+        return true;
+    }
+    cfg!(target_os = "linux") && std::env::var_os("APPIMAGE").is_some()
+}
+
 /// Скачать новый .exe и проверить подпись. Прогресс: {event: "Started", total} и {event: "Progress", chunk}
 #[command]
 async fn portable_download(
@@ -949,6 +973,9 @@ async fn portable_download(
     on_progress: tauri::ipc::Channel<serde_json::Value>,
 ) -> Result<String, String> {
     use tauri_plugin_updater::UpdaterExt;
+    if !is_portable() {
+        return Err("Подмена файла доступна только портативной версии для Windows".into());
+    }
     let update = app
         .updater_builder()
         .target(PORTABLE_TARGET)
@@ -981,6 +1008,10 @@ async fn portable_download(
 fn portable_apply(app: tauri::AppHandle) -> Result<(), String> {
     if cfg!(debug_assertions) {
         return Err("В режиме разработки .exe не подменяется".into());
+    }
+    /* На Linux и у установленной версии исполняемый файл подменять нельзя — их обновляет установщик/пакет */
+    if !is_portable() {
+        return Err("Подмена файла доступна только портативной версии для Windows".into());
     }
     let exe = std::env::current_exe().map_err(|e| e.to_string())?;
     let staged = exe_sibling("update.exe")?;
@@ -1025,6 +1056,56 @@ fn quit_app(app: tauri::AppHandle) {
     app.exit(0);
 }
 
+/* ===== Меню трея ===== */
+/*
+ * На Windows у иконки трея меню нет: левый клик открывает Playly, правый — мини-плеер.
+ * На Linux иконка трея (AppIndicator) о кликах не сообщает вовсе — там работает только меню,
+ * поэтому те же действия собраны в него.
+ */
+
+/// Пункты меню трея — чтобы переводить их на язык интерфейса (на Windows список пуст)
+#[derive(Default)]
+struct TrayMenu(std::sync::Mutex<Vec<tauri::menu::MenuItem<tauri::Wry>>>);
+
+#[cfg(target_os = "linux")]
+fn tray_with_menu(
+    app: &tauri::App,
+    tray: TrayIconBuilder<tauri::Wry>,
+) -> tauri::Result<TrayIconBuilder<tauri::Wry>> {
+    use tauri::menu::{Menu, MenuItem};
+    /* Подписи по умолчанию; главное окно сразу присылает их на языке интерфейса (set_tray_labels) */
+    let open = MenuItem::with_id(app, "open", "Open Playly", true, None::<&str>)?;
+    let mini = MenuItem::with_id(app, "mini", "Mini player", true, None::<&str>)?;
+    let quit = MenuItem::with_id(app, "quit", "Quit Playly", true, None::<&str>)?;
+    let menu = Menu::with_items(app, &[&open, &mini, &quit])?;
+    *app.state::<TrayMenu>().0.lock().unwrap() = vec![open, mini, quit];
+    Ok(tray.menu(&menu).on_menu_event(|app, event| match event.id().as_ref() {
+        "open" => {
+            hide_mini_player(app.clone());
+            reveal_main_window(app);
+        }
+        "mini" => toggle_mini(app, None),
+        "quit" => app.exit(0),
+        _ => {}
+    }))
+}
+
+#[cfg(not(target_os = "linux"))]
+fn tray_with_menu(
+    _app: &tauri::App,
+    tray: TrayIconBuilder<tauri::Wry>,
+) -> tauri::Result<TrayIconBuilder<tauri::Wry>> {
+    Ok(tray)
+}
+
+/// Подписи пунктов меню трея: «Открыть Playly», «Мини-плеер», «Выйти» на языке интерфейса
+#[command]
+fn set_tray_labels(state: tauri::State<'_, TrayMenu>, open: String, mini: String, quit: String) {
+    for (item, text) in state.0.lock().unwrap().iter().zip([open, mini, quit]) {
+        let _ = item.set_text(text);
+    }
+}
+
 fn main() {
     let (tx, rx) = mpsc::channel();
     thread::spawn(move || rpc_worker(rx));
@@ -1048,19 +1129,21 @@ fn main() {
         .plugin(tauri_plugin_shell::init())
         .manage(RpcState { tx })
         .manage(MiniState::default())
+        .manage(TrayMenu::default())
         .setup(|app| {
             wipe_webview_cache_if_requested(app.handle());
             if is_portable() {
                 cleanup_portable_update();
             }
 
-            // Трей: левый клик — открыть Playly, правый — мини-плеер (вместо меню; «Выйти» есть в самом мини-плеере)
+            // Трей: левый клик — открыть Playly, правый — мини-плеер (вместо меню; «Выйти» есть в самом мини-плеере).
+            // На Linux кликов нет — там меню (см. tray_with_menu)
             let icon = app
                 .default_window_icon()
                 .cloned()
                 .unwrap_or_else(|| tauri::image::Image::new(&[0, 0, 0, 0], 1, 1));
 
-            let _tray = TrayIconBuilder::new()
+            let tray = TrayIconBuilder::new()
                 .icon(icon)
                 .tooltip("Playly")
                 .on_tray_icon_event(|tray, event| match event {
@@ -1079,8 +1162,8 @@ fn main() {
                         ..
                     } => toggle_mini(tray.app_handle(), Some(position)),
                     _ => {}
-                })
-                .build(app)?;
+                });
+            let _tray = tray_with_menu(app, tray)?.build(app)?;
 
             if let Some(window) = app.get_webview_window("main") {
                 let w = window.clone();
@@ -1121,10 +1204,12 @@ fn main() {
             mini_user_moved,
             mini_touch,
             is_portable,
+            can_self_update,
             portable_download,
             portable_apply,
             reset_mini_position,
-            quit_app
+            quit_app,
+            set_tray_labels
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

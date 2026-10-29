@@ -5,6 +5,7 @@ import type { Track, PlaylistBanner } from '../App'
 import { normalizeFrame } from './imageFrame'
 import type { DiscordParts } from './discord'
 import type { AppBackdrop, ParticleSettings } from './appearance'
+import { writeSettingsRaw } from '../components/views/settings/helpers'
 
 /* Аудио и видео: у видео играет звуковая дорожка, а кадры можно взять для анимированной обложки */
 export const AUDIO_EXT = ['mp3', 'wav', 'm4a', 'flac', 'ogg', 'oga', 'aac', 'opus', 'wma', 'aif', 'aiff', 'weba']
@@ -33,6 +34,25 @@ interface RustTrackMeta {
 }
 
 const nextTick = () => new Promise<void>((r) => setTimeout(r, 0))
+
+/*
+ * id трека — метка времени, но строго возрастающая. Раньше бралось Date.now() + номер + случайное до 10000,
+ * и при импорте большой папки (сотни файлов за десятки секунд) id совпадали: лайк, удаление и плейлисты
+ * задевали сразу два трека, а обложка одного перезаписывала обложку другого.
+ */
+let lastTrackId = 0
+
+function nextTrackId(): number {
+  lastTrackId = Math.max(Date.now(), lastTrackId + 1)
+  return lastTrackId
+}
+
+/** Учитывает уже существующие id, чтобы новые с ними не совпали (у старых id бывали «из будущего») */
+function noteTrackIds(tracks: Track[]) {
+  for (const t of tracks) {
+    if (typeof t.id === 'number' && t.id > lastTrackId) lastTrackId = t.id
+  }
+}
 
 async function ensureConfigDir(): Promise<string> {
   const appDir = await appDataDir()
@@ -225,7 +245,15 @@ export async function loadTracksFromConfig(
     const data = JSON.parse(content)
     if (!Array.isArray(data)) return []
 
-    const tracks = data as Track[]
+    const tracks = (data as Track[]).filter((t) => t && typeof t === 'object' && typeof t.id === 'number')
+    noteTrackIds(tracks)
+    /* Дубли id остались от старого импорта: второму и следующим даём новые id.
+       Плейлисты и история продолжают указывать на первый трек с этим id */
+    const seenIds = new Set<number>()
+    for (const t of tracks) {
+      if (seenIds.has(t.id)) t.id = nextTrackId()
+      seenIds.add(t.id)
+    }
     const total = tracks.length
     onProgress?.(0, total)
 
@@ -385,7 +413,7 @@ export async function parseAudioFiles(filePaths: string[], opts: ParseOptions = 
       invoke<number>('get_file_mtime', { path }).catch(() => Date.now()),
     ])
 
-    const trackId = Date.now() + i + Math.floor(Math.random() * 10000)
+    const trackId = nextTrackId()
 
     let cover: string | null = null
     let coverFile: string | null = null
@@ -506,11 +534,13 @@ export async function loadSettings(): Promise<AppSettings> {
     if (!(await exists(path))) return DEFAULT_SETTINGS
 
     const data = JSON.parse(await readTextFile(path)) as Record<string, unknown>
+    /* Испорченное или нечисловое значение даёт NaN — тогда берём значение по умолчанию */
+    const num = (v: unknown, fallback: number) => (typeof v === 'number' && isFinite(v) ? v : fallback)
 
     return {
-      volume: Math.max(0, Math.min(100, Math.round((data.volume as number) ?? 100))),
+      volume: Math.max(0, Math.min(100, Math.round(num(data.volume, 100)))),
       isMuted: Boolean(data.isMuted),
-      crossfade: Math.max(0, Math.min(12, Math.round((data.crossfade as number) ?? 0))),
+      crossfade: Math.max(0, Math.min(12, Math.round(num(data.crossfade, 0)))),
       manualCrossfade: data.manualCrossfade === true,
       crossfadeCurve:
         data.crossfadeCurve === 'linear' || data.crossfadeCurve === 'smooth'
@@ -528,22 +558,6 @@ export async function loadSettings(): Promise<AppSettings> {
  * (тема, свой шрифт и т.д. остаются на месте).
  */
 export async function saveSettings(patch: Partial<AppSettings>): Promise<void> {
-  try {
-    const dir = await ensureConfigDir()
-    const path = await join(dir, 'settings.json')
-
-    let current: Record<string, unknown> = {}
-
-    if (await exists(path)) {
-      try {
-        current = JSON.parse(await readTextFile(path)) as Record<string, unknown>
-      } catch {
-        current = {}
-      }
-    }
-
-    await writeTextFile(path, JSON.stringify({ ...current, ...patch }, null, 2))
-  } catch (e) {
-    console.error(e)
-  }
+  /* Через общую очередь записи settings.json: иначе параллельная запись из другого места затирала поля */
+  await writeSettingsRaw(patch as Record<string, unknown>)
 }

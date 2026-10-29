@@ -4,6 +4,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from 'react'
@@ -19,6 +20,7 @@ type Dict = Record<string, unknown>
 const builtIn: Record<string, Dict> = { ru, en }
 
 /* ===== Список встроенных языков ===== */
+// eslint-disable-next-line react-refresh/only-export-components
 export const LANGS: Array<{ id: string; flag: string; title: string }> = [
   { id: 'ru', flag: ru.config.iconemoji, title: ru.config.title },
   { id: 'en', flag: en.config.iconemoji, title: en.config.title },
@@ -93,7 +95,15 @@ interface I18nContextValue {
 
 const I18nContext = createContext<I18nContextValue | null>(null)
 
-export function I18nProvider({ children }: { children: ReactNode }) {
+/**
+ * persist — запоминать выбор языка в settings.json. Мини-плеер берёт язык у главного окна
+ * и сам файл настроек не пишет: иначе два окна одновременно перезаписывали бы его.
+ */
+export function I18nProvider({ children, persist = true }: { children: ReactNode; persist?: boolean }) {
+  const persistRef = useRef(persist)
+  const saveLang = useCallback((language: string) => {
+    if (persistRef.current) writeSettingsRaw({ language }).catch(() => {})
+  }, [])
   const [lang, setLangState] = useState<string>(() => detectLang())
   const [custom, setCustom] = useState<{ lang: string; dict: Dict; base: 'ru' | 'en' } | null>(null)
   const [customLangs, setCustomLangs] = useState<CustomLangMeta[]>([])
@@ -106,8 +116,8 @@ export function I18nProvider({ children }: { children: ReactNode }) {
     setCustom({ lang: langId, dict, base })
     setLangState(langId)
     setLangError(null)
-    writeSettingsRaw({ language: langId }).catch(() => {})
-  }, [])
+    saveLang(langId)
+  }, [saveLang])
 
   /* ===== Переключить на встроенный язык ===== */
   const setLang = useCallback((next: string) => {
@@ -115,9 +125,9 @@ export function I18nProvider({ children }: { children: ReactNode }) {
       setCustom(null)
       setLangState(next)
       setLangError(null)
-      writeSettingsRaw({ language: next }).catch(() => {})
+      saveLang(next)
     }
-  }, [])
+  }, [saveLang])
 
   /* ===== Сканируем папку languages ===== */
   const refreshCustomLangs = useCallback(async () => {
@@ -192,11 +202,11 @@ export function I18nProvider({ children }: { children: ReactNode }) {
         setCustom(null)
         setLangState(fallback)
         setLangError('missing')
-        writeSettingsRaw({ language: fallback }).catch(() => {})
+        saveLang(fallback)
         await refreshCustomLangs()
       }
     },
-    [applyCustom, refreshCustomLangs]
+    [applyCustom, refreshCustomLangs, saveLang]
   )
 
   /* ===== Открыть папку languages ===== */
@@ -240,16 +250,18 @@ export function I18nProvider({ children }: { children: ReactNode }) {
             const fallback = detectLang()
             setLangError('missing')
             setLangState(fallback)
-            writeSettingsRaw({ language: fallback }).catch(() => {})
+            saveLang(fallback)
           }
         }
       }
     })()
+    /* Список своих переводов читается асинхронно — состояние меняется уже после await */
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     refreshCustomLangs()
     return () => {
       cancelled = true
     }
-  }, [applyCustom, refreshCustomLangs])
+  }, [applyCustom, refreshCustomLangs, saveLang])
 
   /* Цепочка словарей: свой перевод → его базовый язык → русский */
   const resolve = useCallback(
@@ -314,6 +326,7 @@ export function I18nProvider({ children }: { children: ReactNode }) {
   return <I18nContext.Provider value={value}>{children}</I18nContext.Provider>
 }
 
+// eslint-disable-next-line react-refresh/only-export-components
 export function useI18n(): I18nContextValue {
   const ctx = useContext(I18nContext)
   if (!ctx) throw new Error('useI18n must be used inside I18nProvider')
