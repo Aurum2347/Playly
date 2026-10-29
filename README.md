@@ -36,7 +36,7 @@
 
 Playly уважает твою приватность. Вся библиотека, плейлисты, настройки и профиль лежат **только на твоём ПК**.
 
-> **Путь к данным:** `%AppData%\playly`
+> **Путь к данным:** `%AppData%\com.playly.player\playly` (Windows), `~/.local/share/com.playly.player/playly` (Linux)
 > 
 > Хочешь начать с чистого листа или удалить все следы? Просто удали эту папку.
 
@@ -50,6 +50,37 @@ Playly уважает твою приватность. Вся библиотек
 3. Запусти двойным кликом. Готово!
 
 *(Требуется Windows 10 или 11. WebView2 обычно уже встроен в систему).*
+
+---
+
+## 🛠 Сборка из исходников
+
+Нужны [Node.js](https://nodejs.org) 20+ и [Rust](https://rustup.rs) (stable).
+
+```bash
+npm install
+npm run tauri dev     # запуск в режиме разработки
+npm run tauri build   # сборка установщиков
+```
+
+### Linux (экспериментально)
+
+Системные библиотеки (Debian / Ubuntu 22.04+):
+
+```bash
+sudo apt install libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev \
+  libssl-dev libxdo-dev build-essential curl wget file \
+  gstreamer1.0-plugins-base gstreamer1.0-plugins-good gstreamer1.0-libav
+```
+
+Fedora: `webkit2gtk4.1-devel libayatana-appindicator-gtk3-devel librsvg2-devel openssl-devel libxdo-devel gstreamer1-plugins-base gstreamer1-plugins-good`.
+
+`npm run tauri build` соберёт `.AppImage`, `.deb` и `.rpm` в `src-tauri/target/release/bundle/`. Звук в WebKitGTK идёт через GStreamer: без пакетов `gstreamer*-plugins-*` часть форматов (MP3, AAC/M4A) не заиграет.
+
+Особенности Linux-версии:
+- у иконки в трее меню («Открыть Playly», «Мини-плеер», «Выйти») — щелчков по иконке Linux не передаёт; в GNOME для трея нужно расширение AppIndicator;
+- обновляется сама только AppImage, `.deb` и `.rpm` — вручную со страницы релиза;
+- выбор устройства вывода звука WebKitGTK не поддерживает — звук идёт в системное устройство по умолчанию.
 
 ---
 

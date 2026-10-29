@@ -166,14 +166,21 @@ export async function readProfileFile(): Promise<ProfileFile> {
   }
 }
 
+/* Правки profile.json идут по очереди: две одновременные («прочитать, поправить, записать») затирали друг друга */
+let profileQueue: Promise<void> = Promise.resolve()
+
 /** Сливает patch в profile.json; null удаляет поле */
-export async function patchProfileFile(patch: { [K in keyof ProfileFile]?: ProfileFile[K] | null }): Promise<void> {
-  const current = (await readProfileFile()) as Record<string, unknown>
-  for (const [key, value] of Object.entries(patch)) {
-    if (value === null) delete current[key]
-    else if (value !== undefined) current[key] = value
-  }
-  await writeTextFile(await join(await getProfileDir(), 'profile.json'), JSON.stringify(current, null, 2))
+export function patchProfileFile(patch: { [K in keyof ProfileFile]?: ProfileFile[K] | null }): Promise<void> {
+  const job = profileQueue.catch(() => {}).then(async () => {
+    const current = (await readProfileFile()) as Record<string, unknown>
+    for (const [key, value] of Object.entries(patch)) {
+      if (value === null) delete current[key]
+      else if (value !== undefined) current[key] = value
+    }
+    await writeTextFile(await join(await getProfileDir(), 'profile.json'), JSON.stringify(current, null, 2))
+  })
+  profileQueue = job
+  return job
 }
 
 export function notifyProfileUpdated() {

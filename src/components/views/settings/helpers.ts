@@ -48,25 +48,33 @@ export async function readSettingsRaw(): Promise<Record<string, unknown>> {
   }
 }
 
-/** Сливает patch в settings.json, не затирая остальные поля */
-export async function writeSettingsRaw(patch: Record<string, unknown>): Promise<void> {
-  try {
-    const current = await readSettingsRaw()
-    const next = { ...current, ...patch }
-    await writeTextFile(await getSettingsPath(), JSON.stringify(next, null, 2))
-  } catch (e) {
-    console.error('Не удалось сохранить настройки:', e)
-  }
+/*
+ * Все изменения settings.json идут по очереди. Каждое — «прочитать, поправить, записать»,
+ * и два таких одновременных (громкость из плеера и язык из настроек) раньше затирали друг друга.
+ */
+let settingsQueue: Promise<void> = Promise.resolve()
+
+function updateSettings(mutate: (current: Record<string, unknown>) => void): Promise<void> {
+  const job = settingsQueue.then(async () => {
+    try {
+      const current = await readSettingsRaw()
+      mutate(current)
+      await writeTextFile(await getSettingsPath(), JSON.stringify(current, null, 2))
+    } catch (e) {
+      console.error('Не удалось сохранить настройки:', e)
+    }
+  })
+  settingsQueue = job
+  return job
 }
 
-export async function removeSettingsKeys(keys: string[]): Promise<void> {
-  try {
-    const current = await readSettingsRaw()
-    keys.forEach((k) => delete current[k])
-    await writeTextFile(await getSettingsPath(), JSON.stringify(current, null, 2))
-  } catch (e) {
-    console.error('Не удалось сохранить настройки:', e)
-  }
+/** Сливает patch в settings.json, не затирая остальные поля */
+export function writeSettingsRaw(patch: Record<string, unknown>): Promise<void> {
+  return updateSettings((current) => Object.assign(current, patch))
+}
+
+export function removeSettingsKeys(keys: string[]): Promise<void> {
+  return updateSettings((current) => keys.forEach((k) => delete current[k]))
 }
 
 /* ===== Тема ===== */

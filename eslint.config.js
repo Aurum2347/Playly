@@ -6,7 +6,8 @@ import tseslint from 'typescript-eslint'
 import { defineConfig, globalIgnores } from 'eslint/config'
 
 export default defineConfig([
-  globalIgnores(['dist']),
+  /* Сборки Rust и релиза содержат сгенерированный JS — линтеру там делать нечего */
+  globalIgnores(['dist', 'release', 'src-tauri/target', 'src-tauri/gen']),
   {
     files: ['**/*.{ts,tsx}'],
     extends: [

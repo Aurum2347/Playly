@@ -1,0 +1,43 @@
+# Пробная сборка Playly под Linux. Запускается только вручную: Actions → Build Linux → Run workflow.
+# Результат (.AppImage, .deb, .rpm) — в артефактах запуска. Сборка без подписи обновлений:
+# подписанный релиз собирается локально через npm run release (см. scripts/release.mjs).
+name: Build Linux
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Системные библиотеки
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev \
+            libssl-dev libxdo-dev build-essential curl wget file
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - run: npm ci
+
+      - name: Сборка
+        run: npx tauri build
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: playly-linux
+          path: |
+            src-tauri/target/release/bundle/appimage/*.AppImage
+            src-tauri/target/release/bundle/deb/*.deb
+            src-tauri/target/release/bundle/rpm/*.rpm

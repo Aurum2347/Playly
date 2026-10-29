@@ -88,6 +88,11 @@ async function isPortable(): Promise<boolean> {
   if (portableCache === null) portableCache = await invoke<boolean>('is_portable').catch(() => false)
   return portableCache
 }
+let selfUpdateCache: boolean | null = null
+async function canSelfUpdate(): Promise<boolean> {
+  if (selfUpdateCache === null) selfUpdateCache = await invoke<boolean>('can_self_update').catch(() => true)
+  return selfUpdateCache
+}
 const listeners = new Set<() => void>()
 
 function set(patch: Partial<UpdaterState>) {
@@ -174,20 +179,22 @@ export async function checkForUpdates(silent = false): Promise<void> {
   if (found) {
     dropUpdate()
     const status = verdict(found.version, found.currentVersion)
-    if (status === 'latest') found.close().catch(() => {})
-    else update = found
+    /* Пакеты .deb и .rpm на Linux сами не обновляются (умеет только AppImage) — им только ссылка на релиз */
+    const installable = status !== 'latest' && (await canSelfUpdate())
+    if (installable) update = found
+    else found.close().catch(() => {})
     set({
-      status,
+      status: status === 'available' && !installable ? 'manual' : status,
       checkedAt: Date.now(),
       version: found.version,
       notes: found.body?.trim() || null,
       date: found.date ?? null,
       releaseUrl: RELEASES_URL,
-      installable: status !== 'latest',
+      installable,
       /* Новое уведомление — только о действительно новой версии */
       dismissed: status === 'available' ? false : state.dismissed,
     })
-    if (status === 'available' && state.auto) await downloadUpdate()
+    if (status === 'available' && installable && state.auto) await downloadUpdate()
     return
   }
 

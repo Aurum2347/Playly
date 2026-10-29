@@ -80,33 +80,22 @@ export default function PlayerBar({
   const [dragProgress, setDragProgress] = useState(false)
   const [dragVolume, setDragVolume] = useState(false)
 
-  const [shownTrack, setShownTrack] = useState<Track | null>(track)
-  const [leavingTrack, setLeavingTrack] = useState<Track | null>(null)
-  const shownRef = useRef<Track | null>(track)
-  const swapTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  /* Смена трека: прежний слой уезжает, новый появляется. Вычисляется прямо при рендере — без лишнего кадра */
+  const [swap, setSwap] = useState<{ shown: Track | null; leaving: Track | null }>({ shown: track, leaving: null })
+  if (track?.id !== swap.shown?.id) {
+    setSwap({ shown: track, leaving: track ? swap.shown : null })
+  } else if (track !== swap.shown) {
+    /* Тот же трек, обновились данные (лайк, обложка) — без анимации */
+    setSwap((s) => ({ ...s, shown: track }))
+  }
+  const shownTrack = swap.shown
+  const leavingTrack = swap.leaving
 
   useEffect(() => {
-    if (!track) {
-      shownRef.current = null
-      setShownTrack(null)
-      setLeavingTrack(null)
-      return
-    }
-    const prev = shownRef.current
-    if (prev && prev.id !== track.id) {
-      setLeavingTrack(prev)
-      if (swapTimerRef.current) clearTimeout(swapTimerRef.current)
-      swapTimerRef.current = setTimeout(() => setLeavingTrack(null), 340)
-    }
-    shownRef.current = track
-    setShownTrack(track)
-  }, [track])
-
-  useEffect(() => {
-    return () => {
-      if (swapTimerRef.current) clearTimeout(swapTimerRef.current)
-    }
-  }, [])
+    if (!leavingTrack) return
+    const timer = setTimeout(() => setSwap((s) => ({ ...s, leaving: null })), 340)
+    return () => clearTimeout(timer)
+  }, [leavingTrack])
 
   const progress = duration > 0 ? Math.min(100, (currentTime / duration) * 100) : 0
 
@@ -179,7 +168,7 @@ export default function PlayerBar({
     try {
       e.currentTarget.setPointerCapture(e.pointerId)
     } catch {
-
+      /* Захват указателя не поддерживается — перетаскивание всё равно работает через window */
     }
   }
 
@@ -191,7 +180,7 @@ export default function PlayerBar({
     try {
       e.currentTarget.setPointerCapture(e.pointerId)
     } catch {
-
+      /* Захват указателя не поддерживается — перетаскивание всё равно работает через window */
     }
   }
 

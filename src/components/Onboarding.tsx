@@ -22,10 +22,8 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
       const appDir = await appDataDir()
       const playlyDir = await join(appDir, 'playly')
       const userFile = await join(playlyDir, 'user.json')
-      try {
-        await mkdir(playlyDir, { recursive: true })
-      } catch (e) {
-      }
+      /* Папка уже есть — ошибка не страшна; если её нет и создать нельзя, упадёт запись ниже */
+      await mkdir(playlyDir, { recursive: true }).catch(() => {})
       await writeTextFile(userFile, JSON.stringify({ nickname: nickname.trim() }, null, 2))
       onComplete(nickname.trim())
     } catch (error) {

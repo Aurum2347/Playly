@@ -43,27 +43,38 @@ const Icon = {
   power: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18.36 6.64a9 9 0 1 1-12.73 0" /><line x1="12" y1="2" x2="12" y2="12" /></svg>,
 }
 
-/** Обложка из папки covers: окна не делят blob-url, поэтому файл читается здесь заново */
+/**
+ * Обложка из папки covers: окна не делят blob-url, поэтому файл читается здесь заново.
+ * При смене трека прежняя картинка остаётся, пока не прочитается новая, — без мигания заглушки.
+ */
 function useCover(file: string | null): string | null {
-  const [cover, setCover] = useState<{ file: string; url: string } | null>(null)
+  const [cover, setCover] = useState<{ file: string; url: string | null } | null>(null)
+  const urlRef = useRef<string | null>(null)
   useEffect(() => {
     if (!file) return
     let alive = true
-    let url: string | null = null
     loadCoverUrl(file).then((u) => {
       if (!alive) {
         if (u) URL.revokeObjectURL(u)
         return
       }
-      url = u
-      setCover(u ? { file, url: u } : null)
+      const old = urlRef.current
+      urlRef.current = u
+      setCover({ file, url: u })
+      /* Старую освобождаем чуть позже — когда новая уже нарисована */
+      if (old) setTimeout(() => URL.revokeObjectURL(old), 1000)
     })
     return () => {
       alive = false
-      if (url) setTimeout(() => URL.revokeObjectURL(url as string), 1000)
     }
   }, [file])
-  return file && cover?.file === file ? cover.url : null
+  useEffect(
+    () => () => {
+      if (urlRef.current) URL.revokeObjectURL(urlRef.current)
+    },
+    []
+  )
+  return file ? cover?.url ?? null : null
 }
 
 function MiniPlayer() {
@@ -442,7 +453,7 @@ function MiniPlayer() {
 
 export default function MiniApp() {
   return (
-    <I18nProvider>
+    <I18nProvider persist={false}>
       <MiniPlayer />
     </I18nProvider>
   )

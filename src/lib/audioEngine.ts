@@ -4,9 +4,9 @@ import { EQ_BANDS } from './equalizer'
 /*
  * Аудиодвижок Playly: две «деки» (HTMLAudioElement → GainNode) поверх одного AudioContext.
  *
- *   deck A ─┐
- *           ├─► fader (плавная пауза) ─► эквалайзер ─► analyser (визуализатор) ─► master (громкость) ─► выход
- *   deck B ─┘
+ *   deck A ─┐                                ┌─► dry ──────────────┐
+ *           ├─► fader (плавная пауза) ─► эквалайзер                 ├─► analyser (визуализатор) ─► master (громкость) ─► выход
+ *   deck B ─┘                                └─► компрессор ─► wet ┘   (нормализация громкости)
  *
  * Любая смена трека загружает файл в свободную деку и сводит деки кривой громкости.
  * Кроссфейд — это та же смена трека, только с длинной кривой. Кривые считаются
@@ -15,6 +15,14 @@ import { EQ_BANDS } from './equalizer'
  */
 
 export type CrossfadeCurve = 'equal' | 'linear' | 'smooth'
+
+/**
+ * Итог смены трека:
+ *  ok    — трек играет (или стоит на паузе, если autoplay выключен);
+ *  stale — загрузку перебила более новая, ничего не изменилось;
+ *  error — файл не прочитался или не воспроизводится, играет то же, что и до вызова.
+ */
+export type LoadResult = 'ok' | 'stale' | 'error'
 
 export interface EngineTrack {
   id: number
@@ -53,6 +61,8 @@ const DECLICK = 0.05
 /* Быстрое глушение уходящей деки при прерывании перехода */
 const ABORT_FADE = 0.08
 const CURVE_STEPS = 48
+/* Переключение нормализации без щелчка */
+const NORMALIZE_FADE = 0.12
 
 export function audioMime(path: string): string {
   const ext = path.split('.').pop()?.toLowerCase() || ''
@@ -90,16 +100,21 @@ function shape(curve: CrossfadeCurve, p: number): number {
   }
 }
 
+/* Файл, у которого движок так и не нашёл ни метаданных, ни ошибки, считаем нечитаемым */
+const READY_TIMEOUT = 15_000
+
 function waitReady(el: HTMLAudioElement): Promise<boolean> {
   if (el.readyState >= HTMLMediaElement.HAVE_METADATA) return Promise.resolve(true)
   return new Promise((resolve) => {
     const done = (ok: boolean) => {
+      clearTimeout(timer)
       el.removeEventListener('loadedmetadata', onOk)
       el.removeEventListener('error', onErr)
       resolve(ok)
     }
     const onOk = () => done(true)
     const onErr = () => done(false)
+    const timer = setTimeout(() => done(false), READY_TIMEOUT)
     el.addEventListener('loadedmetadata', onOk)
     el.addEventListener('error', onErr)
   })
@@ -115,10 +130,17 @@ export class AudioEngine {
   /* Предусилитель эквалайзера: снижает уровень на величину подъёма, чтобы не было перегруза */
   private eqPre: GainNode
   private eqBands: BiquadFilterNode[]
+  /* Нормализация: сигнал идёт либо напрямую (dry), либо через компрессор (wet) */
+  private normDry: GainNode
+  private normWet: GainNode
   private decks: Deck[] = []
   private active = 0
   private transition: Transition | null = null
   private loadSeq = 0
+  /* Запускать ли трек, который сейчас грузится: пауза во время загрузки отменяет автозапуск */
+  private wantPlay = false
+  /* Идёт смена трека (файл читается) */
+  private switching = false
   private playing = false
   private pauseTimer: ReturnType<typeof setTimeout> | null = null
   private events: EngineEvents
@@ -141,13 +163,28 @@ export class AudioEngine {
       band.gain.value = 0
       return band
     })
+    /* Мягкий компрессор выравнивает громкие и тихие треки; недостающий уровень он добирает сам (make-up gain) */
+    const comp = this.ctx.createDynamicsCompressor()
+    comp.threshold.value = -20
+    comp.knee.value = 20
+    comp.ratio.value = 2.5
+    comp.attack.value = 0.01
+    comp.release.value = 0.3
+    this.normDry = this.ctx.createGain()
+    this.normWet = this.ctx.createGain()
+    this.normWet.gain.value = 0
+
     this.fader.connect(this.eqPre)
     let node: AudioNode = this.eqPre
     for (const band of this.eqBands) {
       node.connect(band)
       node = band
     }
-    node.connect(this.analyser)
+    node.connect(this.normDry)
+    node.connect(comp)
+    comp.connect(this.normWet)
+    this.normDry.connect(this.analyser)
+    this.normWet.connect(this.analyser)
     this.analyser.connect(this.master)
     this.master.connect(this.ctx.destination)
 
@@ -222,6 +259,12 @@ export class AudioEngine {
     this.eqPre.gain.setTargetAtTime(Math.pow(10, (-boost * 0.75) / 20), now, 0.04)
   }
 
+  /** Нормализация громкости: включает компрессор вместо прямого сигнала */
+  setNormalize(on: boolean) {
+    this.rampTo(this.normDry.gain, on ? 0 : 1, NORMALIZE_FADE)
+    this.rampTo(this.normWet.gain, on ? 1 : 0, NORMALIZE_FADE)
+  }
+
   setRate(trackId: number, rate: number) {
     for (const d of this.decks) {
       if (d.trackId === trackId) {
@@ -241,6 +284,8 @@ export class AudioEngine {
     if (this.transition) return
     const idle = this.decks[1 - this.active]
     if (idle.trackId === track.id && idle.pending) return
+    /* Свободная дека ещё доигрывает затухание прерванного перехода — не обрываем, попробуем позже */
+    if (!idle.el.paused) return
     void this.prepare(1 - this.active, track)
   }
 
@@ -248,12 +293,24 @@ export class AudioEngine {
    * Переключает на трек. fade — длительность сведения в секундах
    * (0 — мгновенно, но всё равно без щелчка).
    */
-  async load(track: EngineTrack, opts: { autoplay: boolean; fade: number }): Promise<boolean> {
+  async load(track: EngineTrack, opts: { autoplay: boolean; fade: number }): Promise<LoadResult> {
     const seq = ++this.loadSeq
+    this.wantPlay = opts.autoplay
+    /* Пока новый трек грузится, позиция старого в интерфейс не уходит: иначе под новым названием бежит чужое время */
+    this.switching = true
+    try {
+      return await this.switchTo(seq, track, opts)
+    } finally {
+      if (seq === this.loadSeq) this.switching = false
+    }
+  }
+
+  private async switchTo(seq: number, track: EngineTrack, opts: { autoplay: boolean; fade: number }): Promise<LoadResult> {
     this.finishTransition(true)
     const target = 1 - this.active
     const ok = await this.prepare(target, track)
-    if (!ok || seq !== this.loadSeq) return false
+    if (seq !== this.loadSeq) return 'stale'
+    if (!ok) return 'error'
 
     const from = this.active
     const fromDeck = this.decks[from]
@@ -264,24 +321,30 @@ export class AudioEngine {
     this.events.onDuration(this.duration)
     this.events.onTime(0)
 
-    if (!opts.autoplay) {
+    /* Пока файл читался, могли нажать паузу (или, наоборот, «играть») — побеждает последнее желание */
+    if (!this.wantPlay) {
       this.silence(from)
       this.setNow(toDeck.gain.gain, 1)
       this.setPlaying(false)
-      return true
+      return 'ok'
     }
 
     this.cancelPauseTimer()
     await this.ctx.resume().catch(() => {})
-    if (seq !== this.loadSeq) return false
+    if (seq !== this.loadSeq) return 'stale'
     try {
       await toDeck.el.play()
     } catch (e) {
+      /* play() прервала более новая загрузка (она поставила деку на паузу) — это не ошибка */
+      if (seq !== this.loadSeq) return 'stale'
       console.warn('Не удалось воспроизвести:', e)
-      this.setPlaying(false)
-      return false
+      this.silence(target)
+      this.active = from
+      this.events.onDuration(this.duration)
+      this.events.onTime(this.currentTime)
+      return 'error'
     }
-    if (seq !== this.loadSeq) return false
+    if (seq !== this.loadSeq) return 'stale'
     this.rampTo(this.fader.gain, 1, audible ? 0.02 : PAUSE_FADE)
     this.setPlaying(true)
 
@@ -293,11 +356,35 @@ export class AudioEngine {
       this.silence(from)
       this.setNow(toDeck.gain.gain, 1)
     }
-    return true
+    return 'ok'
+  }
+
+  /**
+   * Отменяет незавершённую смену трека: остаётся играть то, что играло.
+   * Нужна, когда вернулись к текущему треку, пока грузился другой («Далее» и сразу «Назад»).
+   */
+  cancelLoad() {
+    if (!this.switching) return
+    this.loadSeq++
+    this.switching = false
+    this.wantPlay = this.playing
+    const idle = this.decks[1 - this.active]
+    if (idle.pending && !this.transition) {
+      idle.token++
+      idle.pending = null
+      idle.trackId = null
+    }
+    this.events.onDuration(this.duration)
+    this.events.onTime(this.currentTime)
+    /* Пока ждали, прежний трек успел доиграть — его «конец» тогда не сообщили, сообщаем сейчас */
+    const el = this.decks[this.active].el
+    if (el.ended && this.hasSource) this.events.onEnded()
   }
 
   stop() {
     this.loadSeq++
+    this.wantPlay = false
+    this.switching = false
     this.finishTransition(true)
     this.cancelPauseTimer()
     this.decks.forEach((d, i) => {
@@ -318,7 +405,10 @@ export class AudioEngine {
   /* ===== Транспорт ===== */
 
   play() {
+    this.wantPlay = true
     if (!this.hasSource) return
+    /* Идёт смена трека — прежний не запускаем: новый заиграет сам, как только прочитается */
+    if (this.switching && !this.playing) return
     this.cancelPauseTimer()
     void this.ctx.resume().catch(() => {})
     const active = this.decks[this.active].el
@@ -333,6 +423,7 @@ export class AudioEngine {
   }
 
   pause() {
+    this.wantPlay = false
     if (!this.playing) return
     this.setPlaying(false)
     if (this.transition?.timer) {
@@ -370,14 +461,15 @@ export class AudioEngine {
     const deck = this.decks[i]
     const el = deck.el
     const isActive = () => this.active === i && deck.url !== null
-    const onTime = () => { if (isActive()) this.events.onTime(el.currentTime) }
+    const onTime = () => { if (isActive() && !this.switching) this.events.onTime(el.currentTime) }
     const onDuration = () => { if (isActive()) this.events.onDuration(isFinite(el.duration) ? el.duration : 0) }
     const onEnded = () => {
       if (this.transition && this.transition.outIdx === i) {
         this.finishTransition(false)
         return
       }
-      if (isActive()) this.events.onEnded()
+      /* Старый трек доиграл, пока грузится выбранный: переход уже идёт, иначе плеер перескочил бы через новый */
+      if (isActive() && !this.switching) this.events.onEnded()
     }
     el.addEventListener('timeupdate', onTime)
     el.addEventListener('durationchange', onDuration)

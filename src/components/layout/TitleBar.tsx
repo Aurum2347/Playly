@@ -53,7 +53,10 @@ export default function TitleBar({
   const toggleMaximize = () => void win.toggleMaximize()
 
   const onDoubleClick = (e: ReactMouseEvent) => {
-    if ((e.target as HTMLElement).closest('button')) return
+    const target = e.target as HTMLElement
+    /* Двойной клик прямо по области перетаскивания Tauri обрабатывает сам (на Linux событие доходит и сюда —
+       окно развернулось бы и тут же свернулось обратно) */
+    if (target.closest('button') || target.hasAttribute('data-tauri-drag-region')) return
     toggleMaximize()
   }
 

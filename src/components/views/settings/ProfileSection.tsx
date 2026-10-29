@@ -1,12 +1,12 @@
 import { useEffect, useRef, useState } from 'react'
 import { appDataDir, join } from '@tauri-apps/api/path'
-import { exists, readFile, readTextFile, writeTextFile, writeFile, remove, mkdir } from '@tauri-apps/plugin-fs'
+import { exists, readFile, readTextFile, writeFile, remove, mkdir } from '@tauri-apps/plugin-fs'
 import { pickVisual } from '../../../lib/media'
 import { imageMime } from './helpers'
 import { useI18n } from '../../../i18n'
 import AvatarCropModal from '../../AvatarCropModal'
 import { DEFAULT_FRAME, frameStyle, normalizeFrame, type ImageFrame } from '../../../lib/imageFrame'
-import { LOOK_DEFAULTS, type LookKind, type ProfileLook, type ProfileLooks } from '../../../lib/profile'
+import { LOOK_DEFAULTS, patchProfileFile, type LookKind, type ProfileLook, type ProfileLooks } from '../../../lib/profile'
 import { LookLayers, ProfileBanner } from '../../ProfileLook'
 import ProfileLookEditor from '../../ProfileLookEditor'
 import DefaultAvatar from '../../DefaultAvatar'
@@ -80,37 +80,12 @@ export default function ProfileSection({ currentNickname, onSaveNickname, looks 
     avatarShape?: AvatarShape | null
     avatarFrame?: ImageFrame | null
   }) => {
-    const profileDir = await getProfileDir()
-    const profileFile = await join(profileDir, 'profile.json')
-
-    let current: ProfileSettings = {}
-
-    if (await exists(profileFile)) {
-      try {
-        current = JSON.parse(await readTextFile(profileFile)) as ProfileSettings
-      } catch {
-        current = {}
-      }
-    }
-
-    const next: ProfileSettings = { ...current }
-
-    if (patch.avatarShape !== undefined) {
-      if (patch.avatarShape === null) delete next.avatarShape
-      else next.avatarShape = patch.avatarShape
-    }
-
-    if (patch.avatarFile !== undefined) {
-      if (patch.avatarFile === null || !patch.avatarFile) delete next.avatarFile
-      else next.avatarFile = patch.avatarFile
-    }
-
-    if (patch.avatarFrame !== undefined) {
-      if (patch.avatarFrame === null) delete next.avatarFrame
-      else next.avatarFrame = patch.avatarFrame
-    }
-
-    await writeTextFile(profileFile, JSON.stringify(next, null, 2))
+    /* Через общую очередь profile.json — фон карточки и баннер пишутся туда же */
+    await patchProfileFile({
+      avatarShape: patch.avatarShape,
+      avatarFile: patch.avatarFile === '' ? null : patch.avatarFile,
+      avatarFrame: patch.avatarFrame,
+    })
   }
 
   useEffect(() => {
