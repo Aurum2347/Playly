@@ -604,6 +604,63 @@ export const en = {
     collapse: 'Collapse',
     entries: [
       {
+        version: '2.0.6',
+        date: '2026-10-29',
+        title: 'Reliable track switching and tidy settings',
+        sections: [
+          {
+            title: 'Track switching',
+            groups: [
+              {
+                items: [
+                  'Pressing «Next» quickly several times — in the player, the mini player or from the keyboard — no longer loses presses: every track you skip to actually starts.',
+                  'If the previous track finished while the selected one was still loading, the player no longer skips past the selected track.',
+                  'Pause pressed while a track is loading is now respected: the new track starts paused. «Play» during loading no longer starts the previous track for a second.',
+                  '«Next» followed right away by «Previous» continues the current track where it was instead of restarting it.',
+                  'The previous track\'s time no longer runs under the new track\'s title — in the player, the mini player or the Discord status.',
+                  'A file that cannot be read (deleted or moved) is skipped. Before, the player showed the new track while the old one kept playing.',
+                  'Clicking the selected track while paused resumes it. «Next» in a one-track queue with repeat restarts it.',
+                  'Deleting the playing track no longer starts music if it was paused.',
+                  '«Recently played» now updates on «Next» and when a track finishes by itself.',
+                ],
+              },
+            ],
+          },
+          {
+            title: 'Mini player',
+            groups: [
+              {
+                items: ['The cover no longer flashes a placeholder when the track changes — the old one stays until the new one is loaded.'],
+              },
+            ],
+          },
+          {
+            title: 'Library and settings',
+            groups: [
+              {
+                items: [
+                  'When importing large folders, different tracks could get the same internal number: liking or deleting one affected two tracks, and one cover replaced another. Numbers are now unique, and existing duplicates are fixed on startup.',
+                  'Settings and profile no longer lose changes when they are saved from several places at once.',
+                  '«Loudness normalization» now really evens out track volume — before, the switch did nothing.',
+                  'A file dropped into the window while a folder is being scanned is no longer added twice.',
+                  'List pages no longer re-render several times per second during playback.',
+                ],
+              },
+            ],
+          },
+          {
+            title: 'Linux',
+            groups: [
+              {
+                items: [
+                  'Groundwork for the Linux version: tray icon menu, «Show in folder» that selects the file, .deb, .rpm and AppImage packages. The Linux version itself is still being tested.',
+                ],
+              },
+            ],
+          },
+        ],
+      },
+      {
         version: '2.0.5',
         date: '2026-10-26',
         title: 'Hotfix: the mini player is back in shape',

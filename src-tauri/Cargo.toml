@@ -1,6 +1,6 @@
 [package]
 name = "app"
-version = "2.0.5"
+version = "2.0.6"
 description = "Playly — offline music player"
 authors = ["Aurum2347"]
 license = ""
