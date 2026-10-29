@@ -77,8 +77,13 @@ Fedora: `webkit2gtk4.1-devel libayatana-appindicator-gtk3-devel librsvg2-devel o
 
 `npm run tauri build` соберёт `.AppImage`, `.deb` и `.rpm` в `src-tauri/target/release/bundle/`. Звук в WebKitGTK идёт через GStreamer: без пакетов `gstreamer*-plugins-*` часть форматов (MP3, AAC/M4A) не заиграет.
 
+Собрать без Linux-машины можно в Docker: `npm run build:linux` — пакеты появятся в `release-linux/` (нужен Docker с включённой виртуализацией). Ещё вариант — GitHub Actions → **Build Linux** → *Run workflow*.
+
 Особенности Linux-версии:
 - у иконки в трее меню («Открыть Playly», «Мини-плеер», «Выйти») — щелчков по иконке Linux не передаёт; в GNOME для трея нужно расширение AppIndicator;
+- работают медиаклавиши и апплет плеера в панели (MPRIS);
+- в сессии Wayland Playly запускается через XWayland: иначе нельзя поставить мини-плеер у края экрана и держать его поверх окон. Вернуть Wayland — `GDK_BACKEND=wayland playly`;
+- если окно пустое (бывает с видеокартами NVIDIA), это уже обходится переменной `WEBKIT_DISABLE_DMABUF_RENDERER=1` — она ставится автоматически;
 - обновляется сама только AppImage, `.deb` и `.rpm` — вручную со страницы релиза;
 - выбор устройства вывода звука WebKitGTK не поддерживает — звук идёт в системное устройство по умолчанию.
 

@@ -35,3 +35,6 @@ release/
 
 # Описания релизов для npm run release --notes-file
 release-notes-*.md
+
+# Сборка под Linux из Docker (npm run build:linux)
+release-linux/

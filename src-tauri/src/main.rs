@@ -1050,6 +1050,24 @@ fn cleanup_portable_update() {
     }
 }
 
+/// Обходы известных проблем WebKitGTK. Вызывается до создания окон и потоков;
+/// переменные, уже заданные пользователем, не трогаются — так любой обход можно отключить
+#[cfg(target_os = "linux")]
+fn linux_env_defaults() {
+    let set_default = |key: &str, value: &str| {
+        if std::env::var_os(key).is_none() {
+            std::env::set_var(key, value);
+        }
+    };
+    /* С новым DMA-BUF-рендером WebKitGTK на видеокартах NVIDIA и части Wayland-сессий окно остаётся пустым */
+    set_default("WEBKIT_DISABLE_DMABUF_RENDERER", "1");
+    /* Wayland не даёт приложению ставить окна в нужное место и держать их поверх остальных,
+       а мини-плеер на этом построен — запускаемся через XWayland (GDK_BACKEND=wayland вернёт Wayland) */
+    if std::env::var_os("WAYLAND_DISPLAY").is_some() {
+        set_default("GDK_BACKEND", "x11");
+    }
+}
+
 /// Полностью закрыть Playly (крестик окна только прячет его в трей)
 #[command]
 fn quit_app(app: tauri::AppHandle) {
@@ -1107,6 +1125,9 @@ fn set_tray_labels(state: tauri::State<'_, TrayMenu>, open: String, mini: String
 }
 
 fn main() {
+    #[cfg(target_os = "linux")]
+    linux_env_defaults();
+
     let (tx, rx) = mpsc::channel();
     thread::spawn(move || rpc_worker(rx));
 

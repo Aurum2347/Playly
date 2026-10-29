@@ -1169,6 +1169,84 @@ function AppInner() {
     }
   }, [handlePlayPause, handleNext, handlePrev, handleSeek, handleVolumeChange, handleMuteToggle, handleToggleLike])
   
+  /*
+   * Системный плеер: медиаклавиши, апплет плеера в панели Linux (MPRIS) и панель мультимедиа Windows.
+   * WebView передаёт туда то, что описано через Media Session API.
+   */
+  useEffect(() => {
+    const ms = navigator.mediaSession
+    if (!ms) return
+    const actions: Array<[MediaSessionAction, MediaSessionActionHandler]> = [
+      ['play', () => engineRef.current?.play()],
+      ['pause', () => engineRef.current?.pause()],
+      ['nexttrack', () => handleNext()],
+      ['previoustrack', () => handlePrev()],
+      ['seekto', (d) => { if (typeof d.seekTime === 'number') handleSeek(Math.max(0, d.seekTime)) }],
+    ]
+    for (const [action, handler] of actions) {
+      try {
+        ms.setActionHandler(action, handler)
+      } catch {
+        /* движок не знает это действие — без него */
+      }
+    }
+    return () => {
+      for (const [action] of actions) {
+        try {
+          ms.setActionHandler(action, null)
+        } catch {
+          /* см. выше */
+        }
+      }
+    }
+  }, [handleNext, handlePrev, handleSeek])
+
+  const msTitle = selectedTrack?.title
+  const msArtist = selectedTrack?.artist
+  const msAlbum = selectedTrack?.album
+  const msCover = selectedTrack?.cover ?? null
+  const msHidden = selectedTrack?.discordHidden === true
+  useEffect(() => {
+    const ms = navigator.mediaSession
+    if (!ms || typeof MediaMetadata === 'undefined') return
+    if (msTitle === undefined) {
+      ms.metadata = null
+      return
+    }
+    /* Трек, скрытый от Discord, не раскрываем и в системной панели */
+    ms.metadata = msHidden
+      ? new MediaMetadata({ title: t('discord.privateTitle'), artist: 'Playly' })
+      : new MediaMetadata({
+          title: msTitle,
+          artist: msArtist ?? '',
+          album: msAlbum ?? '',
+          artwork: msCover ? [{ src: msCover }] : [],
+        })
+  }, [msTitle, msArtist, msAlbum, msCover, msHidden, t])
+
+  useEffect(() => {
+    const ms = navigator.mediaSession
+    if (!ms) return
+    ms.playbackState = msTitle === undefined ? 'none' : isPlaying ? 'playing' : 'paused'
+  }, [isPlaying, msTitle])
+
+  /* Полоса времени в системной панели: обновляется при перемотке и смене трека, дальше её ведёт сама система */
+  useEffect(() => {
+    const ms = navigator.mediaSession
+    const eng = engineRef.current
+    if (!ms?.setPositionState || !eng || duration <= 0) return
+    try {
+      ms.setPositionState({
+        duration,
+        position: Math.min(duration, eng.currentTime),
+        playbackRate: selectedTrack?.playbackRate || 1,
+      })
+    } catch {
+      /* позиция ещё не согласована с длительностью (трек грузится) */
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [duration, seekTick, isPlaying])
+
   const handleShuffleToggle = useCallback(() => setIsShuffle((v) => !v), [])
   const handleRepeatToggle = useCallback(
     () => setRepeatMode((m) => (m === 'off' ? 'all' : m === 'all' ? 'one' : 'off')),
