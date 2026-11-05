@@ -1,7 +1,7 @@
 {
   "name": "playly",
   "private": true,
-  "version": "2.0.6",
+  "version": "2.0.7",
   "type": "module",
   "scripts": {
     "dev": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/android.ps1 -Install",

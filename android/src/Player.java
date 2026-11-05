@@ -21,6 +21,7 @@ public class Player extends Service {
 
   final Connection binder = new Connection();
   final ArrayList<String> queue = new ArrayList<>();
+  final ArrayList<String> shuffled = new ArrayList<>();
   String uri = "", title = "", artist = "", error = "";
   boolean ready, shuffle, resumeOnFocus, wantsPlay;
   int repeat;
@@ -80,9 +81,13 @@ public class Player extends Service {
                     resumeOnFocus = false;
                     play();
                   } else if (change < 0) {
-                    boolean active = wantsPlay;
-                    pause();
-                    resumeOnFocus = active && change != AudioManager.AUDIOFOCUS_LOSS;
+                    if (change == AudioManager.AUDIOFOCUS_LOSS) pause();
+                    else if (wantsPlay) {
+                      wantsPlay = false;
+                      resumeOnFocus = true;
+                      if (playing()) engine.pause();
+                      publish();
+                    }
                   }
                 })
             .build();
@@ -146,7 +151,21 @@ public class Player extends Service {
       if (tracks.has(item)) queue.add(item);
     }
     if (!queue.contains(id)) queue.add(id);
+    rebuildShuffle(id);
     load(id);
+  }
+
+  void rebuildShuffle(String first) {
+    shuffled.clear();
+    if (!shuffle || !queue.contains(first)) return;
+    shuffled.addAll(queue);
+    shuffled.remove(first);
+    Collections.shuffle(shuffled);
+    shuffled.add(0, first);
+  }
+
+  List<String> order() {
+    return shuffle ? shuffled : queue;
   }
 
   void load(String id) {
@@ -162,7 +181,7 @@ public class Player extends Service {
       engine = new MediaPlayer();
       engine.setWakeMode(this, PowerManager.PARTIAL_WAKE_LOCK);
       engine.setAudioAttributes(attributes());
-      engine.setDataSource(this, Uri.parse(id));
+      engine.setDataSource(this, Uri.parse(item.optString("source", id)));
       engine.setOnPreparedListener(
           p -> {
             if (engine != p) return;
@@ -178,10 +197,11 @@ public class Player extends Service {
           });
       engine.setOnCompletionListener(
           p -> {
+            if (engine != p) return;
             if (repeat == 1) {
               seek(0);
               play();
-            } else if (shuffle || repeat == 2 || queue.indexOf(uri) < queue.size() - 1) skip(1);
+            } else if (repeat == 2 || order().indexOf(uri) < order().size() - 1) skip(1);
             else {
               pause();
               seek(0);
@@ -196,7 +216,7 @@ public class Player extends Service {
 
   void failed() {
     releaseEngine();
-    error = "Не удалось открыть трек. Проверьте доступ к файлу.";
+    error = "Не удалось открыть трек. Откройте меню трека и выберите «Указать файл заново».";
     pause();
   }
 
@@ -220,8 +240,14 @@ public class Player extends Service {
     }
     wantsPlay = true;
     if (!ready) return;
-    startService(new Intent(this, Player.class));
-    startForeground(NOTICE, notification());
+    try {
+      startService(new Intent(this, Player.class));
+      startForeground(NOTICE, notification());
+    } catch (IllegalStateException e) {
+      error = "Откройте Playly, чтобы продолжить воспроизведение";
+      pause();
+      return;
+    }
     if (audio.requestAudioFocus(focus) != AudioManager.AUDIOFOCUS_REQUEST_GRANTED) {
       pause();
       return;
@@ -235,6 +261,7 @@ public class Player extends Service {
     wantsPlay = resumeOnFocus = false;
     if (playing()) engine.pause();
     publish();
+    audio.abandonAudioFocusRequest(focus);
     stopForeground(STOP_FOREGROUND_DETACH);
     stopSelf();
   }
@@ -252,11 +279,9 @@ public class Player extends Service {
   }
 
   void skip(int direction) {
-    int size = queue.size();
-    if (size == 0) return;
-    int delta =
-        shuffle && size > 1 && direction > 0 ? 1 + new Random().nextInt(size - 1) : direction;
-    load(queue.get(Math.floorMod(queue.indexOf(uri) + delta, size)));
+    List<String> order = order();
+    if (order.isEmpty()) return;
+    load(order.get(Math.floorMod(order.indexOf(uri) + direction, order.size())));
   }
 
   PendingIntent action(String command) {

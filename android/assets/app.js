@@ -45,7 +45,7 @@ function button(text, action, cls = 'wide') {
 function art(track) {
   const cover = node('span', 'art')
   cover.setAttribute('aria-hidden', 'true')
-  if (track?.cover) {
+  if (track && track.cover) {
     const img = node('img')
     img.alt = ''
     img.src = '/cover/' + encodeURIComponent(track.cover)
@@ -53,10 +53,20 @@ function art(track) {
   }
   return cover
 }
-const read = (key, initial) =>
-  JSON.parse(localStorage.getItem(key) || JSON.stringify(initial))
-const likes = new Set(read('likes', [])),
-  lists = read('lists', [])
+function readArray(key) {
+  try {
+    const data = JSON.parse(localStorage.getItem(key))
+    return Array.isArray(data) ? data : []
+  } catch {
+    return []
+  }
+}
+const likes = new Set(
+    readArray('likes').filter((id) => typeof id === 'string'),
+  ),
+  lists = readArray('lists').filter(
+    (list) => list && typeof list.name === 'string' && Array.isArray(list.ids),
+  )
 let tracks = {},
   page = 'library',
   list = null,
@@ -87,7 +97,10 @@ function favorite(id) {
   render()
 }
 function sheet(title, ...items) {
-  $('sheetBody').replaceChildren(node('h2', '', title), ...items)
+  const heading = node('h2', '', title)
+  heading.id = 'sheetTitle'
+  $('sheetBody').textContent = ''
+  $('sheetBody').append(heading, ...items)
   if (!$('sheet').open) $('sheet').showModal()
 }
 function newList(id) {
@@ -143,6 +156,12 @@ function actions(id) {
       }),
     )
   options.push(
+    button('Указать файл заново', () => {
+      $('sheet').close()
+      Android.relink(id)
+    }),
+  )
+  options.push(
     button('Убрать из медиатеки', () =>
       sheet(
         'Убрать трек из медиатеки?',
@@ -179,7 +198,7 @@ function go(next, playlist = null) {
 function render() {
   const overview = page === 'lists' && !list
   $('heading').textContent =
-    list?.name ||
+    (list && list.name) ||
     { library: 'Моя музыка', likes: 'Любимое', lists: 'Плейлисты' }[page]
   $('filter').hidden = overview
   $('add').hidden = page === 'likes'
@@ -241,7 +260,7 @@ function render() {
       ),
     )
   const box = $('content')
-  box.replaceChildren()
+  box.textContent = ''
   if (overview) {
     for (const l of lists)
       box.append(button(l.name + ' · ' + l.ids.length, () => go('lists', l)))
@@ -329,8 +348,10 @@ function paint(s) {
   if (!t) return
   if (displayed !== s.uri) {
     displayed = s.uri
-    $('miniArt').replaceChildren(art(t))
-    $('bigArt').replaceChildren(art(t))
+    for (const holder of [$('miniArt'), $('bigArt')]) {
+      holder.textContent = ''
+      holder.append(art(t))
+    }
     $('miniTitle').textContent = $('npTitle').textContent = t.title
     $('miniArtist').textContent = $('npArtist').textContent =
       t.artist || 'Без исполнителя'
@@ -417,10 +438,7 @@ window.receive = (event, data) => {
       'aria-label',
       update ? 'Настройки · доступно обновление' : 'Настройки',
     )
-    if (
-      $('sheet').open &&
-      $('sheetBody').querySelector('h2')?.textContent === 'Настройки'
-    )
+    if ($('sheet').open && $('sheetTitle').textContent === 'Настройки')
       settings()
   }
   if (event === 'state') paint(data)

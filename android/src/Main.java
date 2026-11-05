@@ -25,7 +25,8 @@ public class Main extends Activity {
   final ExecutorService worker = Executors.newSingleThreadExecutor();
   final Handler clock = new Handler(Looper.getMainLooper());
   String available = "";
-  boolean checking;
+  boolean checking, manualCheck;
+  String relinkId;
   final ServiceConnection connection =
       new ServiceConnection() {
         public void onServiceConnected(ComponentName name, IBinder binder) {
@@ -64,6 +65,7 @@ public class Main extends Activity {
 
   public void onCreate(Bundle saved) {
     super.onCreate(saved);
+    if (saved != null) relinkId = saved.getString("relinkId");
     prefs = getSharedPreferences("playly", MODE_PRIVATE);
     web = new WebView(this);
     web.setBackgroundColor(0xff0a0a0c);
@@ -175,18 +177,35 @@ public class Main extends Activity {
         });
   }
 
+  @Override
+  protected void onSaveInstanceState(Bundle out) {
+    super.onSaveInstanceState(out);
+    out.putString("relinkId", relinkId);
+  }
+
+  void pickAudio(String existing) {
+    relinkId = existing;
+    Intent pick =
+        new Intent(Intent.ACTION_OPEN_DOCUMENT)
+            .setType("audio/*")
+            .addCategory(Intent.CATEGORY_OPENABLE)
+            .putExtra(Intent.EXTRA_ALLOW_MULTIPLE, existing == null);
+    try {
+      startActivityForResult(pick, existing == null ? 1 : 2);
+    } catch (ActivityNotFoundException e) {
+      toast("Системный выбор файлов недоступен");
+    }
+  }
+
   final class Bridge {
     @JavascriptInterface
     public void pick() {
-      runOnUiThread(
-          () -> {
-            Intent pick =
-                new Intent(Intent.ACTION_OPEN_DOCUMENT)
-                    .setType("audio/*")
-                    .addCategory(Intent.CATEGORY_OPENABLE);
-            pick.putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true);
-            startActivityForResult(pick, 1);
-          });
+      runOnUiThread(() -> pickAudio(null));
+    }
+
+    @JavascriptInterface
+    public void relink(String id) {
+      runOnUiThread(() -> pickAudio(id));
     }
 
     @JavascriptInterface
@@ -224,6 +243,7 @@ public class Main extends Activity {
                 break;
               case "shuffle":
                 player.shuffle = !player.shuffle;
+                player.rebuildShuffle(player.uri);
                 prefs.edit().putBoolean("shuffle", player.shuffle).apply();
                 break;
               case "repeat":
@@ -291,13 +311,15 @@ public class Main extends Activity {
               try {
                 getContentResolver()
                     .releasePersistableUriPermission(
-                        Uri.parse(id), Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                        Uri.parse(track.optString("source", id)),
+                        Intent.FLAG_GRANT_READ_URI_PERMISSION);
               } catch (SecurityException ignored) {
               }
               runOnUiThread(
                   () -> {
                     if (player != null) {
                       player.queue.remove(id);
+                      player.shuffled.remove(id);
                       if (player.uri.equals(id)) {
                         player.pause();
                         player.releaseEngine();
@@ -337,7 +359,10 @@ public class Main extends Activity {
 
   protected void onActivityResult(int request, int result, Intent data) {
     super.onActivityResult(request, result, data);
-    if (request != 1 || result != RESULT_OK || data == null) return;
+    if (request != 1 && request != 2) return;
+    final String existing = request == 2 ? relinkId : null;
+    relinkId = null;
+    if (result != RESULT_OK || data == null || (request == 2 && existing == null)) return;
     LinkedHashSet<Uri> uris = new LinkedHashSet<>();
     ClipData clip = data.getClipData();
     if (clip != null)
@@ -349,23 +374,52 @@ public class Main extends Activity {
           int failed = 0;
           try {
             JSONObject tracks = new JSONObject(prefs.getString("tracks", "{}"));
+            Map<String, String> sources = new HashMap<>();
+            for (Iterator<String> it = tracks.keys(); it.hasNext(); ) {
+              String key = it.next();
+              sources.put(tracks.getJSONObject(key).optString("source", key), key);
+            }
+            String oldSource = null;
             for (Uri uri : uris) {
-              if (uri == null || !"content".equals(uri.getScheme()) || tracks.has(uri.toString()))
-                continue;
+              if (uri == null || !"content".equals(uri.getScheme())) continue;
               try {
                 getContentResolver()
                     .takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION);
-                tracks.put(uri.toString(), metadata(uri));
+                String source = uri.toString();
+                String owner = sources.get(source);
+                if (existing != null) {
+                  JSONObject track = tracks.optJSONObject(existing);
+                  if (track == null) return;
+                  if (owner != null && !owner.equals(existing)) {
+                    runOnUiThread(() -> toast("Этот файл уже связан с другим треком"));
+                    return;
+                  }
+                  oldSource = track.optString("source", existing);
+                  track.put("source", source);
+                } else if (owner == null) {
+                  String key = tracks.has(source) ? UUID.randomUUID().toString() : source;
+                  tracks.put(key, metadata(uri).put("source", source));
+                  sources.put(source, key);
+                }
               } catch (Exception e) {
                 failed++;
               }
             }
             boolean saved = prefs.edit().putString("tracks", tracks.toString()).commit();
+            if (saved && oldSource != null && !uris.contains(Uri.parse(oldSource))) {
+              try {
+                getContentResolver()
+                    .releasePersistableUriPermission(
+                        Uri.parse(oldSource), Intent.FLAG_GRANT_READ_URI_PERMISSION);
+              } catch (SecurityException ignored) {
+              }
+            }
             final int errors = failed;
             runOnUiThread(
                 () -> {
                   library();
                   if (!saved || errors > 0) toast("Часть треков не удалось сохранить");
+                  else if (existing != null) toast("Доступ к файлу восстановлен");
                 });
           } catch (JSONException e) {
             runOnUiThread(() -> toast("Не удалось прочитать библиотеку"));
@@ -431,76 +485,84 @@ public class Main extends Activity {
   }
 
   void check(boolean manual) {
+    if (manual) {
+      manualCheck = true;
+      toast("Проверяем Android-версию…");
+    }
     if (checking) return;
     checking = true;
-    if (manual) toast("Проверяем Android-версию…");
-    worker.execute(
-        () -> {
-          HttpURLConnection conn = null;
-          String link = "", message = "У вас последняя Android-версия";
-          boolean success = false;
-          try {
-            conn =
-                (HttpURLConnection)
-                    new URL("https://api.github.com/repos/Aurum2347/Playly/releases/tags/android")
-                        .openConnection();
-            conn.setConnectTimeout(8000);
-            conn.setReadTimeout(8000);
-            conn.setRequestProperty("User-Agent", "Playly-Android");
-            if (conn.getResponseCode() == 404) {
-              message = "Android-релиз пока не опубликован";
-              success = true;
-            } else {
-              StringBuilder body = new StringBuilder();
-              try (BufferedReader in =
-                  new BufferedReader(new InputStreamReader(conn.getInputStream(), "UTF-8"))) {
-                String line;
-                while ((line = in.readLine()) != null) {
-                  body.append(line);
-                  if (body.length() > 2000000) throw new IOException();
+    new Thread(
+            () -> {
+              HttpURLConnection conn = null;
+              String link = "", message = "У вас последняя Android-версия";
+              boolean success = false;
+              try {
+                conn =
+                    (HttpURLConnection)
+                        new URL(
+                                "https://api.github.com/repos/Aurum2347/Playly/releases/tags/android")
+                            .openConnection();
+                conn.setConnectTimeout(8000);
+                conn.setReadTimeout(8000);
+                conn.setRequestProperty("User-Agent", "Playly-Android");
+                if (conn.getResponseCode() == 404) {
+                  message = "Android-релиз пока не опубликован";
+                  success = true;
+                } else {
+                  StringBuilder body = new StringBuilder();
+                  try (BufferedReader in =
+                      new BufferedReader(new InputStreamReader(conn.getInputStream(), "UTF-8"))) {
+                    String line;
+                    while ((line = in.readLine()) != null) {
+                      body.append(line);
+                      if (body.length() > 2000000) throw new IOException();
+                    }
+                  }
+                  JSONArray assets = new JSONObject(body.toString()).getJSONArray("assets");
+                  long newest =
+                      getPackageManager().getPackageInfo(getPackageName(), 0).getLongVersionCode();
+                  boolean found = false;
+                  for (int i = 0; i < assets.length(); i++) {
+                    String name = assets.getJSONObject(i).getString("name");
+                    Matcher match =
+                        Pattern.compile("Playly-android-([1-9][0-9]{0,9})\\.apk").matcher(name);
+                    if (!match.matches()) continue;
+                    found = true;
+                    long code = Long.parseLong(match.group(1));
+                    if (code > newest) {
+                      newest = code;
+                      link =
+                          "https://github.com/Aurum2347/Playly/releases/download/android/" + name;
+                    }
+                  }
+                  if (!found) message = "В релизе пока нет Android APK";
+                  success = true;
                 }
+              } catch (Exception e) {
+                message = "Не удалось проверить обновление. Попробуйте позже.";
+              } finally {
+                if (conn != null) conn.disconnect();
               }
-              JSONArray assets = new JSONObject(body.toString()).getJSONArray("assets");
-              long newest =
-                  getPackageManager().getPackageInfo(getPackageName(), 0).getLongVersionCode();
-              boolean found = false;
-              for (int i = 0; i < assets.length(); i++) {
-                String name = assets.getJSONObject(i).getString("name");
-                Matcher match =
-                    Pattern.compile("Playly-android-([1-9][0-9]{0,9})\\.apk").matcher(name);
-                if (!match.matches()) continue;
-                found = true;
-                long code = Long.parseLong(match.group(1));
-                if (code > newest) {
-                  newest = code;
-                  link = "https://github.com/Aurum2347/Playly/releases/download/android/" + name;
-                }
-              }
-              if (!found) message = "В релизе пока нет Android APK";
-              success = true;
-            }
-          } catch (Exception e) {
-            message = "Не удалось проверить обновление. Попробуйте позже.";
-          } finally {
-            if (conn != null) conn.disconnect();
-          }
-          if (success)
-            prefs
-                .edit()
-                .putLong("checked", System.currentTimeMillis())
-                .putString("available", link)
-                .putInt("offerFor", versionCode())
-                .apply();
-          String result = link, status = message;
-          boolean successfulCheck = success;
-          runOnUiThread(
-              () -> {
-                checking = false;
-                if (isDestroyed()) return;
-                if (successfulCheck) available = result;
-                send("update", JSONObject.quote(available));
-                if (manual && result.isEmpty()) toast(status);
-              });
-        });
+              if (success)
+                prefs
+                    .edit()
+                    .putLong("checked", System.currentTimeMillis())
+                    .putString("available", link)
+                    .putInt("offerFor", versionCode())
+                    .apply();
+              String result = link, status = message;
+              boolean successfulCheck = success;
+              runOnUiThread(
+                  () -> {
+                    checking = false;
+                    if (isDestroyed()) return;
+                    if (successfulCheck) available = result;
+                    send("update", JSONObject.quote(available));
+                    if (manualCheck && result.isEmpty()) toast(status);
+                    manualCheck = false;
+                  });
+            },
+            "playly-update")
+        .start();
   }
 }

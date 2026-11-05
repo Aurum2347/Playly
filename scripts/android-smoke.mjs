@@ -46,7 +46,7 @@ async function until(expression) {
 }
 try {
   await until(
-    "document.querySelector('.track')?.textContent.includes('Playly-test.wav')",
+    "document.querySelector('.track') && document.querySelector('.track').textContent.includes('Playly-test.wav')",
   )
   await evaluate("document.querySelector('.track').click()")
   await until('state.playing && state.pos>0 && state.duration>=59000')
@@ -69,10 +69,10 @@ try {
     "[...$('sheetBody').querySelectorAll('button')].find(b=>b.textContent==='Новый плейлист').click()",
   )
   await evaluate(
-    "$('sheetBody').querySelector('input').value='Playly smoke'; $('sheetBody').querySelector('button').click(); document.querySelector('[data-page=lists]').click()",
+    "window.auditListName='Playly smoke '+Date.now(); $('sheetBody').querySelector('input').value=auditListName; $('sheetBody').querySelector('button').click(); document.querySelector('[data-page=lists]').click()",
   )
   await evaluate(
-    "[...$('content').querySelectorAll('button')].find(b=>b.textContent.startsWith('Playly smoke')).click()",
+    "[...$('content').querySelectorAll('button')].find(b=>b.textContent===auditListName+' · 1').click()",
   )
   assert.ok(await evaluate("!!$('content').querySelector('.track')"))
   await evaluate(
@@ -101,8 +101,39 @@ try {
     ),
   )
   assert.ok(await evaluate('document.documentElement.scrollWidth<=innerWidth'))
+  const nativeState = await evaluate('({...state})')
+  try {
+    await evaluate("if(!state.shuffle) Android.control('shuffle',0)")
+    // Tap repeat through its public control until it is off.
+    for (let i = 0; i < (3 - nativeState.repeat) % 3; i++) {
+      await evaluate("Android.control('repeat',0)")
+    }
+    await until('state.shuffle && state.repeat===0')
+    await evaluate(
+      "Android.control('seek',state.duration-500); Android.control('toggle',0)",
+    )
+    await until('!state.playing && state.pos<1000')
+  } finally {
+    if (!nativeState.shuffle) await evaluate("Android.control('shuffle',0)")
+    for (let i = 0; i < nativeState.repeat; i++)
+      await evaluate("Android.control('repeat',0)")
+  }
+  await evaluate(`window.auditOriginal = { tracks, receive, state };
+    window.receive=()=>{}; tracks={probe:{title:'Я'.repeat(150),artist:'A'.repeat(200)}};
+    lists.push({name:'Щ'.repeat(80),ids:['probe']}); $('now').close(); go('lists')`)
+  try {
+    assert.ok(await evaluate("$('main').scrollWidth <= $('main').clientWidth"))
+    await evaluate("go('lists', lists[lists.length-1]); actions('probe')")
+    assert.ok(await evaluate("$('main').scrollWidth <= $('main').clientWidth"))
+    assert.ok(await evaluate("$('sheet').scrollWidth <= $('sheet').clientWidth"))
+    await evaluate("$('sheet').close(); paint({...state,uri:'probe'}); $('now').showModal()")
+    assert.ok(await evaluate("$('now').scrollWidth <= $('now').clientWidth"))
+  } finally {
+    await evaluate(`$('sheet').close(); $('now').close(); lists.pop(); tracks=auditOriginal.tracks;
+      window.receive=auditOriginal.receive; go('library'); paint(auditOriginal.state); delete window.auditOriginal`)
+  }
   console.log(
-    'PASS: playback, pause, seeking, likes, playlists, search, update settings, animation and horizontal layout',
+    'PASS: playback, pause, seek, likes, playlists, search, settings, animation, long names and end of shuffled queue',
   )
 } finally {
   ws.close()
