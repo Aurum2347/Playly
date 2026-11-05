@@ -5,7 +5,7 @@
 Современный, быстрый и полностью офлайн аудиоплеер для Windows.  
 Никаких аккаунтов, подписок и стриминга.
 
-[⬇️ Скачать последний релиз](https://github.com/Aurum2347/Playly/releases/latest) • [🌐 Подробнее о проекте]([ССЫЛКА_НА_ПОДРОБНОСТИ]) • [💬 Telegram-канал](https://t.me/aurums2347)
+[⬇️ Скачать последний релиз](https://github.com/Aurum2347/Playly/releases/latest) • [🌐 Подробнее о проекте]([https://aurum2347.github.io/Playly/]) • [💬 Telegram-канал](https://t.me/aurums2347)
 
 </div>
 
