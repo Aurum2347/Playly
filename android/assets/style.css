@@ -1,0 +1,461 @@
+* {
+  box-sizing: border-box;
+}
+:root {
+  color-scheme: dark;
+  --bg: #0a0a0c;
+  --panel: #18181d;
+  --line: #2a2a31;
+  --muted: #a6a6b2;
+  --ink: #f4f3f5;
+  --tint: #d2c5f4;
+}
+body {
+  margin: 0;
+  height: 100vh;
+  height: 100dvh;
+  background: var(--bg);
+  color: var(--ink);
+  font:
+    16px Roboto,
+    system-ui,
+    sans-serif;
+  display: flex;
+  flex-direction: column;
+  overscroll-behavior: none;
+}
+header,
+nav,
+.heading,
+.npTop,
+.transport,
+.times,
+.row,
+#mini,
+label,
+.actions {
+  display: flex;
+  align-items: center;
+}
+header,
+.heading,
+.npTop,
+.times {
+  justify-content: space-between;
+}
+header {
+  padding: 4px 16px 0 22px;
+}
+header strong {
+  font-size: 23px;
+  letter-spacing: -1px;
+  display: flex;
+  gap: 9px;
+  align-items: center;
+}
+header .has-update {
+  position: relative;
+}
+header .has-update:after {
+  content: '';
+  position: absolute;
+  right: 8px;
+  top: 6px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--tint);
+}
+header i {
+  display: inline-block;
+  width: 20px;
+  height: 22px;
+  border-radius: 5px;
+  background: var(--ink);
+  clip-path: polygon(0 0, 100% 50%, 0 100%, 0 70%, 44% 50%, 0 30%);
+}
+button {
+  font: inherit;
+  color: inherit;
+  background: transparent;
+  border: 0;
+  min-height: 48px;
+  min-width: 48px;
+  cursor: pointer;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  transition:
+    transform 0.14s ease,
+    background 0.18s ease;
+  border-radius: 14px;
+}
+button:active {
+  transform: scale(0.96);
+  background: #ffffff12;
+}
+button:focus-visible,
+input:focus-visible {
+  outline: 2px solid var(--tint);
+  outline-offset: 1px;
+}
+svg {
+  width: 23px;
+  height: 23px;
+  vertical-align: middle;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+main {
+  overflow: auto;
+  flex: 1;
+  min-height: 0;
+  padding: 16px 20px 24px;
+  overscroll-behavior: contain;
+}
+h1,
+h2,
+p {
+  margin: 0;
+}
+h1 {
+  font-size: clamp(30px, 8vw, 44px);
+  letter-spacing: -1.6px;
+  line-height: 1.12;
+  overflow-wrap: anywhere;
+}
+.heading {
+  gap: 10px;
+  margin-bottom: 20px;
+}
+.round,
+.primary {
+  background: var(--ink);
+  color: var(--bg);
+  border-radius: 50%;
+}
+.round {
+  flex: none;
+}
+label {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  gap: 10px;
+  padding: 0 14px;
+  color: var(--muted);
+  margin-bottom: 16px;
+}
+input:not([type='range']) {
+  border: 0;
+  color: var(--ink);
+  background: transparent;
+  font: inherit;
+  width: 100%;
+  min-height: 48px;
+  min-width: 0;
+}
+.row {
+  border-bottom: 1px solid #ffffff0b;
+  gap: 2px;
+}
+.row > .track,
+#expand {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  text-align: left;
+  padding: 9px 0;
+}
+.names {
+  min-width: 0;
+  display: block;
+}
+.names b,
+.names small {
+  display: block;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.names b {
+  font-size: 16px;
+}
+.names small,
+small,
+p {
+  color: var(--muted);
+  margin-top: 4px;
+}
+.art {
+  position: relative;
+  display: grid;
+  place-items: center;
+  background:
+    radial-gradient(circle at 24% 16%, #777084, transparent 65%),
+    linear-gradient(135deg, #373642, #17171c);
+  overflow: hidden;
+  width: 50px;
+  height: 50px;
+  border-radius: 12px;
+  flex: none;
+}
+.art:before {
+  content: '';
+  width: 78%;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle, #151519 3%, #d3cbd9 4% 13%, transparent 14%),
+    repeating-radial-gradient(circle, #34333b 0 2%, #24232a 3% 5%);
+  box-shadow: 3px 5px 9px #0005;
+}
+.art img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.current b,
+[aria-pressed='true'] {
+  color: var(--tint);
+}
+.empty {
+  text-align: center;
+  padding: clamp(20px, 5vh, 58px) 12px;
+}
+.empty .art {
+  width: 108px;
+  height: 108px;
+  margin: 0 auto 20px;
+  border-radius: 24px;
+  transform: rotate(-6deg);
+}
+.empty h2 {
+  font-size: 23px;
+  letter-spacing: -0.7px;
+}
+.empty p {
+  line-height: 1.5;
+  margin: 8px auto 20px;
+  max-width: 29ch;
+}
+.primary,
+.secondary {
+  border-radius: 26px;
+  padding: 0 20px;
+  font-weight: 600;
+}
+.secondary {
+  background: #29292f;
+}
+.wide {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 9px 12px;
+}
+.wide[aria-pressed='true'] {
+  background: #302c39;
+}
+nav {
+  justify-content: space-around;
+  background: #101013;
+  border-top: 1px solid var(--line);
+  padding: 4px 10px 7px;
+}
+nav button {
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 3px;
+  font-size: 12px;
+  min-width: 72px;
+  color: var(--muted);
+}
+nav button[aria-current='page'] {
+  background: #242329;
+  color: var(--ink);
+}
+#mini {
+  background: #222127;
+  border: 1px solid #35343c;
+  margin: 4px 10px 8px;
+  border-radius: 18px;
+  padding: 0 6px 0 9px;
+}
+#mini .art {
+  width: 40px;
+  height: 40px;
+}
+dialog {
+  color: var(--ink);
+  background: #19191e;
+  border: 1px solid var(--line);
+  width: min(100%, 520px);
+  max-width: 100%;
+  max-height: 86dvh;
+  margin: auto auto 0;
+  border-radius: 26px 26px 0 0;
+  padding: 10px 20px 20px;
+}
+dialog[open] {
+  animation: sheet-in 0.24s cubic-bezier(0.2, 0.75, 0.2, 1);
+}
+dialog::backdrop {
+  background: #0009;
+}
+.handle {
+  width: 38px;
+  height: 4px;
+  border-radius: 4px;
+  margin: 0 auto 16px;
+  background: #565660;
+}
+dialog h2 {
+  font-size: 24px;
+  letter-spacing: -0.7px;
+  overflow-wrap: anywhere;
+}
+dialog p {
+  line-height: 1.45;
+}
+#sheetBody {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+#closeSheet {
+  width: 100%;
+}
+#now[open] {
+  position: fixed;
+  inset: 0;
+  margin: auto;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  height: 100%;
+  max-height: 100%;
+  border: 0;
+  border-radius: 0;
+  padding: 10px max(20px, calc((100% - 480px) / 2)) 20px;
+  background:
+    radial-gradient(ellipse at 35% 10%, #35313f, transparent 65%), #101014;
+  overflow: auto;
+}
+#bigArt {
+  min-height: 64px;
+  flex: 1;
+  display: grid;
+  place-items: center;
+}
+#bigArt .art {
+  width: min(100%, 43dvh, 440px);
+  height: auto;
+  aspect-ratio: 1;
+  border-radius: 24px;
+  box-shadow: 0 20px 40px #0005;
+}
+#npTitle {
+  font-size: clamp(23px, 6vw, 36px);
+}
+#seek {
+  width: 100%;
+  height: 44px;
+  accent-color: var(--ink);
+  margin: 0;
+}
+.times {
+  font-size: 13px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.transport {
+  justify-content: space-between;
+}
+.transport .round {
+  width: 60px;
+  height: 60px;
+}
+.transport button {
+  position: relative;
+}
+#repeat.one:after {
+  content: '1';
+  font-size: 10px;
+  position: absolute;
+  right: 4px;
+  top: 4px;
+}
+.enter {
+  animation: enter 0.22s ease-out;
+}
+@keyframes enter {
+  from {
+    opacity: 0.3;
+    transform: translateY(5px);
+  }
+}
+@keyframes sheet-in {
+  from {
+    opacity: 0;
+    transform: translateY(28px);
+  }
+}
+.spinning .art:not(:has(img)):before {
+  animation: vinyl 12s linear infinite;
+  background:
+    radial-gradient(circle, #151519 3%, #d3cbd9 4% 13%, transparent 14%),
+    conic-gradient(
+      from 20deg,
+      transparent,
+      #fff2,
+      transparent 22%,
+      transparent 50%,
+      #fff2,
+      transparent 72%
+    ),
+    repeating-radial-gradient(circle, #34333b 0 2%, #24232a 3% 5%);
+}
+@keyframes vinyl {
+  to {
+    transform: rotate(1turn);
+  }
+}
+[hidden] {
+  display: none !important;
+}
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+@media (max-height: 460px) and (orientation: landscape) {
+  #now[open] {
+    display: grid;
+    grid-template-columns: 1fr 1.4fr;
+    align-content: center;
+  }
+  #bigArt {
+    grid-row: 1/5;
+  }
+  .npTop {
+    grid-column: 2;
+  }
+  .empty {
+    padding: 8px;
+  }
+  .empty .art {
+    display: none;
+  }
+}

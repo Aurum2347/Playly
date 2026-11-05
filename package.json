@@ -4,12 +4,11 @@
   "version": "2.0.6",
   "type": "module",
   "scripts": {
-    "dev": "vite",
-    "build": "tsc -b && vite build",
+    "dev": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/android.ps1 -Install",
+    "build": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/android.ps1",
     "lint": "eslint .",
-    "preview": "vite preview",
-    "tauri": "tauri",
-    "release": "node scripts/release.mjs"
+    "test:android": "node scripts/android-smoke.mjs",
+    "release": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/android.ps1 -Release"
   },
   "dependencies": {
     "@fontsource/inter": "^5.3.0",

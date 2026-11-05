@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content"
+    />
+    <meta name="theme-color" content="#0a0a0c" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; connect-src 'none'"
+    />
+    <title>Playly</title>
+    <link rel="stylesheet" href="style.css" />
+    <script src="app.js" defer></script>
+  </head>
+  <body>
+    <header>
+      <strong><i></i> Playly</strong
+      ><button
+        id="settings"
+        aria-label="Настройки"
+        data-icon="settings"
+      ></button>
+    </header>
+    <main id="main">
+      <div class="heading">
+        <h1 id="heading">Моя музыка</h1>
+        <button
+          class="round"
+          id="add"
+          aria-label="Добавить музыку"
+          data-icon="plus"
+        ></button>
+      </div>
+      <div id="filter">
+        <label
+          ><span data-icon="search"></span
+          ><input
+            id="search"
+            type="search"
+            placeholder="Найти трек или артиста"
+            aria-label="Поиск"
+        /></label>
+      </div>
+      <div id="content"></div>
+    </main>
+    <div id="mini" hidden>
+      <button id="expand">
+        <span id="miniArt"></span
+        ><span class="names"
+          ><b id="miniTitle"></b><small id="miniArtist"></small
+        ></span></button
+      ><button id="miniToggle" aria-label="Воспроизведение"></button
+      ><button
+        id="miniNext"
+        aria-label="Следующий трек"
+        data-icon="next"
+      ></button>
+    </div>
+    <nav aria-label="Разделы">
+      <button data-page="library" aria-current="page">
+        <span data-icon="library"></span>Музыка</button
+      ><button data-page="likes"><span data-icon="heart"></span>Любимое</button
+      ><button data-page="lists">
+        <span data-icon="lists"></span>Плейлисты
+      </button>
+    </nav>
+    <dialog id="sheet">
+      <div class="handle"></div>
+      <div id="sheetBody"></div>
+      <button class="secondary" id="closeSheet">Закрыть</button>
+    </dialog>
+    <dialog id="now">
+      <div class="npTop">
+        <button id="collapse" aria-label="Свернуть" data-icon="down"></button
+        ><strong>Сейчас играет</strong
+        ><button id="npLike" aria-label="В любимое" data-icon="heart"></button>
+      </div>
+      <div id="bigArt"></div>
+      <div>
+        <h2 id="npTitle"></h2>
+        <p id="npArtist"></p>
+      </div>
+      <div>
+        <input
+          type="range"
+          min="0"
+          max="1"
+          value="0"
+          id="seek"
+          aria-label="Позиция воспроизведения"
+        />
+        <div class="times">
+          <span id="elapsed">0:00</span><span id="duration">0:00</span>
+        </div>
+      </div>
+      <div class="transport">
+        <button
+          id="shuffle"
+          data-icon="shuffle"
+          aria-label="Перемешать"
+        ></button
+        ><button
+          id="previous"
+          data-icon="prev"
+          aria-label="Предыдущий трек"
+        ></button
+        ><button
+          class="round"
+          id="npToggle"
+          aria-label="Воспроизведение"
+        ></button
+        ><button id="next" data-icon="next" aria-label="Следующий трек"></button
+        ><button
+          id="repeat"
+          data-icon="repeat"
+          aria-label="Режим повтора"
+        ></button>
+      </div>
+    </dialog>
+  </body>
+</html>

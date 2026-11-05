@@ -1,91 +1,19 @@
-<div align="center">
+# Playly для Android
 
-# 🎧 Playly
+Офлайн-плеер для Android 9 и новее. Приложение открывает выбранные в системном диалоге аудиофайлы, сохраняет доступ к ним между запусками и читает встроенные обложки. Библиотека, избранное и плейлисты хранятся на устройстве. Воспроизведением управляют приложение, системная медиапанель и экран блокировки. В настройках есть пресеты эквалайзера для баса, вокала и высоких частот. Можно также открыть системный эквалайзер, если производитель его предоставляет.
 
-Современный, быстрый и полностью офлайн аудиоплеер для Windows.  
-Никаких аккаунтов, подписок и стриминга.
+## Сборка на Windows
 
-[⬇️ Скачать последний релиз](https://github.com/Aurum2347/Playly/releases/latest) • [🌐 Подробнее о проекте]([ССЫЛКА_НА_ПОДРОБНОСТИ]) • [💬 Telegram-канал](https://t.me/aurums2347)
+Нужны JDK 17+, Android SDK Platform 36.1 и Build Tools 36.0.0. Укажите `JAVA_HOME` и `ANDROID_HOME`. Запустите `npm run build` или `.\scripts\android.ps1`. Установка npm-зависимостей для APK не требуется. Команда `npm run dev` собирает и запускает APK на подключённом устройстве или эмуляторе (при нескольких устройствах задайте `ANDROID_SERIAL`). Полученный `android/build/Playly-debug.apk` можно установить через `adb install -r android/build/Playly-debug.apk`. Отладочный ключ хранится в игнорируемом каталоге сборки. Идентификатор приложения — `com.playly.player`.
 
-</div>
+Исходники мобильного плеера находятся в `android/src`, локальный интерфейс — в `android/assets`. Сборка использует иконки Playly из `src-tauri/icons/android` и версию из `package.json`.
 
----
+## Проверка на эмуляторе
 
-## 🖥 Интерфейс
+В тестовой медиатеке импортируйте через системный диалог минутный WAV с именем `Playly-test.wav`. Для debug-сборки пробросьте сокет WebView командой `adb forward tcp:9222 localabstract:webview_devtools_remote_<PID>`, где PID выдаёт `adb shell pidof com.playly.player`. Затем выполните `npm run test:android` (Node.js 22+). Тест управляет плеером и создаёт тестовый плейлист на эмуляторе.
 
-<table>
-  <tr>
-    <td align="center"><b>Главная</b><br>Быстрый доступ к последнему треку</td>
-    <td align="center"><b>Все треки</b><br>Полный контроль, сортировки и поиск</td>
-  </tr>
-  <tr>
-    <td><img src="https://github.com/user-attachments/assets/fe4d96d6-bc29-4ab2-b94b-80ba66a0ea75" alt="Главная страница Playly" width="100%"></td>
-    <td><img src="https://github.com/user-attachments/assets/1785d8f5-b737-4be6-8237-bf5f0c4843ac" alt="Все треки Playly" width="100%"></td>
-  </tr>
-  <tr>
-    <td align="center" colspan="2"><b>Понравившиеся</b><br>Твои избранные треки со статистикой</td>
-  </tr>
-  <tr>
-    <td colspan="2"><img src="https://github.com/user-attachments/assets/24215edd-c68a-47b3-b014-ca721bea9932" alt="Понравившиеся треки Playly" width="100%"></td>
-  </tr>
-</table>
+## Обновления APK
 
----
+Для релиза задайте `PLAYLY_KEYSTORE`, `PLAYLY_KEY_ALIAS`, `PLAYLY_STORE_PASS` и `PLAYLY_KEY_PASS`, увеличьте версию в `package.json` и запустите `npm run release`. Сохраняйте один релизный ключ для всех версий. Код версии равен major × 10000 + minor × 100 + patch (minor и patch от 0 до 99).
 
-## 📂 Приватность и данные
-
-Playly уважает твою приватность. Вся библиотека, плейлисты, настройки и профиль лежат **только на твоём ПК**.
-
-> **Путь к данным:** `%AppData%\com.playly.player\playly` (Windows), `~/.local/share/com.playly.player/playly` (Linux)
-> 
-> Хочешь начать с чистого листа или удалить все следы? Просто удали эту папку.
-
----
-
-
-## 🚀 Как запустить
-
-1. Перейди в раздел [Releases](https://github.com/Aurum2347/Playly/releases/latest).
-2. Скачай `Playly.exe`.
-3. Запусти двойным кликом. Готово!
-
-*(Требуется Windows 10 или 11. WebView2 обычно уже встроен в систему).*
-
----
-
-## 🛠 Сборка из исходников
-
-Нужны [Node.js](https://nodejs.org) 20+ и [Rust](https://rustup.rs) (stable).
-
-```bash
-npm install
-npm run tauri dev     # запуск в режиме разработки
-npm run tauri build   # сборка установщиков
-```
-
-### Linux (экспериментально)
-
-Системные библиотеки (Debian / Ubuntu 22.04+):
-
-```bash
-sudo apt install libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev \
-  libssl-dev libxdo-dev build-essential curl wget file \
-  gstreamer1.0-plugins-base gstreamer1.0-plugins-good gstreamer1.0-libav
-```
-
-Fedora: `webkit2gtk4.1-devel libayatana-appindicator-gtk3-devel librsvg2-devel openssl-devel libxdo-devel gstreamer1-plugins-base gstreamer1-plugins-good`.
-
-`npm run tauri build` соберёт `.AppImage`, `.deb` и `.rpm` в `src-tauri/target/release/bundle/`. Звук в WebKitGTK идёт через GStreamer: без пакетов `gstreamer*-plugins-*` часть форматов (MP3, AAC/M4A) не заиграет.
-
-Особенности Linux-версии:
-- у иконки в трее меню («Открыть Playly», «Мини-плеер», «Выйти») — щелчков по иконке Linux не передаёт; в GNOME для трея нужно расширение AppIndicator;
-- обновляется сама только AppImage, `.deb` и `.rpm` — вручную со страницы релиза;
-- выбор устройства вывода звука WebKitGTK не поддерживает — звук идёт в системное устройство по умолчанию.
-
----
-
-<div align="center">
-
-[![Telegram](https://img.shields.io/badge/Telegram-2CA5E0?style=for-the-badge&logo=telegram&logoColor=white)](https://t.me/aurums2347) 
-
-</div>
+Загрузите подписанный `Playly-android-<код версии>.apk` в GitHub Release репозитория Aurum2347/Playly с постоянным тегом `android`. Проверка выполняется при открытии приложения максимум раз в сутки после успешного запроса и вручную из настроек. Для более новой версии Playly предлагает скачать APK в браузере. Установку подтверждает пользователь в Android. Публикация и подпись релиза выполняются владельцем ключа.
