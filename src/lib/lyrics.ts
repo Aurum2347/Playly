@@ -52,7 +52,7 @@ export function parseLyrics(raw: string): Lyrics | null {
     }
   }
 
-  if (synced.length >= 2) {
+  if (synced.length >= 1) {
     const lines = synced
       .map((l) => ({ time: Math.max(0, l.time - offset), text: l.text }))
       .sort((a, b) => a.time - b.time)
@@ -66,6 +66,20 @@ export function parseLyrics(raw: string): Lyrics | null {
 }
 
 const cache = new Map<string, Promise<Lyrics | null>>()
+
+const LYRICS_EVENT = 'playly-lyrics-updated'
+
+/** Текст трека изменился: сбрасываем кэш и сообщаем открытым экранам */
+export function lyricsUpdated(path: string) {
+  cache.delete(path)
+  window.dispatchEvent(new CustomEvent<string>(LYRICS_EVENT, { detail: path }))
+}
+
+export function onLyricsUpdated(listener: (path: string) => void) {
+  const handler = (event: Event) => listener((event as CustomEvent<string>).detail)
+  window.addEventListener(LYRICS_EVENT, handler)
+  return () => window.removeEventListener(LYRICS_EVENT, handler)
+}
 
 export function loadLyrics(filePath: string): Promise<Lyrics | null> {
   const hit = cache.get(filePath)

@@ -1,3 +1,4 @@
+import SafeImage from './SafeImage'
 import { useRef, type CSSProperties, type ReactNode } from 'react'
 import {
   DEFAULT_FRAME,
@@ -18,7 +19,7 @@ interface FramePreviewProps {
   style?: CSSProperties
   /* Слои поверх картинки (размытие баннера, затемнение и т.п.) */
   children?: ReactNode
-  /* Своя отрисовка картинки (например, баннер со слоями); внутри должен быть <img> */
+  /* Своя отрисовка картинки (например, баннер со слоями); внутри должен быть <SafeImage> */
   image?: ReactNode
 }
 
@@ -29,7 +30,7 @@ export function FramePreview({ src, frame, onChange, className, style, children,
 
   return (
     <div ref={boxRef} className={`frame-box ${className ?? ''}`} style={style} onPointerDown={onPointerDown}>
-      {image ?? <img src={src} alt="" draggable={false} style={frameStyle(frame)} />}
+      {image ?? <SafeImage src={src} alt="" draggable={false} style={frameStyle(frame)} />}
       {children}
     </div>
   )

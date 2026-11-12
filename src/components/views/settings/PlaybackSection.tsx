@@ -82,6 +82,9 @@ export default function PlaybackSection({
   const [localOutputDevice, setLocalOutputDevice] = useState('')
   const [outputDevices, setOutputDevices] = useState<{ id: string; label: string }[]>([])
   const [defaultDeviceName, setDefaultDeviceName] = useState('')
+  const [deviceRefresh, setDeviceRefresh] = useState(0)
+  const [deviceBusy, setDeviceBusy] = useState(false)
+  const [deviceError, setDeviceError] = useState('')
   const [normalization, setNormalization] = useState(true)
   const [eqEdit, setEqEdit] = useState<EqEditTarget | null>(null)
   const [openDropdown, setOpenDropdown] = useState<'output' | 'curve' | null>(null)
@@ -112,7 +115,7 @@ export default function PlaybackSection({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  /* ===== Список устройств вывода (без запроса микрофона) ===== */
+  /* Имена устройств появляются после явного разрешения пользователя. */
   useEffect(() => {
     let cancelled = false
     const load = async () => {
@@ -144,7 +147,7 @@ export default function PlaybackSection({
           setOutputDevices(
             outputs
               /* 'default' и 'communications' — псевдоустройства Windows, дублирующие реальные */
-              .filter((d) => d.deviceId !== 'default' && d.deviceId !== 'communications')
+              .filter((d, i, all) => d.deviceId && d.deviceId !== 'default' && d.deviceId !== 'communications' && all.findIndex((a) => a.deviceId === d.deviceId) === i)
               .map((d) => ({ id: d.deviceId, label: d.label }))
           )
         }
@@ -158,7 +161,7 @@ export default function PlaybackSection({
       cancelled = true
       navigator.mediaDevices?.removeEventListener?.('devicechange', load)
     }
-  }, [])
+  }, [deviceRefresh])
 
   const crossfadeValue = crossfade ?? localCrossfade
   const outputDeviceValue = outputDevice ?? localOutputDevice
@@ -185,7 +188,28 @@ export default function PlaybackSection({
     setLocalOutputDevice(id)
     if (onChangeOutputDevice) onChangeOutputDevice(id)
     else writeSettingsRaw({ outputDevice: id })
-    window.dispatchEvent(new CustomEvent('playly-output-device', { detail: id }))
+  }
+
+  const requestDevices = async () => {
+    setDeviceBusy(true)
+    setDeviceError('')
+    let stream: MediaStream | undefined
+    try {
+      const media = navigator.mediaDevices as MediaDevices & { selectAudioOutput?: () => Promise<MediaDeviceInfo> }
+      if (media?.selectAudioOutput) {
+        const selected = await media.selectAudioOutput()
+        handleOutputDeviceChange(selected.deviceId)
+      } else if (media?.getUserMedia) {
+        stream = await media.getUserMedia({ audio: true, video: false })
+      } else throw new Error('unsupported')
+      setDeviceRefresh((value) => value + 1)
+    } catch (error) {
+      const denied = error instanceof DOMException && error.name === 'NotAllowedError'
+      setDeviceError(denied ? 'audioDevices.denied' : 'audioDevices.failed')
+    } finally {
+      stream?.getTracks().forEach((track) => track.stop())
+      setDeviceBusy(false)
+    }
   }
 
   const handleNormalizationChange = (v: boolean) => {
@@ -370,6 +394,14 @@ export default function PlaybackSection({
               )}
             </div>
           </div>
+        </div>
+        <div className="audio-device-access">
+          {!outputDevices.length && <p className="setting-desc">{t('audioDevices.hint')}</p>}
+          <button className="btn" disabled={deviceBusy} onClick={() => void requestDevices()}>
+            {deviceBusy ? t('audioDevices.finding') : t('audioDevices.find')}
+          </button>
+          {/* Храним ключ, а не готовый текст: при смене языка сообщение переведётся */}
+          {deviceError && <p className="audio-device-error" role="status">{t(deviceError)}</p>}
         </div>
         {/* ===== Эквалайзер ===== */}
         <div className="setting-row">

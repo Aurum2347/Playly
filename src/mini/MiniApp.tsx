@@ -1,3 +1,4 @@
+import SafeImage from '../components/SafeImage'
 import { useEffect, useRef, useState, type CSSProperties } from 'react'
 import { emitTo, listen } from '@tauri-apps/api/event'
 import { invoke } from '@tauri-apps/api/core'
@@ -284,8 +285,8 @@ function MiniPlayer() {
 
   return (
     <div
-      className={`mini ${pinned ? 'pinned' : ''} ${compact ? 'compact' : ''} ${narrow ? 'narrow' : ''} ${wide ? 'wide' : ''}`}
-      style={{ '--tint': tint } as CSSProperties}
+      className={`mini ${state?.appearance?.background === 'dark' ? 'mini-solid' : ''} ${pinned ? 'pinned' : ''} ${compact ? 'compact' : ''} ${narrow ? 'narrow' : ''} ${wide ? 'wide' : ''}`}
+      style={{ '--tint': tint, '--mini-dim': state?.appearance?.dim ?? .4 } as CSSProperties}
       onWheel={(e) => {
         if (!state) return
         setVolume(state.volume + (e.deltaY < 0 ? 5 : -5))
@@ -293,7 +294,7 @@ function MiniPlayer() {
       }}
     >
       <div className="mini-bg" aria-hidden="true">
-        {stillUrl && <img src={stillUrl} alt="" />}
+        {stillUrl && <SafeImage src={stillUrl} alt="" />}
       </div>
 
       <header className="mini-head" data-tauri-drag-region onPointerDown={onHeadPointerDown}>
@@ -354,7 +355,7 @@ function MiniPlayer() {
 
       <div className="mini-body">
         <div className="mini-cover">
-          {cover ? <img key={cover} src={cover} alt="" draggable={false} /> : Icon.music}
+          {cover ? <SafeImage key={cover} src={cover} alt="" draggable={false} /> : Icon.music}
           {volumeFlash && (
             <div className="mini-volume-flash">
               {Icon.volume}

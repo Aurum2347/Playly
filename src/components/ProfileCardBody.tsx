@@ -1,3 +1,4 @@
+import SafeImage from './SafeImage'
 import { frameStyle, type ImageFrame } from '../lib/imageFrame'
 import type { AvatarShape } from '../lib/profile'
 import SessionClock from './SessionClock'
@@ -16,7 +17,7 @@ export default function ProfileCardBody({ nickname, avatarUrl, avatarShape, avat
   return (
     <>
       <div className={`profile-avatar ${avatarShape === 'square' ? 'square' : ''}`}>
-        {avatarUrl ? <img src={avatarUrl} alt="" draggable={false} style={frameStyle(avatarFrame)} /> : <DefaultAvatar seed={nickname} />}
+        {avatarUrl ? <SafeImage src={avatarUrl} alt="" draggable={false} style={frameStyle(avatarFrame)} /> : <DefaultAvatar seed={nickname} />}
       </div>
 
       <div className="profile-info">

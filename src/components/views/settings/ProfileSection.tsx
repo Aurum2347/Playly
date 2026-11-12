@@ -1,3 +1,4 @@
+import SafeImage from '../../SafeImage'
 import { useEffect, useRef, useState } from 'react'
 import { appDataDir, join } from '@tauri-apps/api/path'
 import { exists, readFile, readTextFile, writeFile, remove, mkdir } from '@tauri-apps/plugin-fs'
@@ -303,7 +304,7 @@ export default function ProfileSection({ currentNickname, onSaveNickname, looks 
             <div className="avatar-row">
               <div className={`avatar shape-${avatarShape}`}>
                 {avatarUrl ? (
-                  <img src={avatarUrl} alt={t('settings.profile.avatarImage')} style={frameStyle(avatarFrame)} />
+                  <SafeImage src={avatarUrl} alt={t('settings.profile.avatarImage')} style={frameStyle(avatarFrame)} />
                 ) : (
                   <DefaultAvatar seed={currentNickname} />
                 )}
@@ -405,7 +406,7 @@ export default function ProfileSection({ currentNickname, onSaveNickname, looks 
             >
               <LookLayers look={looks?.card} />
               <span className={`look-thumb-avatar ${avatarShape}`}>
-                {avatarUrl ? <img src={avatarUrl} alt="" draggable={false} style={frameStyle(avatarFrame)} /> : <DefaultAvatar seed={currentNickname} />}
+                {avatarUrl ? <SafeImage src={avatarUrl} alt="" draggable={false} style={frameStyle(avatarFrame)} /> : <DefaultAvatar seed={currentNickname} />}
               </span>
               <span className="look-thumb-lines"><i /><i /></span>
             </button>

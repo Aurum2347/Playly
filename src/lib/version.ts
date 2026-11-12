@@ -13,3 +13,14 @@ export const APP_CHANNEL: AppChannel = 'release'
 export function versionLabel(t: (key: string) => string, version = APP_VERSION, channel: AppChannel = APP_CHANNEL): string {
   return channel === 'release' ? version : `${version} ${t(`version.${channel}`)}`
 }
+
+/* «Посмотреть изменения» после обновления: страница «О программе» откроется сразу на списке изменений */
+let changelogRequested = false
+export function requestChangelog() {
+  changelogRequested = true
+}
+export function consumeChangelogRequest(): boolean {
+  const requested = changelogRequested
+  changelogRequested = false
+  return requested
+}

@@ -1,4 +1,4 @@
-import { customIdOf, type BuiltinParticle, type ParticleBehavior, type ParticleKind } from './appearance'
+import { customIdOf, type BuiltinParticle, type ParticleBehavior, type ParticleKind, type WindPhase } from './appearance'
 import { spriteFrame, type ParticleSprite } from './particleSprites'
 
 /*
@@ -20,6 +20,7 @@ export interface FieldOptions {
   speed: number
   size: number
   opacity: number
+  wind?: WindPhase[]
   custom?: CustomSpec | null
 }
 
@@ -57,6 +58,9 @@ const MAX_DPR = 1.5
 const EDGE = 60
 
 const rand = (a: number, b: number) => a + Math.random() * (b - a)
+/* Сколько секунд порыв перетекает в следующий */
+const WIND_BLEND = 2.5
+const smooth = (k: number) => k * k * (3 - 2 * k)
 const DEG = Math.PI / 180
 
 function makeSprite(size: number, draw: (ctx: CanvasRenderingContext2D, s: number) => void): HTMLCanvasElement {
@@ -147,6 +151,9 @@ export class ParticleField {
   private h = 0
   private dpr = 1
   private time = 0
+  /* Текущий ветер, пкс/с: нужен и шагу, и отрисовке наклона капель */
+  private windX = 0
+  private windY = 0
 
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas
@@ -366,7 +373,17 @@ export class ParticleField {
       case 'flow':
         p.x += p.vx * dt
         p.y += p.vy * dt
-        if (p.x < -m * 1.5 || p.x > w + m * 1.5 || p.y < -m * 1.5 || p.y > h + m * 1.5) this.particles[i] = this.spawn(false)
+        if (p.x < -m * 1.5 || p.x > w + m * 1.5 || p.y < -m * 1.5 || p.y > h + m * 1.5) {
+          /* Встречный ветер выдувал бы новую частицу обратно сразу на входе: с ветром выходим с другой стороны */
+          if (this.windX === 0 && this.windY === 0) {
+            this.particles[i] = this.spawn(false)
+            return
+          }
+          if (p.x < -m * 1.5) p.x = w + m
+          else if (p.x > w + m * 1.5) p.x = -m
+          if (p.y < -m * 1.5) p.y = h + m
+          else if (p.y > h + m * 1.5) p.y = -m
+        }
         return
       case 'wander': {
         const lim = Math.max(10, b.speedMax * 0.5)
@@ -456,11 +473,53 @@ export class ParticleField {
     if (!document.hidden) this.raf = requestAnimationFrame(this.frame)
   }
 
+  /** Ветер в момент t: порывы идут по кругу, конец каждого плавно перетекает в следующий */
+  private updateWind() {
+    const wind = this.opts.wind ?? []
+    const t = this.time
+    let x = 0
+    let y = 0
+    if (wind.length) {
+      const vec = (p: WindPhase) => [Math.sin(p.direction * DEG) * p.strength, Math.cos(p.direction * DEG) * p.strength]
+      const total = wind.reduce((sum, p) => sum + p.duration, 0)
+      let local = total > 0 ? t % total : 0
+      let i = 0
+      while (i < wind.length - 1 && local >= wind[i].duration) {
+        local -= wind[i].duration
+        i++
+      }
+      const cur = wind[i]
+      const next = wind[(i + 1) % wind.length]
+      const blend = Math.min(WIND_BLEND, cur.duration / 2)
+      const k = wind.length > 1 ? smooth(Math.max(0, Math.min(1, (local - (cur.duration - blend)) / blend))) : 0
+      const [ax, ay] = vec(cur)
+      const [bx, by] = vec(next)
+      /* Ветер «дышит»: сила слегка гуляет, а в первые секунды плавно набирается */
+      const gust = (0.85 + 0.15 * Math.sin(t * 0.8) * Math.sin(t * 0.37 + 1)) * Math.min(1, t / 2)
+      x = (ax + (bx - ax) * k) * gust
+      y = (ay + (by - ay) * k) * gust
+    }
+    this.windX = x
+    this.windY = y
+  }
+
   private step(dt: number) {
     const { w, h } = this
     const custom = this.isCustom()
+    this.updateWind()
+    const wx = this.windX
+    const wy = this.windY
+    const windy = wx !== 0 || wy !== 0
     for (let i = 0; i < this.particles.length; i++) {
       const p = this.particles[i]
+      if (windy) {
+        p.x += wx * dt
+        p.y += wy * dt
+        if (this.shown === 'stars') {
+          p.x = (p.x + w) % w
+          p.y = (p.y + h) % h
+        }
+      }
       if (custom) {
         this.stepCustom(p, i, dt)
         continue
@@ -496,7 +555,14 @@ export class ParticleField {
           break
       }
       if (this.shown === 'snow' || this.shown === 'sakura' || this.shown === 'leaves' || this.shown === 'rain') {
-        if (p.y > h + 40 || p.x < -80 || p.x > w + 80) this.particles[i] = this.spawn(false)
+        if (p.y > h + 40) this.particles[i] = this.spawn(false)
+        else if (windy) {
+          /* Ветер может нести вверх и вбок: такие частицы возвращаются с другой стороны,
+             иначе экран постепенно пустел бы */
+          if (p.x < -80) p.x += w + 160
+          else if (p.x > w + 80) p.x -= w + 160
+          if (p.y < -80) p.y = h + 30
+        } else if (p.x < -80 || p.x > w + 80) this.particles[i] = this.spawn(false)
       }
     }
   }
@@ -522,9 +588,12 @@ export class ParticleField {
       ctx.strokeStyle = `rgba(185, 205, 255, ${0.55 * base})`
       ctx.beginPath()
       for (const p of this.particles) {
-        const k = p.r / p.vy
+        /* Капля вытянута по своей скорости вместе с ветром */
+        const vx = p.vx + this.windX
+        const vy = Math.max(10, p.vy + this.windY)
+        const k = p.r / Math.hypot(vx, vy) * (Math.hypot(p.vx, p.vy) / p.vy)
         ctx.moveTo(p.x, p.y)
-        ctx.lineTo(p.x - p.vx * k, p.y - p.vy * k)
+        ctx.lineTo(p.x - vx * k, p.y - vy * k)
       }
       ctx.stroke()
       return

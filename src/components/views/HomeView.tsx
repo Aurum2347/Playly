@@ -1,3 +1,4 @@
+import SafeImage from '../SafeImage'
 import { useCallback, useMemo, useRef, useState, useEffect, useLayoutEffect, type CSSProperties } from 'react'
 import { createPortal } from 'react-dom'
 import type { Track, Playlist } from '../../App'
@@ -110,7 +111,7 @@ function TrackCard({ track, index, queue, onSelectTrack, playing, leaving, cardR
       onContextMenu={(e) => !leaving && onContextMenu?.(e, track.id)}
     >
       <div className="home-card-cover">
-        {track.cover ? <img src={track.cover} alt="" loading="lazy" decoding="async" /> : <MusicIcon />}
+        {track.cover ? <SafeImage src={track.cover} alt="" loading="lazy" decoding="async" /> : <MusicIcon />}
         <div className="home-card-play"><PlayIcon /></div>
         {playing && (
           <div className="home-card-eq" aria-hidden="true"><span /><span /><span /></div>
@@ -405,7 +406,7 @@ export default function HomeView({
             style={tint ? ({ '--hero-tint': tint } as CSSProperties) : undefined}
           >
             <div className="home-hero-backdrop" aria-hidden="true">
-              {heroTrack.cover && <img src={heroTrack.cover} alt="" />}
+              {heroTrack.cover && <SafeImage src={heroTrack.cover} alt="" />}
             </div>
             <div
               className="home-hero-cover"
@@ -419,7 +420,7 @@ export default function HomeView({
                 }
               }}
             >
-              {heroTrack.cover ? <img src={heroTrack.cover} alt="" /> : <MusicIcon />}
+              {heroTrack.cover ? <SafeImage src={heroTrack.cover} alt="" /> : <MusicIcon />}
             </div>
             <div className="home-hero-info" key={`i${heroTrack.id}`}>
               <div className="home-hero-label">
@@ -481,7 +482,7 @@ export default function HomeView({
                   onContextMenu={(e) => openTrackMenu(e, track.id)}
                 >
                   <span className="home-list-cover">
-                    {track.cover ? <img src={track.cover} alt="" loading="lazy" decoding="async" /> : <MusicIcon />}
+                    {track.cover ? <SafeImage src={track.cover} alt="" loading="lazy" decoding="async" /> : <MusicIcon />}
                     <span className="home-list-play"><PlayIcon /></span>
                   </span>
                   <span className="home-list-text">

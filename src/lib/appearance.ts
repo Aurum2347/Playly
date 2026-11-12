@@ -204,7 +204,38 @@ export interface ParticleRule {
   trackIds: number[]
 }
 
+/* Порыв ветра: direction — куда дует (0° вниз, 90° вправо), duration — секунды, strength — пкс/с */
+export interface WindPhase {
+  direction: number
+  duration: number
+  strength: number
+}
+
+export const WIND_MAX_PHASES = 5
+export const WIND_LIMITS = {
+  duration: { min: 1, max: 120 },
+  strength: { min: 0, max: 150 },
+} as const
+
+function normalizeWind(raw: unknown): WindPhase[] {
+  if (!Array.isArray(raw)) return []
+  return raw
+    .filter((p): p is Record<string, unknown> => !!p && typeof p === 'object')
+    .slice(0, WIND_MAX_PHASES)
+    .map((p) => {
+      /* В ранней версии сила умножалась на отдельную «скорость»: переносим её в силу */
+      const legacy = typeof p.speed === 'number' && Number.isFinite(p.speed) ? Math.max(0.1, Math.min(3, p.speed)) : 1
+      const strength = typeof p.strength === 'number' && Number.isFinite(p.strength) ? p.strength * legacy : 20
+      return {
+        direction: Math.round(num(p.direction, 0, 360, 90)) % 360,
+        duration: Math.round(num(p.duration, WIND_LIMITS.duration.min, WIND_LIMITS.duration.max, 8)),
+        strength: Math.round(num(strength, WIND_LIMITS.strength.min, WIND_LIMITS.strength.max, 20)),
+      }
+    })
+}
+
 export interface ParticleSettings {
+  wind?: WindPhase[]
   /* Эффект по умолчанию */
   kind: ParticleKind
   /* Множители: 1 — обычное значение */
@@ -297,6 +328,7 @@ export function normalizeParticles(raw: unknown): ParticleSettings {
         }))
     : []
   return {
+    wind: normalizeWind(r.wind),
     kind: valid(r.kind) ? r.kind : 'none',
     density: num(r.density, 0.25, 3, 1),
     speed: num(r.speed, 0.25, 3, 1),

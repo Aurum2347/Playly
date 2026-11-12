@@ -358,3 +358,155 @@
 .tem-switch .tem-label { margin: 0; }
 .tem-switch .tem-hint { margin: 0; }
 .tem-switch .toggle { flex-shrink: 0; }
+
+/* ===== «Дополнительно»: текст песни и эквалайзер трека ===== */
+.tem-section-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 22px 0 10px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+
+.tem-section-title::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--border-soft);
+}
+
+.tem-extra {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  /* Отступ от закреплённых снизу кнопок «Отмена / Сохранить» */
+  margin-bottom: 18px;
+}
+
+.tem-tile {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  padding: 12px;
+  border-radius: 12px;
+  border: 1px solid var(--border-soft);
+  background: var(--element);
+  color: var(--text-secondary);
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.16s ease, border-color 0.16s ease, transform 0.16s ease, box-shadow 0.16s ease;
+}
+
+button.tem-tile:hover,
+.tem-tile-eq:hover {
+  background: var(--hover);
+  border-color: var(--border);
+  box-shadow: 0 6px 16px var(--shadow);
+}
+
+button.tem-tile:active { transform: scale(0.985); }
+button.tem-tile:focus-visible,
+.tem-tile-main:focus-visible,
+.tem-tile-reset:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.tem-tile-icon {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  flex-shrink: 0;
+  border-radius: 10px;
+  background: var(--element-strong);
+  border: 1px solid var(--border-soft);
+  color: var(--text);
+}
+
+.tem-tile-icon svg { width: 18px; height: 18px; }
+
+.tem-tile-text { display: flex; flex-direction: column; gap: 3px; min-width: 0; flex: 1; }
+
+.tem-tile-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  line-height: 1.3;
+}
+
+.tem-tile-sub {
+  font-size: 11.5px;
+  color: var(--text-faint);
+  line-height: 1.35;
+}
+
+.tem-tile-arrow {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  color: var(--text-faint);
+  transition: transform 0.16s ease, color 0.16s ease;
+}
+
+.tem-tile:hover .tem-tile-arrow { color: var(--text-secondary); transform: translateX(2px); }
+
+/* Плитка эквалайзера: сама плитка — кнопка «открыть», внутри может быть «Сбросить» */
+.tem-tile-eq { padding: 0; cursor: default; flex-direction: column; align-items: stretch; gap: 0; }
+
+.tem-tile-main {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  padding: 12px;
+  border: 0;
+  border-radius: 12px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.tem-tile-eq.is-custom { border-color: color-mix(in srgb, var(--accent) 35%, var(--border-soft)); }
+.tem-tile-eq.is-custom .tem-tile-icon {
+  background: color-mix(in srgb, var(--accent) 18%, var(--element-strong));
+  border-color: color-mix(in srgb, var(--accent) 35%, transparent);
+}
+
+.tem-tile-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent);
+}
+
+.tem-tile-reset {
+  align-self: flex-start;
+  margin: -4px 12px 10px 60px;
+  padding: 4px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--border-soft);
+  background: var(--panel);
+  color: var(--text-muted);
+  font: inherit;
+  font-size: 11.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+
+.tem-tile-reset:hover { background: var(--hover-strong); color: var(--text); border-color: var(--border); }
+
+@media (max-width: 520px) {
+  .tem-extra { grid-template-columns: minmax(0, 1fr); }
+}

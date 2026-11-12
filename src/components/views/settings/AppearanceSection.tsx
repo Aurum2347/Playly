@@ -23,6 +23,8 @@ import {
 import { useI18n } from '../../../i18n'
 import type { Track } from '../../../App'
 import type { AppBackdrop, ParticleSettings } from '../../../lib/appearance'
+import IconEditor from './IconEditor'
+import { resetIcon } from '../../../lib/appIcon'
 import BackdropSettings from './BackdropSettings'
 import ParticleSettingsSection from './ParticleSettingsSection'
 import {
@@ -34,9 +36,13 @@ import {
   UI_SCALE_STEP,
 } from '../../../lib/uiScale'
 
+const APPEARANCE_TABS = ['general', 'background', 'icon'] as const
+
 /* Всё, что сбрасывает «Сбросить все настройки». Язык, библиотека и профиль не трогаются */
 const RESETTABLE_KEYS = [
   'theme',
+  'customTheme',
+  'appIcon',
   'customFont',
   'uiScale',
   'volume',
@@ -80,6 +86,7 @@ export default function AppearanceSection({
   tracks = [],
 }: AppearanceSectionProps) {
   const { t } = useI18n()
+  const [tab, setTab] = useState<(typeof APPEARANCE_TABS)[number]>('general')
   const [localTheme, setLocalTheme] = useState<ThemeMode>('dark')
   const [isThemeOpen, setIsThemeOpen] = useState(false)
   const dropdownRef = useRef<HTMLDivElement>(null)
@@ -106,6 +113,12 @@ export default function AppearanceSection({
     }
   }, [])
 
+  useEffect(() => {
+    const sync = (e: Event) => { setUiScale((e as CustomEvent<number>).detail); setScaleDraft(null) }
+    window.addEventListener('playly-ui-scale', sync)
+    return () => window.removeEventListener('playly-ui-scale', sync)
+  }, [])
+
   const commitScale = (value: number) => {
     const v = clampUiScale(value)
     setScaleDraft(null)
@@ -123,6 +136,7 @@ export default function AppearanceSection({
     try {
       deactivateFont()
       await deleteFontFiles()
+      await resetIcon().catch((e) => console.error('Иконка не сбросилась:', e))
       await removeSettingsKeys(RESETTABLE_KEYS)
       applyTheme('dark')
       await applyUiScale(UI_SCALE_DEFAULT)
@@ -181,6 +195,9 @@ export default function AppearanceSection({
         if (await exists(filePath)) {
           await activateFont(filePath)
           if (!cancelled) setCustomFontName(setting.name)
+        } else {
+          deactivateFont()
+          await removeSettingsKeys(['customFont'])
         }
       } catch (e) {
         console.error('Не удалось загрузить сохранённый шрифт:', e)
@@ -242,6 +259,15 @@ export default function AppearanceSection({
     <>
       <h1 className="page-title">{t('settings.appearance.title')}</h1>
       <p className="page-subtitle">{t('settings.appearance.subtitle')}</p>
+      <div className="appearance-tabs" role="tablist" aria-label={t('settings.appearance.title')}>
+        {APPEARANCE_TABS.map((id) => (
+          <button key={id} role="tab" aria-selected={tab === id} className="appearance-tab" onClick={() => setTab(id)}>
+            {t(`appearanceTabs.${id}`)}
+          </button>
+        ))}
+      </div>
+      {tab === 'icon' && <IconEditor />}
+      <div className="appearance-pane" hidden={tab !== 'general'}>
       <div className="settings-section">
         <div className="section-title">{t('settings.appearance.section')}</div>
         <div className="setting-row">
@@ -267,6 +293,7 @@ export default function AppearanceSection({
                       key={val}
                       className={`dropdown-option ${currentTheme === val ? 'active' : ''}`}
                       onClick={() => {
+                        void removeSettingsKeys(['customTheme'])
                         handleThemeChange(val)
                         setIsThemeOpen(false)
                       }}
@@ -361,6 +388,8 @@ export default function AppearanceSection({
         </div>
       </div>
 
+      </div>
+      <div className="appearance-pane" hidden={tab !== 'background'}>
       {backdrop && onChangeBackdrop && (
         <div className="settings-section">
           <div className="section-title">{t('settings.appearance.backdropSection')}</div>
@@ -372,6 +401,7 @@ export default function AppearanceSection({
         <ParticleSettingsSection value={particles} onChange={onChangeParticles} tracks={tracks} />
       )}
 
+      </div>
       <div className="settings-section">
         <div className="section-title">{t('settings.appearance.resetSection')}</div>
         <div className="setting-row">

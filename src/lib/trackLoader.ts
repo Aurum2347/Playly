@@ -1,5 +1,7 @@
 import { appDataDir, join, sep } from '@tauri-apps/api/path'
-import { exists, readTextFile, writeTextFile, readFile, writeFile, mkdir } from '@tauri-apps/plugin-fs'
+import { exists, readFile, writeFile, mkdir } from '@tauri-apps/plugin-fs'
+import { reportError } from './feedback'
+import { readLibraryJson, writeLibraryJson } from './libraryFiles'
 import { convertFileSrc, invoke } from '@tauri-apps/api/core'
 import type { Track, PlaylistBanner } from '../App'
 import { normalizeFrame } from './imageFrame'
@@ -9,7 +11,7 @@ import { writeSettingsRaw } from '../components/views/settings/helpers'
 
 /* Аудио и видео: у видео играет звуковая дорожка, а кадры можно взять для анимированной обложки */
 export const AUDIO_EXT = ['mp3', 'wav', 'm4a', 'flac', 'ogg', 'oga', 'aac', 'opus', 'wma', 'aif', 'aiff', 'weba']
-export const VIDEO_EXT = ['mp4', 'm4v', 'mov', 'webm', 'mkv']
+export const VIDEO_EXT = ['mp4', 'm4v', 'mov', 'webm', 'mkv', 'avi']
 export const SUPPORTED_EXT = [...AUDIO_EXT, ...VIDEO_EXT]
 
 export function isAudioFile(name: string): boolean {
@@ -238,11 +240,7 @@ export async function loadTracksFromConfig(
   onProgress?: (loaded: number, total: number) => void
 ): Promise<Track[]> {
   try {
-    const path = await getTracksConfigPath()
-    if (!(await exists(path))) return []
-
-    const content = await readTextFile(path)
-    const data = JSON.parse(content)
+    const data = await readLibraryJson('tracks.json')
     if (!Array.isArray(data)) return []
 
     const tracks = (data as Track[]).filter((t) => t && typeof t === 'object' && typeof t.id === 'number')
@@ -312,11 +310,10 @@ export async function loadTracksFromConfig(
 
 export async function saveTracksToConfig(tracks: Track[]): Promise<void> {
   try {
-    const path = await getTracksConfigPath()
     const stripped = tracks.map((t) => ({ ...t, cover: null }))
-    await writeTextFile(path, JSON.stringify(stripped))
+    await writeLibraryJson('tracks.json', stripped)
   } catch (e) {
-    console.error('Не удалось сохранить tracks.json:', e)
+    reportError('librarySave', e)
   }
 }
 
@@ -334,12 +331,7 @@ export interface PlaylistData {
 
 export async function loadPlaylists(): Promise<PlaylistData[]> {
   try {
-    const dir = await ensureConfigDir()
-    const path = await join(dir, 'playlists.json')
-    if (!(await exists(path))) return []
-
-    const content = await readTextFile(path)
-    const data = JSON.parse(content)
+    const data = await readLibraryJson('playlists.json')
     if (!Array.isArray(data)) return []
 
     const lists = data as PlaylistData[]
@@ -366,16 +358,14 @@ export async function loadPlaylists(): Promise<PlaylistData[]> {
 
 export async function savePlaylists(lists: PlaylistData[]): Promise<void> {
   try {
-    const dir = await ensureConfigDir()
-    const path = await join(dir, 'playlists.json')
     const stripped = lists.map((pl) => ({
       ...pl,
       cover: null,
       banner: pl.banner ? { ...pl.banner, url: null } : pl.banner,
     }))
-    await writeTextFile(path, JSON.stringify(stripped))
+    await writeLibraryJson('playlists.json', stripped)
   } catch (e) {
-    console.error('Не удалось сохранить playlists.json:', e)
+    reportError('playlistsSave', e)
   }
 }
 
@@ -472,12 +462,8 @@ export async function parseAudioFiles(filePaths: string[], opts: ParseOptions = 
 
 export async function loadPlayHistory(): Promise<Record<number, number>> {
   try {
-    const dir = await ensureConfigDir()
-    const path = await join(dir, 'history.json')
-    if (!(await exists(path))) return {}
-
-    const data = JSON.parse(await readTextFile(path))
-    return data && typeof data === 'object' ? (data as Record<number, number>) : {}
+    const data = await readLibraryJson('history.json')
+    return data && typeof data === 'object' && !Array.isArray(data) ? (data as Record<number, number>) : {}
   } catch {
     return {}
   }
@@ -485,10 +471,9 @@ export async function loadPlayHistory(): Promise<Record<number, number>> {
 
 export async function savePlayHistory(history: Record<number, number>): Promise<void> {
   try {
-    const dir = await ensureConfigDir()
-    await writeTextFile(await join(dir, 'history.json'), JSON.stringify(history))
+    await writeLibraryJson('history.json', history)
   } catch (e) {
-    console.error(e)
+    reportError('historySave', e)
   }
 }
 
@@ -528,12 +513,9 @@ const DEFAULT_SETTINGS: AppSettings = {
 
 export async function loadSettings(): Promise<AppSettings> {
   try {
-    const dir = await ensureConfigDir()
-    const path = await join(dir, 'settings.json')
-
-    if (!(await exists(path))) return DEFAULT_SETTINGS
-
-    const data = JSON.parse(await readTextFile(path)) as Record<string, unknown>
+    const raw = await readLibraryJson('settings.json')
+    if (!raw || typeof raw !== 'object') return DEFAULT_SETTINGS
+    const data = raw as Record<string, unknown>
     /* Испорченное или нечисловое значение даёт NaN — тогда берём значение по умолчанию */
     const num = (v: unknown, fallback: number) => (typeof v === 'number' && isFinite(v) ? v : fallback)
 

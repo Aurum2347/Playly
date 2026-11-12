@@ -57,3 +57,47 @@
   .p-track .p-info { display: none; }
   .main { margin: 8px; }
 }
+
+
+/* Settings also fit the CSS viewport produced by 400% zoom. */
+.main, .settings-main-content { min-width: 0; min-height: 0; }
+.sidebar { min-height: 0; overflow-y: auto; }
+@media (max-width: 820px) {
+  .settings-content { flex-direction: column; }
+  .settings-nav-sidebar { width: 100%; padding: 4px 0; border-right: 0; border-bottom: 1px solid var(--border); }
+  .settings-nav { flex-direction: row; overflow-x: auto; gap: 4px; }
+  .settings-nav .nav-section-label { display: none; }
+  .settings-nav .nav-item { flex: 0 0 auto; white-space: nowrap; padding: 10px 12px; }
+  .settings-main-content { padding: 20px; }
+  .setting-row { flex-wrap: wrap; gap: 12px; }
+  .setting-control { max-width: 100%; }
+}
+@media (max-width: 450px) {
+  .app { grid-template-columns: 52px minmax(0, 1fr); }
+  .sidebar { padding: 8px 4px; }
+  .sidebar .profile-card { padding: 2px; }
+  .settings-main-content { padding: 16px 12px; }
+  .page-title { font-size: 21px; }
+  .appearance-tabs { gap: 6px; }
+  .appearance-tabs .btn { font-size: 11px; padding: 8px; }
+  .icon-editor { flex-wrap: wrap; gap: 12px; }
+  .player { padding: 0 8px; gap: 8px; grid-template-columns: 34px minmax(0,1fr) auto; }
+  .p-cover { width: 34px; height: 34px; border-radius: 6px; }
+  .p-controls { gap: 2px; }
+  .p-controls .p-btn { padding: 5px; }
+  .p-controls .p-btn svg { width: 16px; height: 16px; }
+  .p-controls .p-play { width: 34px; height: 34px; }
+  .p-right { gap: 4px; }
+  .p-right .p-btn, .p-like-btn, .p-vol-btn { padding: 4px; }
+  .p-progress { gap: 4px; }
+  .p-time { font-size: 10px; min-width: 25px; }
+  .tb-page, .tb-now { display: none; }
+  .titlebar { grid-template-columns: 1fr auto; }
+}
+@media (max-height: 360px) {
+  :root { --titlebar-h: 32px; }
+  .app { grid-template-rows: 32px minmax(0,1fr) 64px; }
+  .app.immersive { grid-template-rows: 32px minmax(0,1fr) 0; }
+  .player { height: 64px; }
+  .p-center { gap: 2px; }
+}

@@ -476,3 +476,20 @@ html.mini-window #root {
 }
 
 .mini-resize:hover { opacity: 0.9; }
+
+/* ===== Настройки внешнего вида (Система → Мини-плеер) ===== */
+/* Затемнение обложки: --mini-dim от 0 до 0.9, сверху чуть светлее, чтобы шапка не тонула */
+.mini-bg::after {
+  background: linear-gradient(
+    180deg,
+    rgba(0, 0, 0, calc(var(--mini-dim, 0.4) * 0.4)),
+    rgba(0, 0, 0, calc(var(--mini-dim, 0.4) + 0.05))
+  );
+  transition: background 0.3s ease;
+}
+
+/* Тёмный фон: без обложки и цветного отлива */
+.mini.mini-solid .mini-bg { background: #121214; }
+.mini.mini-solid .mini-bg img { opacity: 0; }
+.mini.mini-solid .mini-bg::after { background: linear-gradient(180deg, rgba(255, 255, 255, 0.025), transparent 60%); }
+.mini-bg img { transition: opacity 0.4s ease; }

@@ -1,3 +1,4 @@
+import SafeImage from '../SafeImage'
 import { useState, useEffect, useCallback, type CSSProperties, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import type { Track } from '../../App'
@@ -200,7 +201,7 @@ export default function TrackDetailsModal({
         {/* ===== Шапка ===== */}
         <header className={styles.header}>
           <div className={styles.backdrop} aria-hidden="true">
-            {displayTrack.cover && <img src={displayTrack.cover} alt="" />}
+            {displayTrack.cover && <SafeImage src={displayTrack.cover} alt="" />}
           </div>
 
           <button className={styles.closeBtn} onClick={onClose} title={t('common.close')} aria-label={t('common.close')}>
@@ -208,7 +209,7 @@ export default function TrackDetailsModal({
           </button>
 
           <div className={styles.cover} onContextMenu={handleCoverContextMenu}>
-            {displayTrack.cover ? <img src={displayTrack.cover} alt="" /> : icons.music}
+            {displayTrack.cover ? <SafeImage src={displayTrack.cover} alt="" /> : icons.music}
           </div>
 
           <div className={styles.headInfo}>

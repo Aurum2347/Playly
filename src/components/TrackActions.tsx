@@ -1,3 +1,4 @@
+import SafeImage from './SafeImage'
 import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import type { Track, Playlist } from '../App'
@@ -166,7 +167,7 @@ export default function TrackActions({
                     className={`playlist-item ${selectedPlaylistId === pl.id ? 'selected' : ''}`}
                     onClick={() => setSelectedPlaylistId(pl.id)}
                   >
-                    <div className="playlist-cover">{pl.cover ? <img src={pl.cover} alt="" /> : <MusicIcon />}</div>
+                    <div className="playlist-cover">{pl.cover ? <SafeImage src={pl.cover} alt="" /> : <MusicIcon />}</div>
                     <div className="playlist-info">
                       <div className="playlist-name">{pl.name}</div>
                       <div className="playlist-count">{t('views.tracks.totalTracks', { n: pl.trackIds.length })}</div>

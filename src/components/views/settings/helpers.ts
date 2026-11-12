@@ -1,6 +1,8 @@
 import { useEffect, type RefObject } from 'react'
 import { appDataDir, join } from '@tauri-apps/api/path'
-import { exists, readFile, readTextFile, writeTextFile, mkdir, remove } from '@tauri-apps/plugin-fs'
+import { exists, readFile, mkdir, remove } from '@tauri-apps/plugin-fs'
+import { reportError } from '../../../lib/feedback'
+import { readLibraryJson, writeLibraryJson } from '../../../lib/libraryFiles'
 
 /* ===== Служебные флаги (не трогать) ===== */
 export const DEBUG_DIAGNOSTICS_SCREEN = true
@@ -40,9 +42,8 @@ export async function getSettingsPath(): Promise<string> {
 
 export async function readSettingsRaw(): Promise<Record<string, unknown>> {
   try {
-    const path = await getSettingsPath()
-    if (!(await exists(path))) return {}
-    return JSON.parse(await readTextFile(path)) as Record<string, unknown>
+    const data = await readLibraryJson('settings.json')
+    return data && typeof data === 'object' && !Array.isArray(data) ? (data as Record<string, unknown>) : {}
   } catch {
     return {}
   }
@@ -59,9 +60,9 @@ function updateSettings(mutate: (current: Record<string, unknown>) => void): Pro
     try {
       const current = await readSettingsRaw()
       mutate(current)
-      await writeTextFile(await getSettingsPath(), JSON.stringify(current, null, 2))
+      await writeLibraryJson('settings.json', current, true)
     } catch (e) {
-      console.error('Не удалось сохранить настройки:', e)
+      reportError('settingsSave', e)
     }
   })
   settingsQueue = job

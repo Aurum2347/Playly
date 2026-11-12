@@ -10,6 +10,7 @@ import Collapse from '../../Collapse'
 import { useI18n, LANGS } from '../../../i18n'
 import { DEFAULT_DISCORD_PARTS, DISCORD_PART_KEYS, type DiscordParts } from '../../../lib/discord'
 import DiscordPreview from './DiscordPreview'
+import MiniSettings from './MiniSettings'
 import CacheSettings from './CacheSettings'
 
 interface SystemSectionProps {
@@ -92,6 +93,7 @@ export default function SystemSection({
     <>
       <h1 className="page-title">{t('settings.system.title')}</h1>
       <p className="page-subtitle">{t('settings.system.subtitle')}</p>
+      <MiniSettings />
 
       <div className="settings-section">
         <div className="section-title">{t('settings.system.localization')}</div>

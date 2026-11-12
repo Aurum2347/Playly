@@ -1,3 +1,5 @@
+import { APP_VERSION } from '../lib/version'
+import { writeSettingsRaw } from './views/settings/helpers'
 import { useState } from 'react'
 import { appDataDir, join } from '@tauri-apps/api/path'
 import { writeTextFile, mkdir } from '@tauri-apps/plugin-fs'
@@ -25,6 +27,7 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
       /* Папка уже есть — ошибка не страшна; если её нет и создать нельзя, упадёт запись ниже */
       await mkdir(playlyDir, { recursive: true }).catch(() => {})
       await writeTextFile(userFile, JSON.stringify({ nickname: nickname.trim() }, null, 2))
+      await writeSettingsRaw({ lastSeenVersion: APP_VERSION })
       onComplete(nickname.trim())
     } catch (error) {
       console.error('Ошибка сохранения профиля:', error)

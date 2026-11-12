@@ -1,9 +1,12 @@
+import SafeImage from './SafeImage'
 import { useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
 import type { Track } from '../App'
 import { useI18n } from '../i18n'
 import { usePresence } from './views/shared'
 import './CoverPicker.css'
+
+const PAGE_SIZE = 100
 
 interface CoverPickerProps {
   open: boolean
@@ -19,10 +22,11 @@ export default function CoverPicker({ open, tracks, excludeId, onPick, onClose }
   const { t } = useI18n()
   const { mounted, closing } = usePresence(open, 180)
   const [query, setQuery] = useState('')
+  const [page, setPage] = useState(1)
   const [prevOpen, setPrevOpen] = useState(open)
   if (open !== prevOpen) {
     setPrevOpen(open)
-    if (open) setQuery('')
+    if (open) { setQuery(''); setPage(1) }
   }
 
   /* Одинаковые обложки (один альбом) показываем один раз */
@@ -37,6 +41,11 @@ export default function CoverPicker({ open, tracks, excludeId, onPick, onClose }
       return true
     })
   }, [tracks, excludeId, query])
+
+  /* Сотни обложек в одной сетке тормозят: показываем по PAGE_SIZE */
+  const pageCount = Math.max(1, Math.ceil(items.length / PAGE_SIZE))
+  const shownPage = Math.min(page, pageCount)
+  const shown = items.slice((shownPage - 1) * PAGE_SIZE, shownPage * PAGE_SIZE)
 
   /* Capture-фаза: Escape закрывает только это окно, а не модалку под ним */
   useEffect(() => {
@@ -72,17 +81,30 @@ export default function CoverPicker({ open, tracks, excludeId, onPick, onClose }
             type="text"
             placeholder={t('coverPicker.search')}
             value={query}
-            onChange={(e) => setQuery(e.target.value)}
+            onChange={(e) => { setQuery(e.target.value); setPage(1) }}
             autoFocus
           />
         </div>
+        {pageCount > 1 && (
+          <div className="modal-buttons">
+            <button className="btn" disabled={page <= 1} onClick={() => setPage((p) => p - 1)} aria-label={t('history.prev')}>
+              ←
+            </button>
+            <span>
+              {shownPage} / {pageCount}
+            </span>
+            <button className="btn" disabled={shownPage >= pageCount} onClick={() => setPage((p) => p + 1)} aria-label={t('history.next')}>
+              →
+            </button>
+          </div>
+        )}
         <div className="cp-grid">
           {items.length === 0 ? (
             <div className="cp-empty">{t('coverPicker.empty')}</div>
           ) : (
-            items.map((tr) => (
+            shown.map((tr) => (
               <button key={tr.id} className="cp-item" onClick={() => onPick(tr)} title={`${tr.artist} — ${tr.title}`}>
-                <img src={tr.cover!} alt="" loading="lazy" decoding="async" />
+                <SafeImage src={tr.cover!} alt="" loading="lazy" decoding="async" />
                 <span className="cp-item-title">{tr.title}</span>
                 <span className="cp-item-artist">{tr.artist}</span>
               </button>

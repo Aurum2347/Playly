@@ -48,7 +48,6 @@
   font-family: inherit;
   cursor: pointer;
   transition: all 0.2s ease;
-  width: 100%;
 }
 .btn:hover {
   background: var(--hover-strong);
@@ -70,6 +69,7 @@
   cursor: not-allowed;
   transform: none;
 }
+.onboarding-overlay .btn { width: 100%; }
 
 .welcome-text {
   font-size: 20px;

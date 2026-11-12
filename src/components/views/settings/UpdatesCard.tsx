@@ -9,6 +9,7 @@ import {
   installUpdate,
   RELEASES_URL,
   setAutoUpdate,
+  setCheckOnStartup,
   useUpdater,
 } from '../../../lib/updater'
 import { versionLabel } from '../../../lib/version'
@@ -150,6 +151,16 @@ export default function UpdatesCard() {
         </div>
       )}
 
+      <label className="about2-updates-auto">
+        <span>
+          <span className="about2-updates-auto-title">{t('startupCheck.title')}</span>
+          <span className="about2-updates-auto-sub">{t('startupCheck.desc')}</span>
+        </span>
+        <span className="toggle">
+          <input type="checkbox" checked={u.checkOnStartup} onChange={(e) => void setCheckOnStartup(e.target.checked)} />
+          <span className="toggle-slider" />
+        </span>
+      </label>
       <label className="about2-updates-auto">
         <span>
           <span className="about2-updates-auto-title">{t('updates.auto')}</span>

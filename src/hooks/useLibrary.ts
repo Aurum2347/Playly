@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { join } from '@tauri-apps/api/path'
-import { readDir } from '@tauri-apps/plugin-fs'
+import { join, appDataDir } from '@tauri-apps/api/path'
+import { readDir, remove, exists } from '@tauri-apps/plugin-fs'
+import { reportError } from '../lib/feedback'
+import { writeLibraryJson } from '../lib/libraryFiles'
 import { open } from '@tauri-apps/plugin-dialog'
 import {
   loadPlayHistory,
@@ -15,6 +17,7 @@ import {
   saveTracksToConfig,
 } from '../lib/trackLoader'
 import { readSettingsRaw, writeSettingsRaw } from '../components/views/settings/helpers'
+import { initPlayEvents, recordPlayEvent, clearPlayEvents, forgetPlayEvents } from '../lib/playHistory'
 import { pickVisual } from '../lib/media'
 import type { CoverPick, Playlist, Track, ViewType } from '../App'
 import type { TrackUpdates } from '../components/views/TrackEditModal'
@@ -35,7 +38,7 @@ export interface LoadProgress {
 export type SyncMode = 'auto' | 'manual'
 
 /* Обложки и баннеры (GIF бывают тяжёлыми) */
-const COVER_MAX_BYTES = 15 * 1024 * 1024
+const COVER_MAX_BYTES = 5 * 1024 * 1024
 const BANNER_MAX_BYTES = 25 * 1024 * 1024
 
 interface UseLibraryOptions {
@@ -131,6 +134,7 @@ export default function useLibrary(options: UseLibraryOptions) {
     playHistoryRef.current = next
     setPlayHistory(next)
     savePlayHistory(next)
+    recordPlayEvent(trackId)
   }, [])
 
   /* Возвращает id треков из выбранных файлов: и новых, и уже лежавших в библиотеке */
@@ -150,6 +154,7 @@ export default function useLibrary(options: UseLibraryOptions) {
         onProgress: (p) =>
           setUpload((u) => (u ? { ...u, current: p.current, fileName: p.fileName } : u)),
         onTrack: (track) => {
+          if (cancelUploadRef.current) return
           ids.push(track.id)
           setTracks((prev) => [...prev, track])
         },
@@ -233,16 +238,29 @@ export default function useLibrary(options: UseLibraryOptions) {
     }
   }, [scanFolder])
 
-  const handleClearLibrary = useCallback(() => {
-    setTracks([])
-    setPlaylists([])
-    setPlayHistory({})
-    playHistoryRef.current = {}
-    setActivePlaylistId(null)
-    saveTracksToConfig([])
-    savePlaylists([])
-    savePlayHistory({})
-    onLibraryCleared()
+  /* Сначала очищаем файлы и только потом интерфейс: если запись не удалась,
+     библиотека на экране остаётся как была и не расходится с диском.
+     Исходные аудиофайлы не трогаются — удаляются только кеш обложек и записи Playly */
+  const handleClearLibrary = useCallback(async () => {
+    try {
+      if (saveTimerRef.current) clearTimeout(saveTimerRef.current)
+      if (playlistsSaveTimerRef.current) clearTimeout(playlistsSaveTimerRef.current)
+      cancelUploadRef.current = true
+      await writeLibraryJson('tracks.json', [])
+      await writeLibraryJson('playlists.json', [])
+      await writeLibraryJson('history.json', {})
+      setTracks([])
+      setPlaylists([])
+      setPlayHistory({})
+      playHistoryRef.current = {}
+      setActivePlaylistId(null)
+      onLibraryCleared()
+      await clearPlayEvents()
+      const covers = await join(await appDataDir(), 'playly', 'covers')
+      if (await exists(covers)) await remove(covers, { recursive: true })
+    } catch (error) {
+      reportError('libraryClear', error)
+    }
   }, [onLibraryCleared])
 
   const loadLibraryData = useCallback(async () => {
@@ -264,6 +282,7 @@ export default function useLibrary(options: UseLibraryOptions) {
       const hist = await loadPlayHistory()
       playHistoryRef.current = hist
       setPlayHistory(hist)
+      await initPlayEvents(hist)
     } catch (e) {
       console.error('Ошибка загрузки библиотеки:', e)
     }
@@ -295,6 +314,7 @@ export default function useLibrary(options: UseLibraryOptions) {
       setPlaylists((prev) =>
         prev.map((pl) => ({ ...pl, trackIds: pl.trackIds.filter((id) => !idSet.has(id)) }))
       )
+      forgetPlayEvents(idSet)
       onTracksDeleted(ids)
     },
     [onTracksDeleted]

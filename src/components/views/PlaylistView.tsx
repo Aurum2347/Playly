@@ -1,3 +1,4 @@
+import SafeImage from '../SafeImage'
 import { useMemo, useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import type { Track, Playlist } from '../../App'
@@ -98,7 +99,18 @@ export default function PlaylistView({
     onToggleLike?.(trackId, !tr.liked)
   }
 
-  const toggleSelection = (trackId: number) => {
+  const [selectionAnchor, setSelectionAnchor] = useState<number | null>(null)
+  const toggleSelection = (trackId: number, range = false) => {
+    if (range && selectionAnchor !== null) {
+      const ids = items.map((tr) => tr.id)
+      const a = ids.indexOf(selectionAnchor), b = ids.indexOf(trackId)
+      if (a >= 0 && b >= 0) {
+        setSelectedTrackIds(new Set(ids.slice(Math.min(a, b), Math.max(a, b) + 1)))
+        setSelectionMode(true)
+        return
+      }
+    }
+    setSelectionAnchor(trackId)
     const next = new Set(selectedTrackIds)
     if (next.has(trackId)) next.delete(trackId)
     else next.add(trackId)
@@ -106,7 +118,7 @@ export default function PlaylistView({
     if (next.size === 0) setSelectionMode(false)
   }
   const enterSelectionMode = (trackId: number) => { setSelectionMode(true); setSelectedTrackIds(new Set([trackId])) }
-  const exitSelectionMode = () => { setSelectionMode(false); setSelectedTrackIds(new Set()) }
+  const exitSelectionMode = () => { setSelectionAnchor(null); setSelectionMode(false); setSelectedTrackIds(new Set()) }
 
   const handleEditSave = (trackId: number, updates: TrackUpdates) => {
     if (Object.keys(updates).length === 0) return
@@ -161,7 +173,7 @@ export default function PlaylistView({
       if (e.key !== 'Escape') return
       if (isPlaylistModalOpen) setIsPlaylistModalOpen(false)
       else if (isContextMenuOpen) closeContextMenu()
-      else if (selectionMode || selectedCount > 0) { setSelectionMode(false); setSelectedTrackIds(new Set()) }
+      else if (selectionMode || selectedCount > 0) { setSelectionAnchor(null); setSelectionMode(false); setSelectedTrackIds(new Set()) }
     }
     document.addEventListener('mousedown', onDown)
     document.addEventListener('keydown', onKey)
@@ -197,7 +209,7 @@ export default function PlaylistView({
       >
         {hasBanner && playlist.banner && <BannerLayers banner={playlist.banner} />}
         <div className="hero-top">
-          {playlist.cover ? <img className="hero-cover-img" src={playlist.cover} alt="" /> : <div className="hero-icon">{musicIconSVG}</div>}
+          {playlist.cover ? <SafeImage className="hero-cover-img" src={playlist.cover} alt="" /> : <div className="hero-icon">{musicIconSVG}</div>}
           <div className="hero-info">
             <div className="hero-label">{t('views.playlist.label')}</div>
             <h1 className="hero-title">{playlist.name}</h1>
@@ -270,16 +282,16 @@ export default function PlaylistView({
                 key={track.id}
                 className={cx('track-row', selectedTrackIds.has(track.id) && 'selected', playingTrackId === track.id && 'playing', flashingTrackId === track.id && 'flash')}
                 style={{ animationDelay: `${Math.min(idx * 25, 400)}ms` }}
-                onClick={() => (selectionMode ? toggleSelection(track.id) : onSelectTrack(track, items))}
+                onClick={(e) => { if (e.shiftKey || selectionMode) toggleSelection(track.id, e.shiftKey); else { setSelectionAnchor(track.id); onSelectTrack(track, items) } }}
                 onContextMenu={(e) => openContextMenu(e, track.id)}
               >
                 <span className={`tr-playing-bar ${playingTrackId === track.id ? 'active' : ''}`} aria-hidden="true" />
                 <span className="tr-num">{idx + 1}</span>
-                <div className={`tr-checkbox ${selectedTrackIds.has(track.id) ? 'checked' : ''}`} onClick={(e) => { e.stopPropagation(); toggleSelection(track.id) }}>
+                <div className={`tr-checkbox ${selectedTrackIds.has(track.id) ? 'checked' : ''}`} onClick={(e) => { e.stopPropagation(); toggleSelection(track.id, e.shiftKey) }}>
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
                 </div>
                 <div className="tr-info">
-                  <div className="tr-cover">{track.cover ? <img src={track.cover} alt="" /> : musicIconSVG}</div>
+                  <div className="tr-cover">{track.cover ? <SafeImage src={track.cover} alt="" /> : musicIconSVG}</div>
                   <div className="tr-text">
                     <div className="tr-title">{track.title}</div>
                     <div className="tr-artist">{track.artist}</div>
@@ -353,7 +365,7 @@ export default function PlaylistView({
                 ) : (
                   otherPlaylists.map((pl) => (
                     <div key={pl.id} className={`playlist-item ${selectedPlaylistId === pl.id ? 'selected' : ''}`} onClick={() => setSelectedPlaylistId(pl.id)}>
-                      <div className="playlist-cover">{pl.cover ? <img src={pl.cover} alt="" /> : musicIconSVG}</div>
+                      <div className="playlist-cover">{pl.cover ? <SafeImage src={pl.cover} alt="" /> : musicIconSVG}</div>
                       <div className="playlist-info">
                         <div className="playlist-name">{pl.name}</div>
                         <div className="playlist-count">{t('views.tracks.totalTracks', { n: pl.trackIds.length })}</div>

@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { open } from '@tauri-apps/plugin-shell'
 import Logo from '../../Logo'
 import { useI18n } from '../../../i18n'
-import { versionLabel } from '../../../lib/version'
+import { versionLabel, consumeChangelogRequest } from '../../../lib/version'
 import ChangelogPage from './ChangelogPage'
 import UpdatesCard from './UpdatesCard'
 import './AboutSection.css'
@@ -54,7 +54,7 @@ function LinkCard({ href, kind, title, sub, featured }: LinkCardProps) {
 
 export default function AboutSection() {
   const { t } = useI18n()
-  const [page, setPage] = useState<'main' | 'changelog'>('main')
+  const [page, setPage] = useState<'main' | 'changelog'>(() => (consumeChangelogRequest() ? 'changelog' : 'main'))
   const rootRef = useRef<HTMLDivElement>(null)
 
   /* Возврат из списка изменений — тоже к началу страницы */
