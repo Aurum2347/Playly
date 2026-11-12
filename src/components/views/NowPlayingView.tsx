@@ -1,9 +1,10 @@
+import SafeImage from '../SafeImage'
 import { useEffect, useRef, useState, type CSSProperties } from 'react'
 import type { Track, RepeatMode } from '../../App'
 import { useI18n } from '../../i18n'
 import Visualizer from '../Visualizer'
 import { useCoverColor } from '../../lib/coverColor'
-import { activeLineIndex, loadLyrics, type Lyrics } from '../../lib/lyrics'
+import { activeLineIndex, loadLyrics, onLyricsUpdated, type Lyrics } from '../../lib/lyrics'
 import './NowPlayingView.css'
 
 interface NowPlayingViewProps {
@@ -253,12 +254,16 @@ export default function NowPlayingView({
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== 'Escape' || e.defaultPrevented) return
-      if (document.querySelector('.modal-overlay.open, .confirm-overlay')) return
+      if (document.querySelector('.modal-overlay.open, .confirm-overlay, .player-dialog-overlay')) return
       onBack()
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [onBack])
+  /* Текст можно спрятать, чтобы обложка и визуализатор заняли всю страницу */
+  const [lyricsHidden, setLyricsHidden] = useState(false)
+  /* Текст отредактировали в редакторе — перечитываем */
+  const [lyricsRevision, setLyricsRevision] = useState(0)
   const [lyricsState, setLyricsState] = useState<{ path: string; lyrics: Lyrics | null } | null>(null)
 
   const filePath = track?.filePath
@@ -271,11 +276,20 @@ export default function NowPlayingView({
     return () => {
       cancelled = true
     }
+  }, [filePath, lyricsRevision])
+
+  useEffect(() => {
+    if (!filePath) return
+    return onLyricsUpdated((path) => {
+      if (path === filePath) setLyricsRevision((n) => n + 1)
+    })
   }, [filePath])
 
   /* Пока текст не прочитан, считаем, что его нет: страница не прыгает от «пустой колонки» */
   const lyrics = track && lyricsState?.path === track.filePath ? lyricsState.lyrics : null
   const hasLyrics = !!lyrics && lyrics.lines.length > 0
+
+  const showLyrics = hasLyrics && !lyricsHidden
 
   const header = (
     <header className="np-header">
@@ -305,12 +319,12 @@ export default function NowPlayingView({
 
   return (
     <div
-      className={`np-view ${hasLyrics ? 'with-lyrics' : 'no-lyrics'} ${visualizerEnabled ? 'with-viz' : ''} ${isPlaying ? 'playing' : ''}`}
+      className={`np-view ${showLyrics ? 'with-lyrics' : 'no-lyrics'} ${visualizerEnabled ? 'with-viz' : ''} ${isPlaying ? 'playing' : ''}`}
       style={{ ...(tint ? { '--np-tint': tint } : {}), '--np-fade': `${swap.ms}ms` } as CSSProperties}
     >
       <div className="np-backdrop" aria-hidden="true">
-        {prev?.cover && <img key={`p${prev.id}`} className="np-layer-out" src={prev.cover} alt="" />}
-        {track.cover && <img key={`c${track.id}`} className={prev ? 'np-layer-in' : ''} src={track.cover} alt="" />}
+        {prev?.cover && <SafeImage key={`p${prev.id}`} className="np-layer-out" src={prev.cover} alt="" />}
+        {track.cover && <SafeImage key={`c${track.id}`} className={prev ? 'np-layer-in' : ''} src={track.cover} alt="" />}
       </div>
 
       {header}
@@ -321,11 +335,11 @@ export default function NowPlayingView({
             <div className="np-cover">
               {prev && (
                 <div key={`p${prev.id}`} className="np-cover-layer np-layer-out">
-                  {prev.cover ? <img src={prev.cover} alt="" /> : <MusicIcon />}
+                  {prev.cover ? <SafeImage src={prev.cover} alt="" /> : <MusicIcon />}
                 </div>
               )}
               <div key={`c${track.id}`} className={`np-cover-layer ${prev ? 'np-layer-in' : ''}`}>
-                {track.cover ? <img src={track.cover} alt="" /> : <MusicIcon />}
+                {track.cover ? <SafeImage src={track.cover} alt="" /> : <MusicIcon />}
               </div>
             </div>
             <div className="np-meta">
@@ -379,6 +393,19 @@ export default function NowPlayingView({
             <div className="np-toolbar">
               <VolumeControl volume={volume} isMuted={isMuted} onVolumeChange={onVolumeChange} onMuteToggle={onMuteToggle} />
               <div className="np-toolbar-right">
+                {hasLyrics && (
+                  <button
+                    className={`np-icon-btn small ${showLyrics ? 'active' : ''}`}
+                    onClick={() => setLyricsHidden((hidden) => !hidden)}
+                    aria-pressed={showLyrics}
+                    title={showLyrics ? t('views.nowPlaying.lyricsHide') : t('views.nowPlaying.lyricsShow')}
+                  >
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                      <path d="M4 6h11M4 11h16M4 16h9" />
+                      <path d="M17 15.5v4.2a1.6 1.6 0 1 1-1.6-1.6H17" />
+                    </svg>
+                  </button>
+                )}
                 <button
                   className={`np-icon-btn small ${isLiked ? 'liked' : ''}`}
                   onClick={() => onToggleLike(track.id, !isLiked)}
@@ -408,7 +435,7 @@ export default function NowPlayingView({
           )}
         </section>
 
-        {hasLyrics && lyrics && (
+        {showLyrics && lyrics && (
           <LyricsPanel key={track.filePath} lyrics={lyrics} getCurrentTime={getCurrentTime} onSeek={onSeek} />
         )}
       </div>

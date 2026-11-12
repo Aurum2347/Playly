@@ -1,6 +1,7 @@
+import SafeImage from './SafeImage'
 import { useEffect, useRef, useState, type CSSProperties } from 'react'
 import { frameStyle } from '../lib/imageFrame'
-import { customIdOf, type AppBackdrop as Backdrop, type CustomParticle, type ParticleKind } from '../lib/appearance'
+import { customIdOf, type AppBackdrop as Backdrop, type CustomParticle, type ParticleKind, type WindPhase } from '../lib/appearance'
 import { ParticleField } from '../lib/particles'
 import { loadParticleSprite, type ParticleSprite } from '../lib/particleSprites'
 import './AppBackdrop.css'
@@ -52,7 +53,7 @@ export function BackdropLayers({ backdrop: b, coverUrl, className }: BackdropLay
           className={`backdrop-image ${i === layers.length - 1 && layers.length > 1 ? 'entering' : ''}`}
           style={{ filter, transform: bleed !== 1 ? `scale(${bleed})` : undefined } as CSSProperties}
         >
-          <img
+          <SafeImage
             src={l.src}
             alt=""
             draggable={false}
@@ -74,6 +75,7 @@ export interface ParticleLayer {
   size: number
   opacity: number
   blur: number
+  wind?: WindPhase[]
   custom: CustomParticle | null
 }
 
@@ -131,9 +133,10 @@ export function ParticleCanvas({ layer, className }: ParticleCanvasProps) {
       speed: layer.speed,
       size: layer.size,
       opacity: layer.opacity,
+      wind: layer.wind,
       custom: ready ? { behavior: ready.def.behavior, count: ready.def.count, sprite: ready.sprite } : null,
     })
-  }, [layer.kind, layer.density, layer.speed, layer.size, layer.opacity, ready])
+  }, [layer.kind, layer.density, layer.speed, layer.size, layer.opacity, layer.wind, ready])
 
   return (
     <canvas

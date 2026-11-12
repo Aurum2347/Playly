@@ -1,3 +1,4 @@
+import SafeImage from '../SafeImage'
 import { useState, useEffect, useMemo } from 'react'
 import { createPortal } from 'react-dom'
 import type { Track, Playlist } from '../../App'
@@ -102,7 +103,18 @@ export default function TracksView({
     onToggleLike?.(trackId, !track.liked)
   }
 
-  const toggleSelection = (trackId: number) => {
+  const [selectionAnchor, setSelectionAnchor] = useState<number | null>(null)
+  const toggleSelection = (trackId: number, range = false) => {
+    if (range && selectionAnchor !== null) {
+      const ids = filteredTracks.map((tr) => tr.id)
+      const a = ids.indexOf(selectionAnchor), b = ids.indexOf(trackId)
+      if (a >= 0 && b >= 0) {
+        setSelectedTrackIds(new Set(ids.slice(Math.min(a, b), Math.max(a, b) + 1)))
+        setSelectionMode(true)
+        return
+      }
+    }
+    setSelectionAnchor(trackId)
     const next = new Set(selectedTrackIds)
     if (next.has(trackId)) next.delete(trackId)
     else next.add(trackId)
@@ -113,7 +125,7 @@ export default function TracksView({
   }
 
   const enterSelectionMode = (trackId: number) => { setSelectionMode(true); setSelectedTrackIds(new Set([trackId])) }
-  const exitSelectionMode = () => { setSelectionMode(false); setSelectedTrackIds(new Set()) }
+  const exitSelectionMode = () => { setSelectionAnchor(null); setSelectionMode(false); setSelectedTrackIds(new Set()) }
 
   const deleteTracks = (ids: number[]) => {
     if (ids.length === 0) return
@@ -213,7 +225,7 @@ export default function TracksView({
       if (e.key !== 'Escape') return
       if (isPlaylistModalOpen) setIsPlaylistModalOpen(false)
       else if (isContextMenuOpen) closeContextMenu()
-      else if (selectionMode || selectedCount > 0) { setSelectionMode(false); setSelectedTrackIds(new Set()) }
+      else if (selectionMode || selectedCount > 0) { setSelectionAnchor(null); setSelectionMode(false); setSelectedTrackIds(new Set()) }
     }
     document.addEventListener('mousedown', onMouseDown)
     document.addEventListener('keydown', onKeyDown)
@@ -334,17 +346,30 @@ export default function TracksView({
                   playingTrackId === track.id && styles.playing,
                   flashingTrackId === track.id && styles.flash
                 )}
-                onClick={() => (selectionMode ? toggleSelection(track.id) : onSelectTrack(track, sortedTracks))}
+                onClick={(e) => {
+                  /* Shift+клик выделяет диапазон от последнего выбранного трека */
+                  if (e.shiftKey || selectionMode) toggleSelection(track.id, e.shiftKey)
+                  else {
+                    setSelectionAnchor(track.id)
+                    onSelectTrack(track, sortedTracks)
+                  }
+                }}
                 onContextMenu={(e) => openContextMenu(e, track.id)}
               >
                 <span className={cx(styles.trPlayingBar, playingTrackId === track.id && styles.active)} aria-hidden="true" />
                 <span className={styles.trNum}>{globalIdx + 1}</span>
-                <div className={cx(styles.trCheckbox, selectedTrackIds.has(track.id) && styles.checked, animatingCheckboxId === track.id && styles.pop)} onClick={(e) => { e.stopPropagation(); toggleSelection(track.id) }}>
+                <div
+                  className={cx(styles.trCheckbox, selectedTrackIds.has(track.id) && styles.checked, animatingCheckboxId === track.id && styles.pop)}
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    toggleSelection(track.id, e.shiftKey)
+                  }}
+                >
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
                 </div>
                 <div className={styles.trInfo}>
                   <div className={styles.trCover}>
-                    {track.cover ? <img src={track.cover} alt="" loading="lazy" decoding="async" /> : musicIconSVG}
+                    {track.cover ? <SafeImage src={track.cover} alt="" loading="lazy" decoding="async" /> : musicIconSVG}
                   </div>
                   <div className={styles.trText}>
                     <div className={styles.trTitle}>{track.title}</div>
@@ -449,7 +474,7 @@ export default function TracksView({
                 playlists.map((pl) => (
                   <div key={pl.id} className={cx(styles.playlistItem, selectedPlaylistId === pl.id && styles.selected)} onClick={() => setSelectedPlaylistId(pl.id)}>
                     <div className={styles.playlistCover}>
-                      {pl.cover ? <img src={pl.cover} alt="" /> : musicIconSVG}
+                      {pl.cover ? <SafeImage src={pl.cover} alt="" /> : musicIconSVG}
                     </div>
                     <div className={styles.playlistInfo}>
                       <div className={styles.playlistName}>{pl.name}</div>

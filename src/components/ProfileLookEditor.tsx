@@ -1,3 +1,4 @@
+import SafeImage from './SafeImage'
 import { useEffect, useState, type CSSProperties, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { useI18n } from '../i18n'
@@ -198,7 +199,7 @@ export default function ProfileLookEditor({
   } else {
     const avatar = (
       <div className={`look-editor-avatar ${avatarShape}`}>
-        {avatarUrl ? <img src={avatarUrl} alt="" draggable={false} style={frameStyle(avatarFrame)} /> : <DefaultAvatar seed={nickname} />}
+        {avatarUrl ? <SafeImage src={avatarUrl} alt="" draggable={false} style={frameStyle(avatarFrame)} /> : <DefaultAvatar seed={nickname} />}
       </div>
     )
     preview = (

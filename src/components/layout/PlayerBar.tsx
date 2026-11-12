@@ -1,3 +1,4 @@
+import SafeImage from '../SafeImage'
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { createPortal } from 'react-dom'
 import type { Track } from '../../App'
@@ -224,7 +225,7 @@ export default function PlayerBar({
     <>
       <div className="p-cover">
         {tr.cover ? (
-          <img src={tr.cover} alt="" />
+          <SafeImage src={tr.cover} alt="" />
         ) : (
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
             <path d="M9 18V5l12-2v13" />

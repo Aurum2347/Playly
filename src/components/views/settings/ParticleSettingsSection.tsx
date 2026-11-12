@@ -1,7 +1,9 @@
+import SafeImage from '../../SafeImage'
 import { useEffect, useMemo, useState, type CSSProperties } from 'react'
 import { createPortal } from 'react-dom'
 import type { Track } from '../../../App'
 import { useI18n } from '../../../i18n'
+import WindEditor from './WindEditor'
 import Twemoji from '../../Twemoji'
 import CustomParticleEditor from './CustomParticleEditor'
 import { sliderPercent } from './helpers'
@@ -62,7 +64,7 @@ function CustomThumb({ particle }: { particle: CustomParticle }) {
   }, [particle.source])
   const pixelated = particle.source.type === 'image' && particle.source.smoothing === 'pixelated'
   return src && src.key === particle.source ? (
-    <img src={src.url} alt="" draggable={false} style={{ imageRendering: pixelated ? 'pixelated' : undefined }} />
+    <SafeImage src={src.url} alt="" draggable={false} style={{ imageRendering: pixelated ? 'pixelated' : undefined }} />
   ) : null
 }
 
@@ -230,6 +232,8 @@ export default function ParticleSettingsSection({ value, onChange, tracks }: Par
         </div>
       </div>
 
+      <WindEditor value={value} onChange={onChange} />
+
       {/* ===== Правила для треков ===== */}
       <div className="particle-rules">
         <div className="particle-rules-head">
@@ -371,7 +375,7 @@ function RuleEditor({ rule, kinds, kindName, custom, tracks, onClose, onSave }: 
                 <span className="rpc-chip-check" aria-hidden="true">
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
                 </span>
-                <span className="rule-track-cover">{tr.cover ? <img src={tr.cover} alt="" loading="lazy" /> : null}</span>
+                <span className="rule-track-cover">{tr.cover ? <SafeImage src={tr.cover} alt="" loading="lazy" /> : null}</span>
                 <span className="rule-track-text">
                   <span className="rule-track-title">{tr.title}</span>
                   <span className="rule-track-artist">{tr.artist}</span>

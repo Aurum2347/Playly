@@ -1,3 +1,4 @@
+import SafeImage from './SafeImage'
 import { useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
 import type { Playlist, Track } from '../App'
@@ -185,7 +186,7 @@ export default function AddTracksModal({ open, playlist, tracks, onClose, onAdd,
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
                   </span>
                   <span className="atm-cover">
-                    {tr.cover ? <img src={tr.cover} alt="" loading="lazy" decoding="async" /> : <MusicIcon />}
+                    {tr.cover ? <SafeImage src={tr.cover} alt="" loading="lazy" decoding="async" /> : <MusicIcon />}
                   </span>
                   <span className="atm-text">
                     <span className="atm-row-title">{tr.title}</span>

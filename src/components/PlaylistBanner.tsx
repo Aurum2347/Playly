@@ -1,3 +1,4 @@
+import SafeImage from './SafeImage'
 import type { CSSProperties } from 'react'
 import type { PlaylistBanner } from '../App'
 import { frameStyle } from '../lib/imageFrame'
@@ -26,7 +27,7 @@ export function BannerLayers({ banner, className }: BannerLayersProps) {
   const showBlur = banner.blur !== 'none' && banner.blurAmount > 0
   return (
     <div className={`pl-banner ${className ?? ''}`} aria-hidden="true">
-      <img src={banner.url ?? undefined} alt="" draggable={false} style={frameStyle(banner.frame)} />
+      <SafeImage src={banner.url ?? undefined} alt="" draggable={false} style={frameStyle(banner.frame)} />
       {showBlur && (
         <div
           className="pl-banner-blur"

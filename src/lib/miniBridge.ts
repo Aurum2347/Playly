@@ -19,6 +19,7 @@ export interface MiniTrack {
 }
 
 export interface MiniState {
+  appearance?: import('./miniPreferences').MiniPreferences
   track: MiniTrack | null
   isPlaying: boolean
   /* Позиция на момент at (мс, Date.now()); дальше мини-плеер досчитывает сам */

@@ -43,19 +43,27 @@ import {
 import { AudioEngine, type CrossfadeCurve, type EngineEvents } from './lib/audioEngine'
 import { applyUiScale, clampUiScale, UI_SCALE_DEFAULT } from './lib/uiScale'
 import { DEFAULT_FRAME, normalizeFrame, type ImageFrame } from './lib/imageFrame'
-import { normalizeCustomPresets, presetGains, type EqPreset } from './lib/equalizer'
+import { normalizeCustomPresets, normalizeGains, presetGains, type EqPreset } from './lib/equalizer'
 import { initListeningStats, useListeningTracker } from './lib/listeningStats'
-import { loadProfileImage, normalizeLook, readProfileFile, type AvatarShape, type ProfileLook } from './lib/profile'
-import { versionLabel } from './lib/version'
+import { loadProfileImage, normalizeLook, readProfileFile, patchProfileFile, type AvatarShape, type ProfileLook } from './lib/profile'
+import { requestChangelog, versionLabel } from './lib/version'
+import { setPlaybackClock } from './lib/playbackClock'
 import type { TrackUpdates } from './components/views/TrackEditModal'
 import { MINI_COMMAND_EVENT, MINI_HELLO_EVENT, MINI_STATE_EVENT, type MiniCommand, type MiniState } from './lib/miniBridge'
 import { DEFAULT_DISCORD_PARTS, normalizeDiscordParts, type DiscordParts } from './lib/discord'
 import { I18nProvider, useI18n } from './i18n'
+import { loadMiniPreferences, useMiniPreferences } from './lib/miniPreferences'
+import PersonalizationHost from './components/PersonalizationHost'
+import HistoryView from './components/views/HistoryView'
+import FeedbackHost from './components/FeedbackHost'
+import { notify, reportError } from './lib/feedback'
+import { writeSettingsRaw } from './components/views/settings/helpers'
 import './App.css'
 import './styles/buttons.css'
 import './styles/responsive.css'
+import './components/PlayerPolish.css'
 
-export type ViewType = 'home' | 'settings' | 'tracks' | 'liked' | 'playlist' | 'nowplaying'
+export type ViewType = 'home' | 'settings' | 'tracks' | 'liked' | 'playlist' | 'nowplaying' | 'history'
 
 export interface Track {
   id: number
@@ -75,6 +83,7 @@ export interface Track {
   /* Анимированная обложка (GIF в папке covers): видна, пока трек играет; в списках — обычная cover */
   animCoverFile?: string | null
   /* Не показывать этот трек в статусе Discord */
+  eqGains?: number[] | null
   discordHidden?: boolean
 }
 
@@ -141,6 +150,27 @@ const PlaylistViewM = memo(PlaylistView)
 
 function AppInner() {
   const { t, lang } = useI18n()
+
+  /* Ctrl+0 — вернуть масштаб 100% (страница «Оформление» узнаёт об этом из события playly-ui-scale) */
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (!(e.ctrlKey || e.metaKey) || e.altKey || e.shiftKey || e.code !== 'Digit0') return
+      e.preventDefault()
+      void applyUiScale(UI_SCALE_DEFAULT)
+      void writeSettingsRaw({ uiScale: UI_SCALE_DEFAULT })
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [])
+
+  /* Мини-плеер: выключенный в настройках не открывается ни из трея, ни горячей клавишей */
+  const miniPreferences = useMiniPreferences()
+  useEffect(() => {
+    void loadMiniPreferences()
+  }, [])
+  useEffect(() => {
+    invoke('set_mini_enabled', { enabled: miniPreferences.enabled }).catch(() => {})
+  }, [miniPreferences.enabled])
   const [appState, setAppState] = useState<'splash' | 'onboarding' | 'main'>('splash')
   const [userNickname, setUserNickname] = useState('Aurum2347')
   const [userAvatar, setUserAvatar] = useState<string | null>(null)
@@ -249,6 +279,10 @@ function AppInner() {
     navigate: (v) => setCurrentView(v),
     onTracksDeleted: (ids) => {
       const idSet = new Set(ids)
+      const wasPlaying = isPlayingRef.current
+      xfadePlanRef.current = null
+      autoXfadeRef.current = false
+      const activeRemoved = engineRef.current?.removeTracks(idSet)
       const q = queueRef.current
       const cur = queueIndexRef.current
       const curId = q[cur]
@@ -258,6 +292,7 @@ function AppInner() {
       applyQueue(newQueue)
       if (curId === undefined) return
       if (!idSet.has(curId)) {
+        if (activeRemoved) { pendingPlayRef.current = wasPlaying; setLoadTick((v) => v + 1) }
         applyIndex(newQueue.indexOf(curId))
         return
       }
@@ -268,7 +303,7 @@ function AppInner() {
         engineRef.current?.stop()
         return
       }
-      pendingPlayRef.current = isPlayingRef.current
+      pendingPlayRef.current = wasPlaying
       applyIndex(newQueue.indexOf(nextId))
     },
     onLibraryCleared: () => {
@@ -314,7 +349,13 @@ function AppInner() {
   }, [queue, queueIndex, tracks])
 
   const applyOutputDevice = useCallback(async (deviceId: string) => {
-    await engineRef.current?.setOutputDevice(deviceId)
+    try {
+      await engineRef.current?.setOutputDevice(deviceId)
+      return true
+    } catch (error) {
+      reportError('outputDevice', error)
+      return false
+    }
   }, [])
 
   const applyMasterGain = useCallback(() => {
@@ -404,12 +445,12 @@ function AppInner() {
       const eng = engineRef.current
       applyIndex(idx)
       if (id === undefined) return
-      if (opts.autoplay) recordPlay(id)
       if (id !== prevId) {
         pendingPlayRef.current = opts.autoplay
         return
       }
       if (eng && eng.currentTrackId === id) {
+        if (opts.autoplay && opts.restart) recordPlay(id)
         if (opts.restart) {
           eng.seek(0)
           setCurrentTime(0)
@@ -458,12 +499,15 @@ function AppInner() {
     const cf = crossfadeRef.current
     if (!eng || cf <= 0 || autoXfadeRef.current || eng.isTransitioning) return
     if (!isPlayingRef.current || repeatRef.current === 'one') return
+    if (eng.duration / (selectedTrack?.playbackRate ?? 1) <= cf) return
     const remaining = eng.remaining()
     if (!isFinite(remaining) || remaining > cf + CROSSFADE_PRELOAD_LEAD) return
     const plan = getCrossfadePlan()
     if (!plan || plan.failed) return
     const next = tracksRef.current.find((t) => t.id === plan.trackId)
     if (!next) return
+    const nextDuration = next.duration.split(':').reduce((n, part) => n * 60 + Number(part), 0) / (next.playbackRate ?? 1)
+    if (nextDuration > 0 && nextDuration <= cf) return
     if (remaining > cf + 0.3) {
       eng.preload(next)
       return
@@ -483,7 +527,7 @@ function AppInner() {
       if (queueRef.current[idx] !== next.id) idx = queueRef.current.indexOf(next.id)
       if (idx >= 0) commitQueueIndex(idx, fade)
     })
-  }, [getCrossfadePlan, commitQueueIndex, tracksRef])
+  }, [getCrossfadePlan, commitQueueIndex, tracksRef, selectedTrack?.playbackRate])
 
   /* Трек доиграл без кроссфейда */
   const handleEnded = useCallback(() => {
@@ -491,6 +535,8 @@ function AppInner() {
     if (!eng || autoXfadeRef.current) return
     if (repeatRef.current === 'one') {
       eng.seek(0)
+      const id = eng.currentTrackId
+      if (id !== null) recordPlay(id)
       eng.play()
       setSeekTick((v) => v + 1)
       return
@@ -503,7 +549,7 @@ function AppInner() {
       return
     }
     goToIndex(plan.idx, { autoplay: true, fadeSec: 0, history: true })
-  }, [getCrossfadePlan, goToIndex])
+  }, [getCrossfadePlan, goToIndex, recordPlay])
 
   /* Файл не прочитался: пропускаем его и идём дальше по очереди, а если идти некуда — останавливаемся */
   const handleLoadErrorRef = useRef<(trackId: number, autoplay: boolean) => void>(() => {})
@@ -512,16 +558,19 @@ function AppInner() {
       const eng = engineRef.current
       const q = queueRef.current
       if (!eng || q[queueIndexRef.current] !== trackId) return
+      const title = tracksRef.current.find((tr) => tr.id === trackId)?.title ?? ''
       loadFailStreakRef.current += 1
       const next = computeNextIndex()
       if (next !== null && loadFailStreakRef.current < q.length) {
+        notify('trackSkipped', { title })
         goToIndex(next, { autoplay, fadeSec: 0, history: false })
         return
       }
       loadFailStreakRef.current = 0
+      notify('trackUnreadable', { title })
       eng.stop()
     }
-  }, [computeNextIndex, goToIndex])
+  }, [computeNextIndex, goToIndex, tracksRef])
 
   useEffect(() => {
     engineEventsRef.current = {
@@ -551,6 +600,7 @@ function AppInner() {
       onDuration: (d) => engineEventsRef.current?.onDuration(d),
       onPlayingChange: (p) => engineEventsRef.current?.onPlayingChange(p),
       onEnded: () => engineEventsRef.current?.onEnded(),
+      onError: (id) => handleLoadErrorRef.current(id, isPlayingRef.current),
     })
     eng.setVolume(volumeRef.current / 100, mutedRef.current)
     eng.setNormalize(normalizeRef.current)
@@ -587,7 +637,7 @@ function AppInner() {
     setDuration(0)
     setSeekTick((v) => v + 1)
     void eng.load(selectedTrack, { autoplay, fade }).then((res) => {
-      if (res === 'ok') loadFailStreakRef.current = 0
+      if (res === 'ok') { loadFailStreakRef.current = 0; if (autoplay) recordPlay(trackId) }
       else if (res === 'error') handleLoadErrorRef.current(trackId, autoplay)
     })
     /* Загружаем только при смене трека (или явной перезагрузке), а не при правке его тегов */
@@ -635,10 +685,10 @@ function AppInner() {
   )
 
   const handleOutputDeviceChange = useCallback(
-    (id: string) => {
+    async (id: string) => {
+      if (!await applyOutputDevice(id)) return
       setOutputDevice(id)
       outputDeviceRef.current = id
-      applyOutputDevice(id)
       scheduleSettingsSave({ outputDevice: id })
     },
     [applyOutputDevice, scheduleSettingsSave]
@@ -768,8 +818,9 @@ function AppInner() {
       setTimeout(() => stale.forEach((u) => URL.revokeObjectURL(u)), 1000)
       profileUrlsRef.current = [avatarUrl, cardUrl, bannerUrl].filter((u): u is string => !!u)
 
-      setAvatarShape(data.avatarShape === 'square' ? 'square' : 'circle')
+      setAvatarShape(avatarUrl && data.avatarShape === 'square' ? 'square' : 'circle')
       setAvatarFrame(normalizeFrame(data.avatarFrame))
+      if (data.avatarFile && !avatarUrl) await patchProfileFile({ avatarFile: null, avatarShape: 'circle', avatarFrame: null })
       setUserAvatar(avatarUrl)
       setCardLook({ ...card, url: cardUrl })
       setBannerLook({ ...banner, url: bannerUrl })
@@ -1102,10 +1153,13 @@ function AppInner() {
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      if (e.defaultPrevented || document.querySelector('.player-dialog-overlay:not(.closing)')) return
       const target = e.target as HTMLElement | null
       if (
         target &&
-        (target.tagName === 'INPUT' ||
+        (target.tagName === 'BUTTON' ||
+          target.tagName === 'SELECT' ||
+          target.tagName === 'INPUT' ||
           target.tagName === 'TEXTAREA' ||
           target.isContentEditable)
       ) {
@@ -1195,6 +1249,7 @@ function AppInner() {
               liked: selectedTrack.liked,
             }
           : null,
+        appearance: miniPreferences,
         isPlaying,
         position: live ? eng.currentTime : 0,
         at: Date.now(),
@@ -1241,7 +1296,10 @@ function AppInner() {
   })
 
   const sendMiniState = useCallback(() => {
-    emitTo('mini', MINI_STATE_EVENT, miniStateRef.current()).catch(() => {})
+    const state = miniStateRef.current()
+    emitTo('mini', MINI_STATE_EVENT, state).catch(() => {})
+    /* Меню трея показывает, что сейчас играет, и говорит на языке интерфейса */
+    emitTo('traymenu', MINI_STATE_EVENT, state).catch(() => {})
   }, [])
 
   useEffect(() => {
@@ -1254,6 +1312,7 @@ function AppInner() {
   }, [
     appState,
     sendMiniState,
+    miniPreferences,
     selectedTrack?.id,
     selectedTrack?.title,
     selectedTrack?.artist,
@@ -1290,6 +1349,13 @@ function AppInner() {
     if (appState === 'main') void startUpdater()
   }, [appState])
 
+  /* Портативное обновление: новая версия дошла до экрана — значит, запустилась нормально,
+     резервную копию прежней можно удалять. Не зависит от загрузки оформления и прочего:
+     любая мелкая ошибка там не должна приводить к откату обновления */
+  useEffect(() => {
+    if (appState !== 'splash') invoke('confirm_portable_update').catch(() => {})
+  }, [appState])
+
 
   const openProfileSettings = useCallback(() => {
     setIsProfileOpen(false)
@@ -1321,6 +1387,10 @@ function AppInner() {
 
   const getAnalyser = useCallback(() => engineRef.current?.analyser ?? null, [])
   const getEngineTime = useCallback(() => engineRef.current?.currentTime ?? 0, [])
+  const selectedPath = selectedTrack?.filePath ?? null
+  useEffect(() => {
+    setPlaybackClock({ trackPath: () => selectedPath, position: getEngineTime })
+  }, [selectedPath, getEngineTime])
 
   /* Статистика прослушиваний для окна профиля */
   useListeningTracker(isPlaying, selectedTrack?.id ?? null, duration, getEngineTime)
@@ -1334,8 +1404,8 @@ function AppInner() {
     const eng = engineRef.current
     if (!eng) return
     if (eqPreview) eng.setEq(eqPreview)
-    else eng.setEq(eqEnabled ? presetGains(eqPresetId, eqCustomPresets) : null)
-  }, [eqEnabled, eqPresetId, eqCustomPresets, eqPreview])
+    else eng.setEq(selectedTrack?.eqGains ? normalizeGains(selectedTrack.eqGains) : eqEnabled ? presetGains(eqPresetId, eqCustomPresets) : null)
+  }, [eqEnabled, eqPresetId, eqCustomPresets, eqPreview, selectedTrack?.eqGains])
 
   const handleEqEnabledChange = useCallback(
     (v: boolean) => {
@@ -1463,9 +1533,10 @@ function AppInner() {
       size: particles.size,
       opacity: particles.opacity,
       blur: particles.blur,
+      wind: particles.wind,
       custom: particleCustom,
     }),
-    [particleKind, particles.density, particles.speed, particles.size, particles.opacity, particles.blur, particleCustom]
+    [particleKind, particles.density, particles.speed, particles.size, particles.opacity, particles.blur, particles.wind, particleCustom]
   )
   /* Фон рисуется, если выбран свой фон или вообще настроены частицы (хотя бы в правилах) */
   const hasBackdrop =
@@ -1547,6 +1618,8 @@ function AppInner() {
 
   const renderView = () => {
     switch (currentView) {
+      case 'history':
+        return <HistoryView tracks={tracks} onSelectTrack={handleTrackSelect} playingTrackId={selectedTrack?.id ?? null} isPlaying={isPlaying} onPlayToggle={handlePlayPause} />
       case 'home':
         return renderHome()
       case 'nowplaying':
@@ -1761,6 +1834,14 @@ function AppInner() {
         isPlaying={isPlaying}
         onOpenNowPlaying={openNowPlaying}
         versionLabel={`Playly ${versionLabel(t)}`}
+      />
+      <FeedbackHost />
+      <PersonalizationHost
+        onOpenChanges={() => {
+          requestChangelog()
+          setSettingsSection('about')
+          setCurrentView('settings')
+        }}
       />
       <SidebarM
         currentView={currentView}

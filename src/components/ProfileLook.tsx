@@ -1,3 +1,4 @@
+import SafeImage from './SafeImage'
 import { useMemo, type CSSProperties, type ReactNode } from 'react'
 import { frameStyle } from '../lib/imageFrame'
 import { blurMask, fadeMask } from '../lib/masks'
@@ -77,7 +78,7 @@ export function LookLayers({ look, className, effects = true }: LookLayersProps)
       style={{ maskImage: fade, WebkitMaskImage: fade }}
     >
       {isImage ? (
-        <img src={look.url ?? undefined} alt="" draggable={false} style={frameStyle(look.frame)} />
+        <SafeImage src={look.url ?? undefined} alt="" draggable={false} style={frameStyle(look.frame)} />
       ) : (
         <div className="look-gradient" style={{ background: gradientCss(look.gradient) }} />
       )}

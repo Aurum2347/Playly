@@ -1,8 +1,8 @@
 import { getCurrentWebview } from '@tauri-apps/api/webview'
 
-/* ===== Масштаб приложения: строго 100–200 % ===== */
-export const UI_SCALE_MIN = 100
-export const UI_SCALE_MAX = 200
+/* ===== Масштаб приложения: 25–400 % ===== */
+export const UI_SCALE_MIN = 25
+export const UI_SCALE_MAX = 400
 export const UI_SCALE_DEFAULT = 100
 export const UI_SCALE_STEP = 5
 
@@ -18,7 +18,9 @@ export function clampUiScale(value: unknown): number {
  * под уменьшившийся CSS-вьюпорт медиазапросами.
  */
 export async function applyUiScale(percent: number): Promise<void> {
-  const scale = clampUiScale(percent) / 100
+  const value = clampUiScale(percent)
+  window.dispatchEvent(new CustomEvent('playly-ui-scale', { detail: value }))
+  const scale = value / 100
   document.documentElement.style.setProperty('--ui-scale', String(scale))
   try {
     await getCurrentWebview().setZoom(scale)

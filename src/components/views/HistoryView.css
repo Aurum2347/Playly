@@ -1,0 +1,340 @@
+/* ===== История прослушивания ===== */
+
+.listening-history { gap: 0; }
+
+/* Шапка: иконка, заголовок с подписью и «Очистить» */
+.history-head {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 18px;
+}
+
+.history-head-main { display: flex; align-items: center; gap: 14px; min-width: 0; }
+
+.history-head-icon {
+  display: grid;
+  place-items: center;
+  width: 46px;
+  height: 46px;
+  flex-shrink: 0;
+  border-radius: 14px;
+  color: var(--text);
+  background: linear-gradient(145deg, color-mix(in srgb, var(--accent) 22%, transparent), var(--element));
+  border: 1px solid var(--border);
+  box-shadow: 0 6px 18px var(--shadow);
+}
+
+.history-head-icon svg { width: 22px; height: 22px; }
+.history-head-text { min-width: 0; }
+.history-head-text h1 { line-height: 1.15; }
+
+.history-subtitle {
+  margin-top: 4px;
+  font-size: 13px;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.history-clear { flex-shrink: 0; }
+.history-clear:hover { color: var(--danger, #ef4444); }
+
+/* Сводка: четыре плитки */
+.history-stats {
+  flex-shrink: 0;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  margin-bottom: 14px;
+  animation: historyIn 0.3s ease both;
+}
+
+.history-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+  padding: 12px 16px;
+  border-radius: 14px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-faint);
+}
+
+.history-stat-label {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.history-stat-value {
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Список: каждый день — своя карточка */
+.history-list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding-right: 4px;
+  margin-right: -4px;
+}
+
+.history-list::-webkit-scrollbar { width: 6px; }
+.history-list::-webkit-scrollbar-track { background: transparent; }
+.history-list::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+.history-day {
+  flex-shrink: 0;
+  border-radius: 16px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-faint);
+  padding: 6px;
+  animation: historyIn 0.3s ease both;
+}
+
+.history-day-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px 8px;
+}
+
+.history-day-label {
+  font-size: 14px;
+  font-weight: 650;
+  color: var(--text);
+  letter-spacing: -0.01em;
+}
+
+/* «понедельник, 3 ноября» → «Понедельник, 3 ноября» */
+.history-day-label::first-letter { text-transform: uppercase; }
+
+.history-day-meta {
+  font-size: 12px;
+  color: var(--text-faint);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.history-day-rows { display: flex; flex-direction: column; gap: 2px; }
+
+/* Строка: время · обложка · название · альбом · длительность */
+.history-row {
+  position: relative;
+  display: grid;
+  grid-template-columns: 52px 42px minmax(0, 1.4fr) minmax(0, 1fr) 56px;
+  align-items: center;
+  gap: 14px;
+  padding: 7px 12px 7px 6px;
+  border-radius: 11px;
+  cursor: pointer;
+  transition: background 0.14s ease;
+  animation: historyRowIn 0.24s ease both;
+}
+
+.history-row:hover { background: var(--hover); }
+.history-row:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; background: var(--hover); }
+
+.history-row.is-current { background: color-mix(in srgb, var(--accent) 9%, transparent); }
+.history-row.is-current:hover { background: color-mix(in srgb, var(--accent) 14%, transparent); }
+
+/* Полоска слева у текущего трека */
+.history-row.is-current::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 10px;
+  bottom: 10px;
+  width: 3px;
+  border-radius: 3px;
+  background: var(--accent);
+}
+
+.history-time {
+  font-size: 12px;
+  color: var(--text-faint);
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+
+.history-row.is-current .history-time { color: var(--text-secondary); font-weight: 600; }
+
+.history-cover {
+  position: relative;
+  width: 42px;
+  height: 42px;
+  flex-shrink: 0;
+  border-radius: 9px;
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+  background: var(--element-strong);
+  border: 1px solid var(--border-soft);
+  box-shadow: 0 2px 6px var(--shadow);
+}
+
+.history-cover img { width: 100%; height: 100%; object-fit: cover; }
+.history-cover > svg { width: 18px; height: 18px; color: var(--text-faint); }
+
+.history-cover-play {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: rgba(0, 0, 0, 0.55);
+  color: #fff;
+  opacity: 0;
+  transition: opacity 0.16s ease;
+}
+
+.history-cover-play svg { width: 18px; height: 18px; }
+
+.history-row:hover .history-cover-play,
+.history-row:focus-visible .history-cover-play,
+.history-row.is-playing .history-cover-play { opacity: 1; }
+
+/* Анимированные столбики «играет» */
+.history-bars { display: flex; align-items: flex-end; gap: 2px; height: 14px; }
+
+.history-bars i {
+  display: block;
+  width: 3px;
+  height: 100%;
+  border-radius: 2px;
+  background: #fff;
+  transform-origin: bottom;
+  animation: historyBars 0.9s ease-in-out infinite;
+}
+
+.history-bars i:nth-child(2) { animation-delay: -0.3s; }
+.history-bars i:nth-child(3) { animation-delay: -0.6s; }
+
+.history-text { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+
+.history-title,
+.history-artist,
+.history-album {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.history-title { font-size: 14px; font-weight: 500; color: var(--text-secondary); line-height: 1.25; }
+.history-row:hover .history-title,
+.history-row.is-current .history-title { color: var(--text); }
+.history-artist { font-size: 12px; color: var(--text-muted); }
+.history-album { font-size: 12px; color: var(--text-faint); }
+
+.history-dur {
+  font-size: 12px;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+/* Пусто / ничего не найдено */
+.history-empty {
+  flex: 1;
+  min-height: 260px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 32px 20px;
+  text-align: center;
+  border-radius: 16px;
+  background: var(--bg-elevated);
+  border: 1px dashed var(--border);
+  animation: historyIn 0.3s ease both;
+}
+
+.history-empty-icon {
+  display: grid;
+  place-items: center;
+  width: 64px;
+  height: 64px;
+  border-radius: 20px;
+  background: var(--element);
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  margin-bottom: 18px;
+}
+
+.history-empty-icon svg { width: 28px; height: 28px; }
+.history-empty h2 { font-size: 16px; font-weight: 600; color: var(--text-secondary); margin-bottom: 6px; }
+.history-empty p { font-size: 13px; color: var(--text-faint); line-height: 1.6; max-width: 320px; }
+
+/* Страницы */
+.history-pagination {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  padding-top: 14px;
+}
+
+.history-page {
+  min-width: 120px;
+  text-align: center;
+  font-size: 12px;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+@keyframes historyIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: none; }
+}
+
+@keyframes historyRowIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: none; }
+}
+
+@keyframes historyBars {
+  0%, 100% { transform: scaleY(0.3); }
+  50%      { transform: scaleY(1); }
+}
+
+@media (max-width: 900px) {
+  .history-row { grid-template-columns: 48px 42px minmax(0, 1fr) 52px; }
+  .history-album { display: none; }
+}
+
+@media (max-width: 700px) {
+  .history-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .history-subtitle { display: none; }
+}
+
+@media (max-width: 450px) {
+  .history-row { grid-template-columns: 42px minmax(0, 1fr) 44px; gap: 10px; }
+  .history-time { display: none; }
+  .history-clear { padding: 0 10px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .history-stats, .history-day, .history-row, .history-empty { animation-duration: 1ms !important; animation-delay: 0ms !important; }
+  .history-bars i { animation: none; transform: scaleY(0.7); }
+  .history-cover-play { transition-duration: 1ms !important; }
+}

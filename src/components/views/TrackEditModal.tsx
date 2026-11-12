@@ -1,3 +1,5 @@
+import LyricsEditor from '../LyricsEditor'
+import SafeImage from '../SafeImage'
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { copyCover, loadCoverUrl, saveCoverFromBytes } from '../../lib/trackLoader'
@@ -5,9 +7,16 @@ import { isVideoPath, pickVisual, requestVideoGif } from '../../lib/media'
 import CoverPicker from '../CoverPicker'
 import type { Track } from '../../App'
 import { useI18n } from '../../i18n'
+import { invoke } from '@tauri-apps/api/core'
+import { reportError } from '../../lib/feedback'
+import EqEditorModal from '../EqEditorModal'
+import { FLAT_GAINS, normalizeGains } from '../../lib/equalizer'
 import './TrackEditModal.css'
 
 export interface TrackUpdates {
+  album?: string
+  genre?: string
+  eqGains?: number[] | null
   title?: string
   artist?: string
   cover?: string | null
@@ -44,6 +53,12 @@ function TrackEditForm({ track, onClose, onSave, tracks }: TrackEditModalProps &
   const { t } = useI18n()
   const [title, setTitle] = useState(track.title)
   const [artist, setArtist] = useState(track.artist)
+  const [album, setAlbum] = useState(track.album)
+  const [genre, setGenre] = useState(track.genre)
+  const [saving, setSaving] = useState(false)
+  const [eqGains, setEqGains] = useState(track.eqGains ?? null)
+  const [eqOpen, setEqOpen] = useState(false)
+  const [lyricsOpen, setLyricsOpen] = useState(false)
   const [cover, setCover] = useState<string | null>(track.cover ?? null)
   const [coverFile, setCoverFile] = useState<string | null>(track.coverFile ?? null)
   const [speed, setSpeed] = useState(track.playbackRate ?? 1)
@@ -114,21 +129,22 @@ function TrackEditForm({ track, onClose, onSave, tracks }: TrackEditModalProps &
   /* Capture-фаза на window: Escape закрывает только модалку и не доходит до списка треков */
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key !== 'Escape' || isBorrowOpen || isMakingGif || isPickingCover) return
+      if (document.querySelector('.player-dialog-overlay:not(.closing)')) return
+      if (saving || eqOpen || lyricsOpen || e.key !== 'Escape' || isBorrowOpen || isMakingGif || isPickingCover) return
       e.preventDefault()
       e.stopPropagation()
       onClose()
     }
     window.addEventListener('keydown', onKey, true)
     return () => window.removeEventListener('keydown', onKey, true)
-  }, [onClose, isBorrowOpen, isMakingGif, isPickingCover])
+  }, [onClose, isBorrowOpen, isMakingGif, isPickingCover, saving, eqOpen, lyricsOpen])
 
   const pickCover = async () => {
     if (isPickingCover) return
     setIsPickingCover(true)
     try {
       /* Видео сразу открывает окно «Анимация из видео», GIF становится анимацией с заставкой */
-      const picked = await pickVisual({ filterName: t('settings.profile.imagesFilter'), purpose: 'track', maxBytes: 25 * 1024 * 1024 })
+      const picked = await pickVisual({ filterName: t('settings.profile.imagesFilter'), purpose: 'track', maxBytes: 5 * 1024 * 1024 })
       if (picked) await applyVisual(picked.bytes, picked.ext, picked.poster)
     } catch (e) {
       console.error('Ошибка выбора обложки:', e)
@@ -144,39 +160,52 @@ function TrackEditForm({ track, onClose, onSave, tracks }: TrackEditModalProps &
     if (copied && mountedRef.current) { setCover(copied.coverUrl); setCoverFile(copied.coverFile); setAnimFile(null) }
   }
 
-  const handleSave = () => {
+  const handleSave = async () => {
+    if (saving) return
     const t2 = title.trim()
     if (!t2) return
-    const updates: TrackUpdates = {}
+    const updates: TrackUpdates = { eqGains }
     if (t2 !== track.title) updates.title = t2
     const a = artist.trim()
-    if (a && a !== track.artist) updates.artist = a
+    if (a !== track.artist) updates.artist = a
+    if (album.trim() !== track.album) updates.album = album.trim()
+    if (genre.trim() !== track.genre) updates.genre = genre.trim()
     if (cover !== (track.cover ?? null)) { updates.cover = cover; updates.coverFile = coverFile }
     if (speed !== (track.playbackRate ?? 1)) updates.playbackRate = speed
     if (animFile !== (track.animCoverFile ?? null)) updates.animCoverFile = animFile
     if (discordHidden !== (track.discordHidden === true)) updates.discordHidden = discordHidden
-    onSave(track.id, updates)
-    onClose()
+    setSaving(true)
+    try {
+      if (updates.title !== undefined || updates.artist !== undefined || updates.album !== undefined || updates.genre !== undefined) {
+        await invoke('write_track_tags', { path: track.filePath, title: t2, artist: a, album: album.trim(), genre: genre.trim() })
+      }
+      onSave(track.id, updates)
+      onClose()
+    } catch (error) {
+      reportError('tagsSave', error)
+    } finally {
+      if (mountedRef.current) setSaving(false)
+    }
   }
 
   const pct = ((speed - 0.5) / 1.5) * 100
 
   return createPortal(
-    <div className="tem-overlay" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose() }}>
+    <div className="tem-overlay" onMouseDown={(e) => { if (e.target === e.currentTarget && !saving) onClose() }}>
       <div className="tem-modal" onMouseDown={(e) => e.stopPropagation()}>
         <div className="tem-head">
           <div>
             <div className="tem-title">{t('views.trackEdit.title')}</div>
             <div className="tem-subtitle">{t('views.trackEdit.subtitle')}</div>
           </div>
-          <button className="tem-close" onClick={onClose} title={t('common.close')}>
+          <button className="tem-close" disabled={saving} onClick={onClose} title={t('common.close')}>
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
           </button>
         </div>
 
         <div className="tem-cover-row">
           <div className="tem-cover" key={(animUrl ?? cover) ?? 'none'}>
-            {animUrl ? <img src={animUrl} alt="" /> : cover ? <img src={cover} alt="" /> : <MusicIcon />}
+            {animUrl ? <SafeImage src={animUrl} alt="" /> : cover ? <SafeImage src={cover} alt="" /> : <MusicIcon />}
             {animFile && <span className="tem-gif-badge">GIF</span>}
           </div>
           <div className="tem-cover-actions">
@@ -223,6 +252,10 @@ function TrackEditForm({ track, onClose, onSave, tracks }: TrackEditModalProps &
           onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleSave() } }}
         />
 
+        <label className="tem-label" htmlFor="temAlbum">{t('views.trackEdit.albumLabel')}</label>
+        <input id="temAlbum" className="tem-input" value={album} onChange={(e) => setAlbum(e.target.value)} />
+        <label className="tem-label" htmlFor="temGenre">{t('views.trackEdit.genreLabel')}</label>
+        <input id="temGenre" className="tem-input" value={genre} onChange={(e) => setGenre(e.target.value)} />
         <div className="tem-speed-head">
           <span className="tem-label">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" /></svg>
@@ -254,9 +287,55 @@ function TrackEditForm({ track, onClose, onSave, tracks }: TrackEditModalProps &
           </span>
         </label>
 
+        <div className="tem-section-title">{t('views.trackEdit.extraTitle')}</div>
+        <div className="tem-extra">
+          <button type="button" className="tem-tile" onClick={() => setLyricsOpen(true)}>
+            <span className="tem-tile-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M4 6h16M4 12h10M4 18h7" /><path d="M17 14v6" /><circle cx="15.5" cy="20" r="1.5" /><path d="M17 14l3 -1" /></svg>
+            </span>
+            <span className="tem-tile-text">
+              <span className="tem-tile-title">{t('views.trackEdit.lyricsEdit')}</span>
+              <span className="tem-tile-sub">{t('views.trackEdit.lyricsHint')}</span>
+            </span>
+            <svg className="tem-tile-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true"><path d="m9 6 6 6-6 6" /></svg>
+          </button>
+
+          <div className={`tem-tile tem-tile-eq ${eqGains ? 'is-custom' : ''}`}>
+            <button type="button" className="tem-tile-main" onClick={() => setEqOpen(true)}>
+              <span className="tem-tile-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M6 4v16M12 4v16M18 4v16" /><circle cx="6" cy="14" r="2" fill="currentColor" /><circle cx="12" cy="8" r="2" fill="currentColor" /><circle cx="18" cy="16" r="2" fill="currentColor" /></svg>
+              </span>
+              <span className="tem-tile-text">
+                <span className="tem-tile-title">
+                  {t('views.trackEdit.trackEq')}
+                  {eqGains && <span className="tem-tile-dot" aria-hidden="true" />}
+                </span>
+                <span className="tem-tile-sub">{t(eqGains ? 'views.trackEdit.eqCustom' : 'views.trackEdit.eqGlobal')}</span>
+              </span>
+              {!eqGains && (
+                <svg className="tem-tile-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true"><path d="m9 6 6 6-6 6" /></svg>
+              )}
+            </button>
+            {eqGains && (
+              <button type="button" className="tem-tile-reset" onClick={() => setEqGains(null)} title={t('views.trackEdit.globalEq')}>
+                {t('views.trackEdit.eqReset')}
+              </button>
+            )}
+          </div>
+        </div>
+        <LyricsEditor path={lyricsOpen ? track.filePath : null} onClose={() => setLyricsOpen(false)} />
+        <EqEditorModal
+          target={eqOpen ? { id: 'track', name: title, gains: eqGains ? normalizeGains(eqGains) : FLAT_GAINS } : null}
+          onCancel={() => setEqOpen(false)}
+          onSave={(preset) => {
+            setEqGains(preset.gains)
+            setEqOpen(false)
+          }}
+          onPreview={() => {}}
+        />
         <div className="tem-actions">
-          <button className="tem-btn" onClick={onClose}>{t('common.cancel')}</button>
-          <button className="tem-btn tem-btn-primary" onClick={handleSave} disabled={!title.trim()}>{t('common.save')}</button>
+          <button className="tem-btn" disabled={saving} onClick={onClose}>{t('common.cancel')}</button>
+          <button className="tem-btn tem-btn-primary" onClick={handleSave} disabled={saving || !title.trim()}>{t('common.save')}</button>
         </div>
       </div>
       {tracks && (

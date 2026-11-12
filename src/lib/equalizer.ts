@@ -1,6 +1,7 @@
-/* ===== 10-полосный эквалайзер: полосы, пресеты, кривая ===== */
+/* ===== 15-полосный эквалайзер: полосы, пресеты, кривая ===== */
 
-export const EQ_BANDS = [32, 64, 125, 250, 500, 1000, 2000, 4000, 8000, 16000]
+const LEGACY_BANDS = [32, 64, 125, 250, 500, 1000, 2000, 4000, 8000, 16000]
+export const EQ_BANDS = [25, 40, 63, 100, 160, 250, 400, 630, 1000, 1600, 2500, 4000, 6300, 10000, 16000]
 export const EQ_MIN_DB = -12
 export const EQ_MAX_DB = 12
 export const FLAT_GAINS = EQ_BANDS.map(() => 0)
@@ -21,7 +22,8 @@ export const BUILTIN_EQ_PRESETS: Array<{ id: string; gains: number[] }> = [
   { id: 'vocal', gains: [-2, -2, -1, 1, 3, 4, 4, 2, 0, -1] },
   { id: 'jazz', gains: [3, 2, 1, 2, -1, -1, 0, 1, 2, 3] },
   { id: 'classic', gains: [4, 3, 2, 1, -1, -1, 0, 2, 3, 4] },
-]
+  { id: 'treble', gains: [0, 0, 0, 0, 0, 1, 3, 5, 6, 7] },
+].map((p) => ({ ...p, gains: normalizeGains(p.gains) }))
 
 export const isBuiltinPreset = (id: string) => BUILTIN_EQ_PRESETS.some((p) => p.id === id)
 
@@ -29,10 +31,20 @@ export function bandLabel(freq: number): string {
   return freq >= 1000 ? `${freq / 1000}k` : String(freq)
 }
 
-const clampDb = (v: number) => Math.max(EQ_MIN_DB, Math.min(EQ_MAX_DB, Math.round(v * 2) / 2))
+function clampDb(v: number) { return Math.max(EQ_MIN_DB, Math.min(EQ_MAX_DB, Math.round(v * 2) / 2)) }
 
 export function normalizeGains(value: unknown): number[] {
-  const arr = Array.isArray(value) ? value : []
+  let arr = Array.isArray(value) ? value : []
+  if (arr.length === LEGACY_BANDS.length) {
+    const old = arr.map((v) => typeof v === 'number' && Number.isFinite(v) ? v : 0)
+    arr = EQ_BANDS.map((freq) => {
+      if (freq <= LEGACY_BANDS[0]) return old[0]
+      const hi = LEGACY_BANDS.findIndex((f) => f >= freq)
+      if (hi < 0) return old[old.length - 1]
+      const t = Math.log(freq / LEGACY_BANDS[hi - 1]) / Math.log(LEGACY_BANDS[hi] / LEGACY_BANDS[hi - 1])
+      return old[hi - 1] + (old[hi] - old[hi - 1]) * t
+    })
+  }
   return EQ_BANDS.map((_, i) => {
     const v = arr[i]
     return typeof v === 'number' && isFinite(v) ? clampDb(v) : 0

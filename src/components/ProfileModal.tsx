@@ -1,3 +1,4 @@
+import SafeImage from './SafeImage'
 import { useEffect, useMemo, useState, type CSSProperties, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import type { Track } from '../App'
@@ -149,7 +150,7 @@ function ProfileModalContent({
               <div className={`pm-avatar ${avatarShape}`}>
                 <div className="pm-avatar-img">
                   {avatarUrl ? (
-                    <img src={avatarUrl} alt="" draggable={false} style={frameStyle(avatarFrame)} />
+                    <SafeImage src={avatarUrl} alt="" draggable={false} style={frameStyle(avatarFrame)} />
                   ) : (
                     <DefaultAvatar seed={nickname} />
                   )}
@@ -273,7 +274,7 @@ function ProfileModalContent({
                         <button className="pm-track" onClick={() => onPlayTrack(tr, topTracks)} title={tr.title}>
                           <span className={`pm-rank ${i === 0 ? 'first' : ''}`}>{i === 0 ? <Icon.crown /> : i + 1}</span>
                           <span className="pm-cover">
-                            {tr.cover ? <img src={tr.cover} alt="" draggable={false} /> : <MusicIcon />}
+                            {tr.cover ? <SafeImage src={tr.cover} alt="" draggable={false} /> : <MusicIcon />}
                             <span className="pm-cover-play">
                               <svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z" /></svg>
                             </span>

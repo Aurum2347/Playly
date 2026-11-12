@@ -1,3 +1,4 @@
+import SafeImage from '../SafeImage'
 import { useState, useRef, useEffect } from 'react'
 import { createPortal, flushSync } from 'react-dom'
 import { appDataDir, join } from '@tauri-apps/api/path'
@@ -508,6 +509,10 @@ export default function Sidebar({
             {t('layout.sidebar.liked')}
           </button>
 
+          <button className={`nav-item ${currentView === 'history' ? 'active' : ''}`} onClick={() => onViewChange('history')}>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 12a9 9 0 1 0 3-6.7M3 3v6h6"/><path d="M12 7v5l3 2"/></svg>
+            {t('layout.sidebar.history')}
+          </button>
           <button
             className={`nav-item ${currentView === 'settings' ? 'active' : ''}`}
             onClick={() => onViewChange('settings')}
@@ -560,7 +565,7 @@ export default function Sidebar({
                   title={pl.name}
                 >
                   <div className="playlist-cover">
-                    {pl.cover ? <img src={pl.cover} alt="" draggable={false} /> : <MusicIcon />}
+                    {pl.cover ? <SafeImage src={pl.cover} alt="" draggable={false} /> : <MusicIcon />}
                   </div>
 
                   <div className="playlist-info">
@@ -655,7 +660,7 @@ export default function Sidebar({
               <div className="sb-modal-body">
                 <div className="sb-edit-cover-row">
                   <div className="sb-edit-cover">
-                    {createCover ? <img src={createCover.coverUrl} alt="" /> : <MusicIcon />}
+                    {createCover ? <SafeImage src={createCover.coverUrl} alt="" /> : <MusicIcon />}
                   </div>
 
                   <button
@@ -732,7 +737,7 @@ export default function Sidebar({
               <div className="sb-modal-body">
                 <div className="sb-edit-cover-row">
                   <div className="sb-edit-cover">
-                    {editPlaylist?.cover ? <img src={editPlaylist.cover} alt="" /> : <MusicIcon />}
+                    {editPlaylist?.cover ? <SafeImage src={editPlaylist.cover} alt="" /> : <MusicIcon />}
                   </div>
 
                   <button
@@ -774,7 +779,7 @@ export default function Sidebar({
                           style={{ background: `linear-gradient(${editPlaylist.banner.gradient.angle}deg, ${editPlaylist.banner.gradient.from}, ${editPlaylist.banner.gradient.to})` }}
                         />
                       ) : editPlaylist?.banner?.url ? (
-                        <img src={editPlaylist.banner.url} alt="" />
+                        <SafeImage src={editPlaylist.banner.url} alt="" />
                       ) : null}
                     </div>
                     <button className="sb-modal-btn sb-modal-btn-cancel" onClick={() => setBannerFor(editState.id)}>

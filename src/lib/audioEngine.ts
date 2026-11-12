@@ -1,4 +1,5 @@
-import { readFile } from '@tauri-apps/plugin-fs'
+import { invoke } from '@tauri-apps/api/core'
+import { readFile, remove } from '@tauri-apps/plugin-fs'
 import { EQ_BANDS } from './equalizer'
 
 /*
@@ -36,6 +37,7 @@ export interface EngineEvents {
   onPlayingChange: (playing: boolean) => void
   /** Активная дека доиграла до конца сама (без перехода) */
   onEnded: () => void
+  onError?: (trackId: number) => void
 }
 
 interface Deck {
@@ -232,17 +234,10 @@ export class AudioEngine {
   async setOutputDevice(deviceId: string) {
     /* Звук идёт через AudioContext, поэтому устройство меняется у контекста, а не у <audio> */
     const ctx = this.ctx as AudioContext & { setSinkId?: (id: string) => Promise<void> }
-    try {
-      if (typeof ctx.setSinkId === 'function') {
-        await ctx.setSinkId(deviceId === 'default' ? '' : deviceId)
-        return
-      }
-      for (const d of this.decks) {
-        const el = d.el as HTMLAudioElement & { setSinkId?: (id: string) => Promise<void> }
-        await el.setSinkId?.(deviceId || 'default')
-      }
-    } catch (e) {
-      console.warn('Не удалось применить устройство вывода:', e)
+    if (typeof ctx.setSinkId === 'function') {
+      await ctx.setSinkId(deviceId === 'default' ? '' : deviceId)
+    } else if (deviceId && deviceId !== 'default') {
+      throw new Error('Эта версия WebView2 не поддерживает выбор устройства. Обнови Microsoft Edge WebView2 Runtime.')
     }
   }
 
@@ -381,7 +376,24 @@ export class AudioEngine {
     if (el.ended && this.hasSource) this.events.onEnded()
   }
 
+  removeTracks(ids: Set<number>) {
+    const activeRemoved = this.currentTrackId !== null && ids.has(this.currentTrackId)
+    if (activeRemoved) { this.stop(); return true }
+    const idle = this.decks[1 - this.active]
+    if (idle.trackId !== null && ids.has(idle.trackId)) {
+      this.loadSeq++
+      this.switching = false
+      this.finishTransition(true)
+      idle.token++
+      idle.pending = null
+      idle.trackId = null
+      this.silence(1 - this.active)
+    }
+    return false
+  }
+
   stop() {
+    void invoke('cancel_media_decode').catch(() => {})
     this.loadSeq++
     this.wantPlay = false
     this.switching = false
@@ -474,11 +486,14 @@ export class AudioEngine {
     el.addEventListener('timeupdate', onTime)
     el.addEventListener('durationchange', onDuration)
     el.addEventListener('loadedmetadata', onDuration)
+    const onError = () => { if (isActive() && !this.switching && deck.trackId !== null) this.events.onError?.(deck.trackId) }
+    el.addEventListener('error', onError)
     el.addEventListener('ended', onEnded)
     this.cleanups.push(() => {
       el.removeEventListener('timeupdate', onTime)
       el.removeEventListener('durationchange', onDuration)
       el.removeEventListener('loadedmetadata', onDuration)
+      el.removeEventListener('error', onError)
       el.removeEventListener('ended', onEnded)
     })
   }
@@ -513,7 +528,21 @@ export class AudioEngine {
         if (deck.url) URL.revokeObjectURL(deck.url)
         deck.url = url
         deck.el.src = url
-        const ok = await waitReady(deck.el)
+        let ok = await waitReady(deck.el)
+        if (!ok && deck.token === token) {
+          // FFmpeg decodes only for playback; the imported source file stays untouched.
+          const decoded = await invoke<string>('decode_media_audio', { path: track.filePath })
+          try {
+            if (deck.token !== token) return false
+            const pcm = await readFile(decoded)
+            if (deck.token !== token) return false
+            const decodedUrl = URL.createObjectURL(new Blob([pcm as unknown as BlobPart], { type: 'audio/wav' }))
+            if (deck.url) URL.revokeObjectURL(deck.url)
+            deck.url = decodedUrl
+            deck.el.src = decodedUrl
+            ok = await waitReady(deck.el)
+          } finally { await remove(decoded).catch(() => {}) }
+        }
         return ok && deck.token === token
       } catch (e) {
         console.error(`Не удалось прочитать трек (id ${track.id}):`, e)

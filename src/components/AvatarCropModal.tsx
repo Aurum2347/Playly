@@ -1,3 +1,4 @@
+import SafeImage from './SafeImage'
 import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useI18n } from '../i18n'
@@ -55,7 +56,7 @@ export default function AvatarCropModal({ src, shape, initialFrame, onCancel, on
         <div className="avatar-crop-previews">
           {[56, 42, 28].map((size) => (
             <div key={size} className={`avatar-crop-mini ${shape}`} style={{ width: size, height: size }}>
-              <img src={src} alt="" draggable={false} style={frameStyle(frame)} />
+              <SafeImage src={src} alt="" draggable={false} style={frameStyle(frame)} />
             </div>
           ))}
         </div>

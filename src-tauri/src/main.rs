@@ -1,6 +1,8 @@
 // Prevents additional console window on Windows in release, DO NOT REMOVE!!
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+mod media_audio;
+mod storage;
 use base64::Engine as _;
 use discord_rich_presence::{activity, DiscordIpc, DiscordIpcClient};
 use lofty::file::{AudioFile, TaggedFileExt};
@@ -11,7 +13,7 @@ use std::sync::mpsc;
 use std::thread;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
-use tauri::{command, Manager};
+use tauri::{command, Emitter, Manager};
 
 #[derive(serde::Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -80,9 +82,7 @@ fn get_track_lyrics(path: String) -> Option<String> {
         if let Ok(bytes) = fs::read(&sidecar) {
             let text = String::from_utf8_lossy(&bytes);
             let text = text.trim_start_matches('\u{feff}');
-            if !text.trim().is_empty() {
-                return Some(text.to_string());
-            }
+            return Some(text.to_string());
         }
     }
 
@@ -839,7 +839,14 @@ fn place_mini(app: &tauri::AppHandle, w: &tauri::WebviewWindow, anchor: Option<t
 
 /// Окно WebView нельзя создавать из обработчика событий главного потока (на Windows это зависание),
 /// поэтому при первом открытии мини-плеер создаётся в отдельном потоке
+static MINI_ENABLED: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(true);
+#[command]
+fn set_mini_enabled(app: tauri::AppHandle, enabled: bool) {
+    MINI_ENABLED.store(enabled, std::sync::atomic::Ordering::SeqCst);
+    if !enabled { hide_mini_player(app); }
+}
 fn toggle_mini(app: &tauri::AppHandle, anchor: Option<tauri::PhysicalPosition<f64>>) {
+    if !MINI_ENABLED.load(std::sync::atomic::Ordering::SeqCst) { return; }
     match app.get_webview_window(MINI_LABEL) {
         Some(w) => toggle_mini_window(app, &w, anchor),
         None => {
@@ -866,6 +873,15 @@ fn toggle_mini_window(app: &tauri::AppHandle, w: &tauri::WebviewWindow, anchor: 
         let _ = w.hide();
         return;
     }
+    show_mini_window(app, w, anchor);
+}
+
+fn show_mini_window(app: &tauri::AppHandle, w: &tauri::WebviewWindow, anchor: Option<tauri::PhysicalPosition<f64>>) {
+    let state = app.state::<MiniState>();
+    if w.is_visible().unwrap_or(false) {
+        let _ = w.set_focus();
+        return;
+    }
     if !state.user_placed.load(std::sync::atomic::Ordering::Relaxed) {
         place_mini(app, w, anchor);
     }
@@ -873,6 +889,22 @@ fn toggle_mini_window(app: &tauri::AppHandle, w: &tauri::WebviewWindow, anchor: 
     let _ = w.set_focus();
     state.armed.store(false, std::sync::atomic::Ordering::Relaxed);
     watch_mini_blur(app.clone(), w.clone());
+}
+
+/// Показать мини-плеер (из меню трея): в отличие от toggle_mini, уже открытый не прячется
+fn open_mini(app: &tauri::AppHandle, anchor: Option<tauri::PhysicalPosition<f64>>) {
+    if !MINI_ENABLED.load(std::sync::atomic::Ordering::SeqCst) { return; }
+    match app.get_webview_window(MINI_LABEL) {
+        Some(w) => show_mini_window(app, &w, anchor),
+        None => {
+            let app = app.clone();
+            thread::spawn(move || {
+                if let Some(w) = mini_window(&app) {
+                    show_mini_window(&app, &w, anchor);
+                }
+            });
+        }
+    }
 }
 
 #[command]
@@ -999,7 +1031,7 @@ async fn portable_download(
         )
         .await
         .map_err(|e| e.to_string())?;
-    fs::write(exe_sibling("update.exe")?, bytes).map_err(|e| format!("Не удалось сохранить обновление рядом с Playly: {}", e))?;
+    storage::replace(&exe_sibling("update.exe")?, &bytes).map_err(|e| format!("Не удалось сохранить обновление рядом с Playly: {}", e))?;
     Ok(update.version)
 }
 
@@ -1022,20 +1054,26 @@ fn portable_apply(app: tauri::AppHandle) -> Result<(), String> {
     let _ = fs::remove_file(&old);
     fs::rename(&exe, &old).map_err(|e| format!("Не удалось заменить Playly: {}", e))?;
     if let Err(e) = fs::rename(&staged, &exe) {
-        let _ = fs::rename(&old, &exe);
+        fs::rename(&old, &exe).map_err(|restore| format!("Не удалось восстановить Playly: {restore}. Предыдущая версия: {}", old.display()))?;
         return Err(format!("Не удалось заменить Playly: {}", e));
     }
     #[cfg(target_os = "windows")]
     {
         use std::os::windows::process::CommandExt;
         const CREATE_NO_WINDOW: u32 = 0x0800_0000;
-        /* Новая копия стартует через секунду, когда эта уже закроется: иначе защита от второго запуска
-           решит, что Playly ещё открыт, и просто покажет старое окно */
-        std::process::Command::new("cmd")
-            .raw_arg(format!("/C ping -n 2 127.0.0.1 >nul & start \"\" \"{}\"", exe.display()))
+        // The helper restores the backup if the new app fails before reaching its main screen.
+        let helper = std::process::Command::new("powershell.exe")
+            .args(["-NoProfile", "-NonInteractive", "-Command", include_str!("portable-restart.ps1")])
+            .env("PLAYLY_UPDATE_EXE", &exe)
+            .env("PLAYLY_UPDATE_BACKUP", &old)
+            .env("PLAYLY_UPDATE_PID", std::process::id().to_string())
             .creation_flags(CREATE_NO_WINDOW)
-            .spawn()
-            .map_err(|e| e.to_string())?;
+            .spawn();
+        if let Err(error) = helper {
+            fs::rename(&exe, &staged).map_err(|e| format!("Не удалось отложить новую версию: {e}. Резервная копия: {}", old.display()))?;
+            fs::rename(&old, &exe).map_err(|e| format!("Не удалось восстановить Playly: {e}. Резервная копия: {}", old.display()))?;
+            return Err(format!("Не удалось запустить перезапуск: {error}"));
+        }
     }
     app.exit(0);
     Ok(())
@@ -1043,11 +1081,16 @@ fn portable_apply(app: tauri::AppHandle) -> Result<(), String> {
 
 /// Остатки прошлого обновления: старый .exe и недокачанный/неустановленный новый
 fn cleanup_portable_update() {
-    for ext in ["old.exe", "update.exe"] {
+    for ext in ["update.exe", "update.playly-tmp"] {
         if let Ok(p) = exe_sibling(ext) {
             let _ = fs::remove_file(p);
         }
     }
+}
+
+#[command]
+fn confirm_portable_update() {
+    if let Ok(old) = exe_sibling("old.exe") { let _ = fs::remove_file(old); }
 }
 
 /// Полностью закрыть Playly (крестик окна только прячет его в трей)
@@ -1058,7 +1101,7 @@ fn quit_app(app: tauri::AppHandle) {
 
 /* ===== Меню трея ===== */
 /*
- * На Windows у иконки трея меню нет: левый клик открывает Playly, правый — мини-плеер.
+ * На Windows системного меню у иконки трея нет: левый клик открывает Playly, правый — своё меню (см. «Своё меню трея»).
  * На Linux иконка трея (AppIndicator) о кликах не сообщает вовсе — там работает только меню,
  * поэтому те же действия собраны в него.
  */
@@ -1106,6 +1149,169 @@ fn set_tray_labels(state: tauri::State<'_, TrayMenu>, open: String, mini: String
     }
 }
 
+/* ===== Своё меню трея (Windows) ===== */
+/*
+ * Системное меню Windows не оформить, поэтому по правому клику открывается маленькое прозрачное окно
+ * с меню в стиле Playly (src/tray/TrayMenu.tsx). Как и мини-плеер, оно создаётся заранее и скрытым,
+ * а прячется, когда пользователь уходит в другое окно или выбирает пункт.
+ */
+
+const TRAY_MENU_LABEL: &str = "traymenu";
+/* Размер окна меню (логические пиксели): карточка меню плюс поля под тень */
+const TRAY_MENU_WIDTH: f64 = 272.0;
+const TRAY_MENU_HEIGHT: f64 = 268.0;
+/// Как часто проверять, не ушёл ли пользователь из меню
+const TRAY_MENU_CHECK: Duration = Duration::from_millis(80);
+
+#[derive(Default)]
+struct TrayMenuState {
+    /* Где кликнули по иконке: туда же ставим мини-плеер, если его выберут в меню */
+    anchor: std::sync::Mutex<Option<tauri::PhysicalPosition<f64>>>,
+    /* Когда меню спряталось из-за потери фокуса: повторный клик по иконке должен его закрыть, а не открыть снова */
+    hidden_at: std::sync::Mutex<Option<Instant>>,
+    /* Номер показа: слежка за фокусом от прошлого показа сама завершается */
+    show_seq: std::sync::atomic::AtomicU64,
+}
+
+fn tray_menu_window(app: &tauri::AppHandle) -> Option<tauri::WebviewWindow> {
+    if let Some(w) = app.get_webview_window(TRAY_MENU_LABEL) {
+        return Some(w);
+    }
+    tauri::WebviewWindowBuilder::new(app, TRAY_MENU_LABEL, tauri::WebviewUrl::App("index.html".into()))
+        .title("Playly")
+        .inner_size(TRAY_MENU_WIDTH, TRAY_MENU_HEIGHT)
+        .resizable(false)
+        .maximizable(false)
+        .minimizable(false)
+        .decorations(false)
+        .transparent(true)
+        .shadow(false)
+        .always_on_top(true)
+        .skip_taskbar(true)
+        .visible(false)
+        .build()
+        .map_err(|e| eprintln!("[tray] Не удалось создать меню: {}", e))
+        .ok()
+}
+
+fn hide_tray_menu_window(app: &tauri::AppHandle) {
+    if let Some(w) = app.get_webview_window(TRAY_MENU_LABEL) {
+        if w.is_visible().unwrap_or(false) {
+            let _ = w.hide();
+        }
+    }
+}
+
+/// Меню встаёт углом к курсору: над панелью задач (или под ней, если она сверху), не выходя за экран
+fn place_tray_menu(app: &tauri::AppHandle, w: &tauri::WebviewWindow, p: tauri::PhysicalPosition<f64>) {
+    let monitor = app
+        .monitor_from_point(p.x, p.y)
+        .ok()
+        .flatten()
+        .or_else(|| app.primary_monitor().ok().flatten());
+    let Some(monitor) = monitor else { return };
+    let scale = monitor.scale_factor();
+    let area = monitor.work_area();
+    let (ax, ay) = (area.position.x as f64, area.position.y as f64);
+    let (aw, ah) = (area.size.width as f64, area.size.height as f64);
+    let (ww, wh) = (TRAY_MENU_WIDTH * scale, TRAY_MENU_HEIGHT * scale);
+    /* Тень в окне — прозрачные поля по 8 px: сама карточка меню оказывается вплотную к курсору */
+    let pad = 8.0 * scale;
+    let x = if p.x + ww - pad > ax + aw { p.x - ww + pad } else { p.x - pad };
+    let y = if p.y > ay + ah / 2.0 { p.y - wh + pad } else { p.y - pad };
+    let x = x.clamp(ax, (ax + aw - ww).max(ax));
+    let y = y.clamp(ay, (ay + ah - wh).max(ay));
+    let _ = w.set_size(tauri::LogicalSize::new(TRAY_MENU_WIDTH, TRAY_MENU_HEIGHT));
+    let _ = w.set_position(tauri::PhysicalPosition::new(x.round() as i32, y.round() as i32));
+}
+
+/// Следит, пока меню открыто: пользователь кликнул мимо (другое окно стало активным) — прячем
+fn watch_tray_menu(app: tauri::AppHandle, w: tauri::WebviewWindow, seq: u64) {
+    thread::spawn(move || {
+        let state = app.state::<TrayMenuState>();
+        let mut armed = false;
+        loop {
+            thread::sleep(TRAY_MENU_CHECK);
+            if state.show_seq.load(std::sync::atomic::Ordering::Acquire) != seq || !w.is_visible().unwrap_or(false) {
+                break;
+            }
+            if mini_in_foreground(&w) {
+                armed = true;
+                continue;
+            }
+            /* Windows может отдать фокус не сразу — прячем только после того, как меню хоть раз было активным */
+            if armed {
+                let _ = w.hide();
+                *state.hidden_at.lock().unwrap() = Some(Instant::now());
+                break;
+            }
+        }
+    });
+}
+
+fn show_tray_menu_window(app: &tauri::AppHandle, w: &tauri::WebviewWindow, p: tauri::PhysicalPosition<f64>) {
+    let state = app.state::<TrayMenuState>();
+    let just_hidden = state
+        .hidden_at
+        .lock()
+        .unwrap()
+        .take()
+        .is_some_and(|t| t.elapsed() < Duration::from_millis(350));
+    if just_hidden || w.is_visible().unwrap_or(false) {
+        let _ = w.hide();
+        return;
+    }
+    *state.anchor.lock().unwrap() = Some(p);
+    place_tray_menu(app, w, p);
+    let seq = state.show_seq.fetch_add(1, std::sync::atomic::Ordering::AcqRel) + 1;
+    /* Меню знает, что его открыли: перезапускает анимацию появления и просит свежее состояние */
+    let _ = w.emit_to(TRAY_MENU_LABEL, "traymenu:shown", ());
+    let _ = w.show();
+    let _ = w.set_focus();
+    watch_tray_menu(app.clone(), w.clone(), seq);
+}
+
+/// Правый клик по иконке трея. Окно WebView нельзя создавать в обработчике главного потока — только в отдельном
+fn open_tray_menu(app: &tauri::AppHandle, p: tauri::PhysicalPosition<f64>) {
+    match app.get_webview_window(TRAY_MENU_LABEL) {
+        Some(w) => show_tray_menu_window(app, &w, p),
+        None => {
+            let app = app.clone();
+            thread::spawn(move || {
+                if let Some(w) = tray_menu_window(&app) {
+                    /* Свежему окну нужно время, чтобы загрузить страницу, иначе мелькнёт пустая рамка */
+                    thread::sleep(Duration::from_millis(250));
+                    show_tray_menu_window(&app, &w, p);
+                }
+            });
+        }
+    }
+}
+
+/// Пункт меню трея: «show» — главное окно, «mini» — мини-плеер, «quit» — выйти, «close» — просто закрыть меню
+#[command]
+fn tray_menu_action(app: tauri::AppHandle, state: tauri::State<'_, TrayMenuState>, action: String) {
+    hide_tray_menu_window(&app);
+    match action.as_str() {
+        "show" => {
+            hide_mini_player(app.clone());
+            reveal_main_window(&app);
+        }
+        "mini" => {
+            let anchor = *state.anchor.lock().unwrap();
+            open_mini(&app, anchor);
+        }
+        "quit" => app.exit(0),
+        _ => {}
+    }
+}
+
+/// Можно ли открыть мини-плеер (его отключают в настройках) — меню трея прячет пункт, если нет
+#[command]
+fn mini_enabled() -> bool {
+    MINI_ENABLED.load(std::sync::atomic::Ordering::SeqCst)
+}
+
 fn main() {
     let (tx, rx) = mpsc::channel();
     thread::spawn(move || rpc_worker(rx));
@@ -1130,20 +1336,21 @@ fn main() {
         .manage(RpcState { tx })
         .manage(MiniState::default())
         .manage(TrayMenu::default())
+        .manage(TrayMenuState::default())
         .setup(|app| {
             wipe_webview_cache_if_requested(app.handle());
             if is_portable() {
                 cleanup_portable_update();
             }
 
-            // Трей: левый клик — открыть Playly, правый — мини-плеер (вместо меню; «Выйти» есть в самом мини-плеере).
+            // Трей: левый клик — открыть Playly, правый — своё меню (Показать плеер / Мини-плеер / Выйти).
             // На Linux кликов нет — там меню (см. tray_with_menu)
             let icon = app
                 .default_window_icon()
                 .cloned()
                 .unwrap_or_else(|| tauri::image::Image::new(&[0, 0, 0, 0], 1, 1));
 
-            let tray = TrayIconBuilder::new()
+            let tray = TrayIconBuilder::with_id("playly")
                 .icon(icon)
                 .tooltip("Playly")
                 .on_tray_icon_event(|tray, event| match event {
@@ -1152,6 +1359,7 @@ fn main() {
                         button_state: MouseButtonState::Up,
                         ..
                     } => {
+                        hide_tray_menu_window(tray.app_handle());
                         hide_mini_player(tray.app_handle().clone());
                         reveal_main_window(tray.app_handle());
                     }
@@ -1160,7 +1368,7 @@ fn main() {
                         button_state: MouseButtonState::Up,
                         position,
                         ..
-                    } => toggle_mini(tray.app_handle(), Some(position)),
+                    } => open_tray_menu(tray.app_handle(), position),
                     _ => {}
                 });
             let _tray = tray_with_menu(app, tray)?.build(app)?;
@@ -1180,11 +1388,25 @@ fn main() {
             thread::spawn(move || {
                 thread::sleep(Duration::from_secs(3));
                 mini_window(&handle);
+                /* И меню трея — на Linux вместо него системное меню */
+                if !cfg!(target_os = "linux") {
+                    tray_menu_window(&handle);
+                }
             });
 
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
+            media_audio::decode_media_audio,
+            media_audio::cancel_media_decode,
+            storage::save_track_lyrics,
+            set_mini_enabled,
+            storage::set_application_icon,
+            storage::reset_application_icon,
+            storage::create_icon_shortcut,
+            storage::write_library_json,
+            storage::read_library_json,
+            storage::write_track_tags,
             get_track_metadata,
             get_file_mtime,
             get_path_created,
@@ -1207,9 +1429,12 @@ fn main() {
             can_self_update,
             portable_download,
             portable_apply,
+            confirm_portable_update,
             reset_mini_position,
             quit_app,
-            set_tray_labels
+            set_tray_labels,
+            tray_menu_action,
+            mini_enabled
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

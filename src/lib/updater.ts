@@ -53,6 +53,7 @@ export interface UpdaterState {
   error: string | null
   checkedAt: number | null
   /* Скачивать обновления сами, без вопросов */
+  checkOnStartup: boolean
   auto: boolean
   /* Пользователь нажал «Позже» в уведомлении */
   dismissed: boolean
@@ -76,6 +77,7 @@ let state: UpdaterState = {
   total: 0,
   error: null,
   checkedAt: null,
+  checkOnStartup: true,
   auto: true,
   dismissed: false,
 }
@@ -259,6 +261,7 @@ export async function downloadUpdate(): Promise<void> {
 /** Установить скачанное и перезапуститься (на Windows установщик сам закроет и откроет Playly) */
 export async function installUpdate(): Promise<void> {
   if (!update || state.status !== 'ready') return
+  await writeSettingsRaw({ pendingUpdateVersion: state.version, pendingUpdateNotes: state.notes })
   set({ status: 'installing' })
   try {
     /* Портативная версия подменяет свой .exe и перезапускается сама (Rust закрывает приложение) */
@@ -286,6 +289,11 @@ export function dismissUpdateToast() {
   set({ dismissed: true })
 }
 
+export async function setCheckOnStartup(checkOnStartup: boolean) {
+  set({ checkOnStartup })
+  await writeSettingsRaw({ checkUpdatesOnStartup: checkOnStartup })
+}
+
 export async function setAutoUpdate(auto: boolean) {
   set({ auto })
   await writeSettingsRaw({ autoUpdate: auto })
@@ -297,9 +305,9 @@ export async function startUpdater() {
   if (started) return
   started = true
   const raw = await readSettingsRaw()
-  set({ auto: raw.autoUpdate !== false })
+  set({ auto: raw.autoUpdate !== false, checkOnStartup: raw.checkUpdatesOnStartup !== false })
   setTimeout(() => {
-    void checkForUpdates(true)
+    if (state.checkOnStartup) void checkForUpdates(true)
     setInterval(() => void checkForUpdates(true), CHECK_INTERVAL)
   }, FIRST_CHECK_DELAY)
 }

@@ -1,8 +1,9 @@
 import { useSyncExternalStore } from 'react'
-import { convertFileSrc } from '@tauri-apps/api/core'
+import { convertFileSrc, invoke } from '@tauri-apps/api/core'
 import { readFile } from '@tauri-apps/plugin-fs'
 import { open } from '@tauri-apps/plugin-dialog'
 import { GIFEncoder, applyPalette, quantize } from 'gifenc'
+import { reportError } from './feedback'
 import { drawFrame, frameStyle, type ImageFrame } from './imageFrame'
 
 /* ===== Форматы ===== */
@@ -79,6 +80,8 @@ export interface PickedVisual {
   poster?: Uint8Array
 }
 
+const megabytes = (bytes: number) => Math.round(bytes / 1024 / 1024)
+
 /**
  * Диалог выбора картинки; видео сразу открывает окно «Видео → GIF».
  * Возвращает байты (GIF для видео) или null, если ничего не выбрали или файл слишком большой.
@@ -93,14 +96,32 @@ export async function pickVisual(opts: {
     filters: [{ name: opts.filterName, extensions: [...IMAGE_EXTENSIONS, ...VIDEO_EXTENSIONS] }],
   })
   if (!selected || Array.isArray(selected)) return null
+  if (opts.maxBytes && !isVideoPath(selected)) {
+    const size = await invoke<number>('path_size', { path: selected })
+    if (size > opts.maxBytes) {
+      reportError('imageTooLarge', undefined, { mb: megabytes(opts.maxBytes) })
+      return null
+    }
+  }
   if (isVideoPath(selected)) {
     const result = await requestVideoGif(selected, opts.purpose)
+    if (result && opts.maxBytes && result.gif.length > opts.maxBytes) {
+      reportError('animationTooLarge', undefined, { mb: megabytes(opts.maxBytes) })
+      return null
+    }
     return result ? { bytes: result.gif, ext: 'gif', poster: result.poster } : null
   }
   const raw = fileExt(selected) || 'png'
   const ext = raw === 'jpeg' ? 'jpg' : raw
   const bytes = await readFile(selected)
-  if (bytes.length === 0 || (opts.maxBytes && bytes.length > opts.maxBytes)) return null
+  if (bytes.length === 0) {
+    reportError('imageEmpty')
+    return null
+  }
+  if (opts.maxBytes && bytes.length > opts.maxBytes) {
+    reportError('imageTooLarge', undefined, { mb: megabytes(opts.maxBytes) })
+    return null
+  }
   return { bytes, ext, poster: ext === 'gif' ? (await firstFramePoster(bytes)) ?? undefined : undefined }
 }
 
