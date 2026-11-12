@@ -622,6 +622,7 @@ export const en = {
               {
                 items: [
                   'A new History page in the sidebar shows everything you listened to, grouped by day and searchable. Play any track from it again.',
+                  'A summary on top shows plays, different tracks, listening time and plays today. Each day gets its own card with the number of plays and the time.',
                   'Repeats and tracks that started on their own after the previous one are recorded too. Tracks removed from the library disappear from history.',
                   'History can be cleared. Your tracks, playlists and profile stats stay.',
                 ],
@@ -652,6 +653,8 @@ export const en = {
                   'Background particles can get wind: up to five gusts, each with its own direction, strength and duration. Gusts blend smoothly, and snowflakes or leaves blown off the edge come back from the other side.',
                   'The mini player is customizable: turn it off, pick a dark or cover background and adjust the dimming.',
                   'Interface scale goes from 25 to 400%. Ctrl+0 brings it back to 100%.',
+                  'Right-clicking the tray icon opens a Playly-styled menu: what is playing now, «Show player», «Open mini player» and «Quit».',
+                  'In the track editor, lyrics and the track equalizer are now separate cards: you can see at a glance whether the track has its own equalizer and reset it with one click.',
                 ],
               },
             ],
@@ -715,7 +718,7 @@ export const en = {
             groups: [
               {
                 items: [
-                  'Groundwork for the Linux version: tray icon menu, «Show in folder» that selects the file, .deb, .rpm and AppImage packages. The Linux version itself is still being tested.',
+                  'Groundwork for the Linux version: tray icon menu, «Show in folder» that selects the file, .deb, .rpm and AppImage packages. The Linux version itself is still being tested — a full Linux build is coming soon, and an Android build will arrive with version 2.1.',
                 ],
               },
             ],
