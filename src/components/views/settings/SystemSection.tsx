@@ -23,8 +23,6 @@ interface SystemSectionProps {
   onChangeDiscordParts?: (parts: DiscordParts) => void
   /* Имена файлов обложек, которые сейчас используются, — их очистка кеша не трогает */
   getReferencedCovers?: () => Set<string>
-  /* Основное устройство вывода — для «отдельного звука» режима стримера нужно другое */
-  outputDevice?: string
 }
 
 export default function SystemSection({
@@ -33,7 +31,6 @@ export default function SystemSection({
   discordParts = DEFAULT_DISCORD_PARTS,
   onChangeDiscordParts,
   getReferencedCovers,
-  outputDevice = '',
 }: SystemSectionProps) {
   const prefs = usePrefs()
   const {
@@ -167,7 +164,7 @@ export default function SystemSection({
       <div className="settings-section">
         <div className="section-title">{t('streamer.title')}</div>
         <p className="setting-desc" style={{ margin: '0 0 12px' }}>{t('streamer.settingsDesc')}</p>
-        <StreamerToggles outputDevice={outputDevice} />
+        <StreamerToggles />
       </div>
 
       <div className="settings-section">

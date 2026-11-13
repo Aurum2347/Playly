@@ -133,7 +133,7 @@ export default function ParticleSettingsSection({ value, onChange, tracks }: Par
   const kinds: ParticleKind[] = ['none', ...BUILTIN_PARTICLES, ...value.custom.map((c) => customKind(c.id))]
   const kindName = (k: ParticleKind) => {
     const id = customIdOf(k)
-    return id ? value.custom.find((c) => c.id === id)?.name ?? '—' : t(`particles.kind_${k}`)
+    return id ? value.custom.find((c) => c.id === id)?.name ?? '-' : t(`particles.kind_${k}`)
   }
 
   const saveRule = (rule: ParticleRule) => {

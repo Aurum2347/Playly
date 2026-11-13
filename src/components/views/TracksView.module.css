@@ -32,29 +32,38 @@
   letter-spacing: -0.02em;
   color: var(--text);
   line-height: 38px;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
-/* Сортировка с подписью сверху — кнопки выравниваем по нижнему краю поля */
+/* Сортировка с подписью сверху - кнопки выравниваем по нижнему краю поля.
+ * В узком окне кнопки переносятся на новую строку, а не сжимают заголовок. */
 .headerActions {
   display: flex;
   align-items: flex-end;
-  gap: 10px;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 8px 10px;
+  min-width: 0;
 }
 
+/* Без выделения панели нет совсем: раньше она была лишь прозрачной и всё равно занимала место в шапке */
 .selectionActions {
-  display: flex;
+  display: none;
   align-items: center;
-  gap: 10px;
-  opacity: 0;
-  transform: translateX(8px);
-  pointer-events: none;
-  transition: opacity 0.2s ease, transform 0.2s ease;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px 10px;
 }
 
 .selectionActions.visible {
-  opacity: 1;
-  transform: translateX(0);
-  pointer-events: auto;
+  display: flex;
+  animation: selectionIn 0.2s ease both;
+}
+
+@keyframes selectionIn {
+  from { opacity: 0; transform: translateX(8px); }
+  to { opacity: 1; transform: none; }
 }
 
 /* Тот же вид, что у глобальной .btn (src/styles/buttons.css) */
@@ -217,7 +226,7 @@
 
 .trackRow {
   display: grid;
-  grid-template-columns: 44px 1fr 80px 28px 28px;
+  grid-template-columns: 44px minmax(0, 1fr) minmax(80px, auto) 28px 28px;
   align-items: center;
   padding: 10px 12px;
   border-radius: 10px;

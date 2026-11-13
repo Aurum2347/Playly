@@ -93,7 +93,7 @@ function RangePair({ label, min, max, step = 1, lo, hi, unit, onChange }: {
     <div className="banner-editor-field cp-pair">
       <div className="banner-editor-label">
         <span>{label}</span>
-        <span>{fmt(lo)}–{fmt(hi)} {unit}</span>
+        <span>{fmt(lo)}-{fmt(hi)} {unit}</span>
       </div>
       <div className="cp-pair-sliders">
         <input

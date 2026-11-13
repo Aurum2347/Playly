@@ -2,68 +2,68 @@
 
 # 🎧 Playly
 
-Аудиоплеер для локальной музыкальной библиотеки под Windows и Linux.
-Воспроизведение локальных файлов работает без интернета. Для проверки обновлений нужен интернет.
+Аудиоплее�- для локальной музыкальной библиотеки под Windows и Linux.
+Восп�-оизведение локальных файлов �-аботает без инте�-нета. �-ля п�-ове�-ки обновлений нужен инте�-нет.
 
-[⬇️ Скачать последний релиз](https://github.com/Aurum2347/Playly/releases/latest) • [🌐 Подробнее о проекте](https://aurum2347.github.io/Playly/) • [💬 Telegram-канал](https://t.me/aurums2347)
+[-��️ Скачать последний �-елиз](https://github.com/Aurum2347/Playly/releases/latest) --� [🌐 Под�-обнее о п�-оекте](https://aurum2347.github.io/Playly/) --� [💬 Telegram-канал](https://t.me/aurums2347)
 
 </div>
 
 ---
 
-## 🖥 Интерфейс
+## 🖥 Инте�-фейс
 
 <table>
   <tr>
-    <td align="center"><b>Главная</b><br>Быстрый доступ к последнему треку</td>
-    <td align="center"><b>Все треки</b><br>Полный контроль, сортировки и поиск</td>
+    <td align="center"><b>�-лавная</b><br>Быст�-ый доступ к последнему т�-еку</td>
+    <td align="center"><b>Все т�-еки</b><br>Полный конт�-оль, со�-ти�-овки и поиск</td>
   </tr>
   <tr>
-    <td><img src="https://github.com/user-attachments/assets/fe4d96d6-bc29-4ab2-b94b-80ba66a0ea75" alt="Главная страница Playly" width="100%"></td>
-    <td><img src="https://github.com/user-attachments/assets/1785d8f5-b737-4be6-8237-bf5f0c4843ac" alt="Все треки Playly" width="100%"></td>
+    <td><img src="https://github.com/user-attachments/assets/fe4d96d6-bc29-4ab2-b94b-80ba66a0ea75" alt="�-лавная ст�-аница Playly" width="100%"></td>
+    <td><img src="https://github.com/user-attachments/assets/1785d8f5-b737-4be6-8237-bf5f0c4843ac" alt="Все т�-еки Playly" width="100%"></td>
   </tr>
   <tr>
-    <td align="center" colspan="2"><b>Понравившиеся</b><br>Твои избранные треки со статистикой</td>
+    <td align="center" colspan="2"><b>Пон�-авившиеся</b><br>Твои изб�-анные т�-еки со статистикой</td>
   </tr>
   <tr>
-    <td colspan="2"><img src="https://github.com/user-attachments/assets/24215edd-c68a-47b3-b014-ca721bea9932" alt="Понравившиеся треки Playly" width="100%"></td>
+    <td colspan="2"><img src="https://github.com/user-attachments/assets/24215edd-c68a-47b3-b014-ca721bea9932" alt="Пон�-авившиеся т�-еки Playly" width="100%"></td>
   </tr>
 </table>
 
 ---
 
-## 📂 Приватность и данные
+## �-� П�-иватность и данные
 
-Playly уважает твою приватность. Вся библиотека, плейлисты, настройки и профиль лежат **только на твоём ПК**.
+Playly уважает твою п�-иватность. Вся библиотека, плейлисты, наст�-ойки и п�-офиль лежат **только на твоём ПК**.
 
 > **Путь к данным:** `%AppData%\com.playly.player\playly` (Windows), `~/.local/share/com.playly.player/playly` (Linux)
 > 
-> Хочешь начать с чистого листа или удалить все следы? Просто удали эту папку.
+> Хочешь начать с чистого листа или удалить все следы? П�-осто удали эту папку.
 
 ---
 
 
-## 🚀 Как запустить
+## �- Как запустить
 
-1. Перейди в раздел [Releases](https://github.com/Aurum2347/Playly/releases/latest).
+1. Пе�-ейди в �-аздел [Releases](https://github.com/Aurum2347/Playly/releases/latest).
 2. Скачай `Playly.exe`.
-3. Запусти двойным кликом. Готово!
+3. Запусти двойным кликом. �-отово!
 
-*(Требуется Windows 10 или 11. WebView2 обычно уже встроен в систему).*
+*(Т�-ебуется Windows 10 или 11. WebView2 обычно уже вст�-оен в систему).*
 
 ---
 
-## 🛠 Сборка из исходников
+## 🛠 Сбо�-ка из исходников
 
 Нужны [Node.js](https://nodejs.org) 20+ и [Rust](https://rustup.rs) (stable).
 
 ```bash
 npm install
-npm run tauri dev     # запуск в режиме разработки
-npm run tauri build   # сборка установщиков
+npm run tauri dev     # запуск в �-ежиме �-аз�-аботки
+npm run tauri build   # сбо�-ка установщиков
 ```
 
-### Linux (экспериментально)
+### Linux (экспе�-иментально)
 
 Системные библиотеки (Debian / Ubuntu 22.04+):
 
@@ -75,12 +75,12 @@ sudo apt install libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev
 
 Fedora: `webkit2gtk4.1-devel libayatana-appindicator-gtk3-devel librsvg2-devel openssl-devel libxdo-devel gstreamer1-plugins-base gstreamer1-plugins-good`.
 
-`npm run tauri build` соберёт `.AppImage`, `.deb` и `.rpm` в `src-tauri/target/release/bundle/`. Звук в WebKitGTK идёт через GStreamer: без пакетов `gstreamer*-plugins-*` часть форматов (MP3, AAC/M4A) не заиграет.
+`npm run tauri build` собе�-ёт `.AppImage`, `.deb` и `.rpm` в `src-tauri/target/release/bundle/`. Звук в WebKitGTK идёт че�-ез GStreamer: без пакетов `gstreamer*-plugins-*` часть фо�-матов (MP3, AAC/M4A) не заиг�-ает.
 
-Особенности Linux-версии:
-- у иконки в трее меню («Открыть Playly», «Мини-плеер», «Выйти») — щелчков по иконке Linux не передаёт; в GNOME для трея нужно расширение AppIndicator;
-- обновляется сама только AppImage, `.deb` и `.rpm` — вручную со страницы релиза;
-- выбор устройства вывода звука WebKitGTK не поддерживает — звук идёт в системное устройство по умолчанию.
+Особенности Linux-ве�-сии:
+- у иконки в т�-ее меню («Отк�-ыть Playly», «Мини-плее�-», «Выйти») --- щелчков по иконке Linux не пе�-едаёт; в GNOME для т�-ея нужно �-асши�-ение AppIndicator;
+- обновляется сама только AppImage, `.deb` и `.rpm` --- в�-учную со ст�-аницы �-елиза;
+- выбо�- уст�-ойства вывода звука WebKitGTK не подде�-живает --- звук идёт в системное уст�-ойство по умолчанию.
 
 ---
 
@@ -91,12 +91,12 @@ Fedora: `webkit2gtk4.1-devel libayatana-appindicator-gtk3-devel librsvg2-devel o
 </div>
 
 
-## Проверки
+## П�-ове�-ки
 
-`npm test` — регрессии миграции EQ, LRC, масштаба и версии. `npm run lint` и `npm run build` проверяют frontend. `cargo test --manifest-path src-tauri/Cargo.toml --bin app` проверяет атомарную замену JSON, сохранность файла при ошибке тегов, Unicode-теги.
+`npm test` --- �-ег�-ессии миг�-ации EQ, LRC, масштаба и ве�-сии. `npm run lint` и `npm run build` п�-ове�-яют frontend. `cargo test --manifest-path src-tauri/Cargo.toml --bin app` п�-ове�-яет атома�-ную замену JSON, сох�-анность файла п�-и ошибке тегов, Unicode-теги.
 
-История хранит последние 10 000 запусков треков; старые данные «недавно прослушанных» переносятся как последние известные прослушивания. Ctrl+0 возвращает масштаб к 100%. Закреплённый в Windows ярлык может потребовать повторного закрепления после смены иконки.
+Исто�-ия х�-анит последние 10 000 запусков т�-еков; ста�-ые данные «недавно п�-ослушанных» пе�-еносятся как последние известные п�-ослушивания. Ctrl+0 возв�-ащает масштаб к 100%. Зак�-еплённый в Windows я�-лык может пот�-ебовать повто�-ного зак�-епления после смены иконки.
 
-Для контейнеров и кодеков, которые WebView не воспроизводит, FFmpeg создаёт временный WAV только для воспроизведения. Исходный аудио- или видеофайл не меняется. Временный WAV удаляется после чтения; очень длинные файлы могут требовать много памяти, декодирование ограничено двумя минутами.
+�-ля контейне�-ов и кодеков, кото�-ые WebView не восп�-оизводит, FFmpeg создаёт в�-еменный WAV только для восп�-оизведения. Исходный аудио- или видеофайл не меняется. В�-еменный WAV удаляется после чтения; очень длинные файлы могут т�-ебовать много памяти, декоди�-ование ог�-аничено двумя минутами.
 
-Проверка восстановления portable-обновления на Windows: `powershell -NoProfile -ExecutionPolicy Bypass -File scripts/test-update.ps1`. Тест запускает изолированные фиктивные приложения: исправный запуск подтверждает обновление, неисправный exe заменяется резервной копией. Реальные файлы приложения тест не меняет.
+П�-ове�-ка восстановления portable-обновления на Windows: `powershell -NoProfile -ExecutionPolicy Bypass -File scripts/test-update.ps1`. Тест запускает изоли�-ованные фиктивные п�-иложения: исп�-авный запуск подтве�-ждает обновление, неисп�-авный exe заменяется �-езе�-вной копией. Реальные файлы п�-иложения тест не меняет.

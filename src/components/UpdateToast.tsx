@@ -27,7 +27,7 @@ export default function UpdateToast() {
       </span>
       <span className="update-toast-text">
         <span className="update-toast-title">
-          {t(ready ? 'updates.toastReady' : 'updates.toastAvailable', { v: versionLabel(t, u.version, 'release') })}
+          {t(ready ? 'updates.toastReady' : 'updates.toastAvailable', { v: versionLabel(u.version) })}
         </span>
         <span className="update-toast-sub">
           {t(ready ? 'updates.toastReadySub' : u.status === 'manual' ? 'updates.manualSub' : 'updates.toastAvailableSub')}

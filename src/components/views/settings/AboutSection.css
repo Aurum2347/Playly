@@ -400,9 +400,6 @@
 
 .changelog-group strong { color: var(--text); font-weight: 600; }
 
-/* Снапшот — пунктирная рамка, чтобы отличать от релизов */
-.changelog-version.snapshot { border-style: dashed; }
-.changelog-entry.current .changelog-version.snapshot { border-style: solid; }
 
 /* ===== Обновления ===== */
 .about2-updates {

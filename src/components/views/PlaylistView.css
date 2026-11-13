@@ -32,26 +32,28 @@
 .playlist-view .hero-right {
   display: flex;
   align-items: center;
-  gap: 10px;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 8px 10px;
   margin-left: auto;
+  min-width: 0;
 }
+/* Без выделения панели нет совсем; с выделением кнопки не обрезаются, а переносятся */
 .playlist-view .selection-actions {
-  display: flex;
+  display: none;
   align-items: center;
-  gap: 10px;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 8px 10px;
   margin-left: auto;
-  opacity: 0;
-  transform: translateX(12px);
-  pointer-events: none;
-  max-width: 0;
-  overflow: hidden;
-  transition: opacity 0.2s ease, transform 0.2s ease, max-width 0.2s ease;
 }
 .playlist-view .selection-actions.visible {
-  opacity: 1;
-  transform: translateX(0);
-  pointer-events: auto;
-  max-width: 500px;
+  display: flex;
+  animation: plSelectionIn 0.2s ease both;
+}
+@keyframes plSelectionIn {
+  from { opacity: 0; transform: translateX(12px); }
+  to { opacity: 1; transform: none; }
 }
 .playlist-view .selection-actions .btn {
   display: inline-flex;

@@ -167,7 +167,7 @@ export default function TrackDetailsModal({
   if (!displayTrack) return null
 
   const formatDate = (ts?: number) => {
-    if (!ts) return <span className={styles.empty}>—</span>
+    if (!ts) return <span className={styles.empty}>-</span>
     return new Date(ts).toLocaleString(lang === 'ru' ? 'ru-RU' : 'en-US', {
       day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit',
     })
@@ -278,7 +278,7 @@ export default function TrackDetailsModal({
               </div>
               <div className={styles.grid}>
                 <Field label={t('views.details.duration')}>{displayTrack.duration}</Field>
-                <Field label={t('views.details.format')}>{ext || '—'}</Field>
+                <Field label={t('views.details.format')}>{ext || '-'}</Field>
                 <Field label={t('views.details.fileModified')}>{formatDate(displayTrack.fileModifiedAt)}</Field>
                 <Field label={t('views.details.addedAt')}>{formatDate(displayTrack.addedAt)}</Field>
               </div>

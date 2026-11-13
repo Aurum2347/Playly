@@ -208,7 +208,7 @@ export default function PlaylistView({
   }
 
   return (
-    <div className="liked-view-container playlist-view">
+    <div className="liked-view-container playlist-view" onScroll={() => isContextMenuOpen && closeContextMenu()}>
       <div
         className={cx('hero', hasBanner && 'has-banner')}
         style={!hasBanner && playlist.color ? { background: `linear-gradient(135deg, ${playlist.color}66 0%, var(--panel) 60%)` } : undefined}

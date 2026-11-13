@@ -1152,7 +1152,7 @@ function AppInner() {
   const handleCopyTitleArtist = useCallback(
     async (trackId: number) => {
       const tr = tracks.find((x) => x.id === trackId)
-      if (tr) await navigator.clipboard.writeText(`${tr.title} — ${tr.artist}`)
+      if (tr) await navigator.clipboard.writeText(`${tr.title} - ${tr.artist}`)
     },
     [tracks]
   )
@@ -2051,7 +2051,7 @@ function AppInner() {
                 Playly
               </span>
             </div>
-            <div className="subtitle">Version {versionLabel(t)}</div>
+            <div className="subtitle">Version {versionLabel()}</div>
             <div className="loading-bar-container">
               <div
                 className="loading-bar-fill"
@@ -2093,8 +2093,7 @@ function AppInner() {
         track={selectedTrack ? { title: selectedTrack.title, artist: selectedTrack.artist } : null}
         isPlaying={isPlaying}
         onOpenNowPlaying={openNowPlaying}
-        versionLabel={`Playly ${versionLabel(t)}`}
-        outputDevice={outputDevice}
+        versionLabel={`Playly ${versionLabel()}`}
       />
       <FeedbackHost />
       <PersonalizationHost
@@ -2173,7 +2172,7 @@ function AppInner() {
           selectedTrack
             ? () =>
                 navigator.clipboard.writeText(
-                  `${selectedTrack.title} — ${selectedTrack.artist}`
+                  `${selectedTrack.title} - ${selectedTrack.artist}`
                 )
             : undefined
         }

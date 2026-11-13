@@ -260,7 +260,6 @@ export default function SettingsView({
               discordParts={discordParts}
               onChangeDiscordParts={onChangeDiscordParts}
               getReferencedCovers={getReferencedCovers}
-              outputDevice={outputDevice}
             />
           )}
           {activeSection === 'profile' && (

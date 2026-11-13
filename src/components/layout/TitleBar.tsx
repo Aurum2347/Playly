@@ -13,8 +13,6 @@ interface TitleBarProps {
   isPlaying: boolean
   onOpenNowPlaying: () => void
   versionLabel: string
-  /* Основное устройство вывода: для «отдельного звука» стримера нужно другое */
-  outputDevice: string
 }
 
 /**
@@ -28,7 +26,6 @@ export default function TitleBar({
   isPlaying,
   onOpenNowPlaying,
   versionLabel,
-  outputDevice,
 }: TitleBarProps) {
   const { t } = useI18n()
   const [isMaximized, setIsMaximized] = useState(false)
@@ -86,7 +83,7 @@ export default function TitleBar({
       </div>
 
       <div className="tb-right">
-        <StreamerButton outputDevice={outputDevice} />
+        <StreamerButton />
         <button className="tb-btn" onClick={() => invoke('toggle_mini_player').catch(() => {})} title={t('mini.open')}>
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="4" width="20" height="16" rx="2.5" /><rect x="11" y="11" width="8" height="6" rx="1.2" /></svg>
         </button>

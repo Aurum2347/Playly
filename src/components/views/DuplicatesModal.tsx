@@ -149,7 +149,7 @@ export default function DuplicatesModal({ open, onClose, tracks, onDeleteTracks,
                       <label key={id} className={`dup-item ${selected.has(id) ? 'checked' : ''}`}>
                         <input type="checkbox" checked={selected.has(id)} onChange={() => toggle(id)} disabled={busy} />
                         <span className="dup-text">
-                          <span className="dup-title">{tr.title} <span className="dup-artist">— {tr.artist}</span></span>
+                          <span className="dup-title">{tr.title} <span className="dup-artist">- {tr.artist}</span></span>
                           <span className="dup-path" title={tr.filePath}>{tr.filePath}</span>
                         </span>
                         <span className="dup-dur">{tr.duration}</span>

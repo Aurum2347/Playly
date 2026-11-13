@@ -26,7 +26,7 @@ export default function UpdatesCard() {
   const units = tm<string[]>('settings.system.cacheUnits') ?? ['B', 'KB', 'MB', 'GB']
   const pct = u.total > 0 ? Math.min(100, Math.round((u.downloaded / u.total) * 100)) : 0
   const busy = u.status === 'checking' || u.status === 'downloading' || u.status === 'installing'
-  const newVersion = u.version ? versionLabel(t, u.version, 'release') : ''
+  const newVersion = u.version ? versionLabel(u.version) : ''
 
   let title: string
   let sub: string | null = null
@@ -36,7 +36,7 @@ export default function UpdatesCard() {
       break
     case 'latest':
       title = t('updates.latest')
-      sub = t('updates.latestSub', { v: versionLabel(t) })
+      sub = t('updates.latestSub', { v: versionLabel() })
       break
     case 'available':
       title = t('updates.available', { v: newVersion })
@@ -47,7 +47,7 @@ export default function UpdatesCard() {
       sub = t('updates.manualSub')
       break
     case 'unknown':
-      title = t('updates.unknown', { v: versionLabel(t) })
+      title = t('updates.unknown', { v: versionLabel() })
       sub = newVersion ? t('updates.unknownSub', { v: newVersion }) : null
       break
     case 'downloading':
@@ -67,7 +67,7 @@ export default function UpdatesCard() {
       break
     default:
       title = t('updates.idle')
-      sub = t('updates.latestSub', { v: versionLabel(t) })
+      sub = t('updates.latestSub', { v: versionLabel() })
   }
 
   return (
@@ -122,7 +122,7 @@ export default function UpdatesCard() {
 
       {u.status === 'unknown' && confirmRelease && (
         <div className="about2-updates-confirm">
-          <span>{t('updates.installReleaseConfirm', { v: newVersion, cur: versionLabel(t) })}</span>
+          <span>{t('updates.installReleaseConfirm', { v: newVersion, cur: versionLabel() })}</span>
           <span className="about2-updates-actions">
             <button className="btn" onClick={() => setConfirmRelease(false)}>{t('common.cancel')}</button>
             <button

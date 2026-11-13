@@ -189,7 +189,7 @@ function ProfileModalContent({
               </div>
               <div className="pm-since-date">
                 {firstSeen === null
-                  ? '—'
+                  ? '-'
                   : new Intl.DateTimeFormat(locale, { day: 'numeric', month: 'long', year: 'numeric' }).format(firstSeen)}
               </div>
               <div className="pm-since-days">
@@ -221,7 +221,7 @@ function ProfileModalContent({
               <div className="pm-tile">
                 <span className={`pm-tile-icon flame ${streak > 0 ? 'lit' : ''}`}><Icon.flame /></span>
                 <span className="pm-tile-label">{t('profile.streak')}</span>
-                <span className="pm-tile-value">{streak > 0 ? t('profile.streakDays', { n: streak }) : '—'}</span>
+                <span className="pm-tile-value">{streak > 0 ? t('profile.streakDays', { n: streak }) : '-'}</span>
                 {streak === 0 && <span className="pm-tile-meta">{t('profile.streakNone')}</span>}
               </div>
               <div className="pm-tile">

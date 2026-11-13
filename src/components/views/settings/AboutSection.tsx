@@ -76,7 +76,7 @@ export default function AboutSection() {
           <h1 className="about2-name">Playly</h1>
           <p className="about2-tagline">{t('settings.about.tagline')}</p>
           <div className="about2-badges">
-            <span className="about2-badge strong">v{versionLabel(t)}</span>
+            <span className="about2-badge strong">v{versionLabel()}</span>
             <span className="about2-badge">{t('settings.about.badgeOffline')}</span>
             <span className="about2-badge">Tauri · React</span>
           </div>
@@ -94,7 +94,7 @@ export default function AboutSection() {
         </span>
         <span className="about2-changes-text">
           <span className="about2-changes-title">{t('settings.about.changesTitle')}</span>
-          <span className="about2-changes-sub">{t('settings.about.changesSub', { v: versionLabel(t) })}</span>
+          <span className="about2-changes-sub">{t('settings.about.changesSub', { v: versionLabel() })}</span>
         </span>
         <span className="about2-changes-arrow">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">

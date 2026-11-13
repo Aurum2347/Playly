@@ -42,7 +42,9 @@ const pkg = JSON.parse(readFileSync(new URL('../package.json', import.meta.url))
 const conf = JSON.parse(readFileSync(new URL('../src-tauri/tauri.conf.json', import.meta.url)))
 assert.equal(pkg.version, '2.0.7')
 assert.equal(conf.version, pkg.version)
-assert.match(readFileSync(new URL('../src/lib/version.ts', import.meta.url), 'utf8'), /APP_VERSION = '2\.0\.6'/)
+/* Версия для интерфейса (заставка, «О программе», «Что нового») должна совпадать с package.json */
+assert.equal(/APP_VERSION = '([^']+)'/.exec(readFileSync(new URL('../src/lib/version.ts', import.meta.url), 'utf8'))?.[1], pkg.version)
+assert.equal(/^version = "([^"]+)"/m.exec(readFileSync(new URL('../src-tauri/Cargo.toml', import.meta.url), 'utf8'))?.[1], pkg.version)
 const updaterSource = readFileSync(new URL('../src/lib/updater.ts', import.meta.url), 'utf8')
 for (const enabled of [false, true]) {
   const fixture = { settings: { checkUpdatesOnStartup: enabled, autoUpdate: false }, timers: [], intervals: [], checks: 0 }

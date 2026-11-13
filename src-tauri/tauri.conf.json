@@ -41,7 +41,7 @@
     "homepage": "https://github.com/Aurum2347/Playly",
     "category": "Music",
     "shortDescription": "Offline music player",
-    "longDescription": "Playly — a fast offline music player: library, playlists, crossfade, equalizer, mini player and Discord Rich Presence.",
+    "longDescription": "Playly - a fast offline music player: library, playlists, crossfade, equalizer, mini player and Discord Rich Presence.",
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",

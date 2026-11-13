@@ -103,7 +103,7 @@ export default function CoverPicker({ open, tracks, excludeId, onPick, onClose }
             <div className="cp-empty">{t('coverPicker.empty')}</div>
           ) : (
             shown.map((tr) => (
-              <button key={tr.id} className="cp-item" onClick={() => onPick(tr)} title={`${tr.artist} — ${tr.title}`}>
+              <button key={tr.id} className="cp-item" onClick={() => onPick(tr)} title={`${tr.artist} - ${tr.title}`}>
                 <SafeImage src={tr.cover!} alt="" loading="lazy" decoding="async" />
                 <span className="cp-item-title">{tr.title}</span>
                 <span className="cp-item-artist">{tr.artist}</span>

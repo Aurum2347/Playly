@@ -1,7 +1,7 @@
 import { Fragment, useEffect, useRef, useState } from 'react'
 import { useI18n } from '../../../i18n'
 import Collapse from '../../Collapse'
-import { APP_VERSION, versionLabel, type AppChannel } from '../../../lib/version'
+import { APP_VERSION } from '../../../lib/version'
 
 interface ChangelogGroup {
   title?: string
@@ -15,8 +15,6 @@ interface ChangelogSection {
 
 interface ChangelogEntry {
   version: string
-  /* Снапшот — промежуточная сборка; без поля версия считается релизом */
-  channel?: AppChannel
   date: string
   title: string
   sections: ChangelogSection[]
@@ -39,7 +37,6 @@ function readEntries(raw: unknown): ChangelogEntry[] {
       ...e,
       title: typeof e.title === 'string' ? e.title : '',
       date: typeof e.date === 'string' ? e.date : '',
-      channel: e.channel === 'snapshot' ? 'snapshot' : 'release',
       sections: e.sections
         .filter((s) => s && Array.isArray(s.groups))
         .map((s) => ({ ...s, groups: s.groups.filter((g) => g && Array.isArray(g.items)) })),
@@ -106,8 +103,8 @@ export default function ChangelogPage({ onBack }: ChangelogPageProps) {
                 aria-expanded={isOpen}
                 title={isOpen ? t('changelog.collapse') : t('changelog.expand')}
               >
-                <span className={`changelog-version ${e.channel === 'snapshot' ? 'snapshot' : ''}`}>
-                  v{versionLabel(t, e.version, e.channel)}
+                <span className="changelog-version">
+                  v{e.version}
                 </span>
                 <span className="changelog-entry-text">
                   <span className="changelog-entry-title">{e.title}</span>

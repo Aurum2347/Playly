@@ -3,11 +3,16 @@
   flex-direction: column;
   height: 100%;
   min-height: 0;
-  overflow: hidden;
+  /* Прокручивается вся страница: при невысоком окне шапка не сжимает список до пары строк */
+  overflow-x: hidden;
+  overflow-y: auto;
   padding: 24px 32px;
   box-sizing: border-box;
   animation: likedViewIn 0.28s ease both;
 }
+
+/* Части страницы не сжимаются - лишнее уходит в прокрутку */
+.liked-view-container > * { flex-shrink: 0; }
 
 @keyframes likedViewIn {
   from { opacity: 0; transform: translateY(10px); }
@@ -131,23 +136,22 @@
   margin-bottom: 16px;
 }
 
-.header-actions { display: flex; align-items: center; gap: 10px; }
+.header-actions { display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: 8px 10px; min-width: 0; }
+/* Без выделения панели нет совсем; с выделением кнопки не обрезаются, а переносятся */
 .selection-actions {
-  display: flex;
+  display: none;
   align-items: center;
-  gap: 10px;
-  opacity: 0;
-  transform: translateX(8px);
-  pointer-events: none;
-  max-width: 0;
-  overflow: hidden;
-  transition: opacity 0.2s ease, transform 0.2s ease, max-width 0.2s ease;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 8px 10px;
 }
 .selection-actions.visible {
-  opacity: 1;
-  transform: translateX(0);
-  pointer-events: auto;
-  max-width: 500px;
+  display: flex;
+  animation: selectionIn 0.2s ease both;
+}
+@keyframes selectionIn {
+  from { opacity: 0; transform: translateX(8px); }
+  to { opacity: 1; transform: none; }
 }
 
 .btn {
@@ -271,22 +275,23 @@
 .dropdown-divider { height: 1px; background: var(--border-soft); margin: 4px 0; }
 
 .track-list-container {
-  flex: 1;
-  min-height: 0;
-  overflow-y: auto;
+  flex: 1 0 auto;
   border-radius: 12px;
   background: var(--bg-elevated);
   border: 1px solid var(--border-faint);
   padding: 8px 12px;
 }
 
+.liked-view-container::-webkit-scrollbar,
 .track-list-container::-webkit-scrollbar { width: 6px; }
+.liked-view-container::-webkit-scrollbar-track,
 .track-list-container::-webkit-scrollbar-track { background: transparent; }
+.liked-view-container::-webkit-scrollbar-thumb,
 .track-list-container::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
 
 .track-row {
   display: grid;
-  grid-template-columns: 44px 1fr 80px 28px 28px;
+  grid-template-columns: 44px minmax(0, 1fr) minmax(80px, auto) 28px 28px;
   align-items: center;
   padding: 10px 12px;
   border-radius: 10px;

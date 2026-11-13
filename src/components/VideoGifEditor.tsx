@@ -276,7 +276,7 @@ function VideoGifEditor({ path, purpose, onDone }: EditorProps) {
                     <input type="number" min={0} max={duration} step={0.1} value={s.start} onChange={(e) => updateSeg(i, { start: Number(e.target.value) })} />
                   </label>
                   <button className="btn btn-ghost vg-mini-btn" onClick={() => updateSeg(i, { start: time })} title={t('videoGif.setStart')}>⇤</button>
-                  <span className="vg-dash">—</span>
+                  <span className="vg-dash">-</span>
                   <label className="vg-time-field">
                     <input type="number" min={0} max={duration} step={0.1} value={s.end} onChange={(e) => updateSeg(i, { end: Number(e.target.value) })} />
                   </label>

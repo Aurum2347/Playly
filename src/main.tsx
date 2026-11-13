@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client'
 import { getCurrentWindow } from '@tauri-apps/api/window'
 import './index.css'
 import '@fontsource/noto-color-emoji'
+import { installTooltips } from './lib/tooltips'
 
 /* Одна сборка на четыре окна: главное, мини-плеер у трея («mini»), меню трея («traymenu») и уведомление («notice») */
 const label = (() => {
@@ -21,6 +22,9 @@ if (isMini || isTrayMenu || isNotice) {
   document.documentElement.classList.add(isMini ? 'mini-window' : isTrayMenu ? 'tray-window' : 'notice-window')
   document.documentElement.style.backgroundColor = 'transparent'
 }
+
+/* Подсказки при наведении в стиле Playly (вместо системных) - в главном окне и мини-плеере */
+if (!isTrayMenu && !isNotice) installTooltips()
 
 /* Мини-плееру и меню трея не нужен код всего приложения — грузим только своё.
    Отдельные import(), а не один с «?:» внутри: сборщик склеивал такой вызов в один и подгружал

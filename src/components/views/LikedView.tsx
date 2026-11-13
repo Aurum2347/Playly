@@ -263,7 +263,7 @@ export default function LikedView({
   )
 
   return (
-    <div className="liked-view-container">
+    <div className="liked-view-container" onScroll={() => isContextMenuOpen && closeContextMenu()}>
       <div className="hero">
         <div className="hero-top">
           <div className="hero-icon">
@@ -371,7 +371,7 @@ export default function LikedView({
         )}
       </div>
 
-      <div className={`track-list-container ${selectionMode ? 'selecting' : ''}`} onScroll={() => isContextMenuOpen && closeContextMenu()}>
+      <div className={`track-list-container ${selectionMode ? 'selecting' : ''}`}>
         {sortedTracks.length === 0 ? (
           <div className="empty-state">
             <div className="empty-icon">

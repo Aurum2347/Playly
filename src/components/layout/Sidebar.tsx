@@ -649,7 +649,7 @@ export default function Sidebar({
             >
               <div className="sb-modal-header">
                 <h3 className="sb-modal-title">{t('layout.sidebar.createTitle')}</h3>
-                <button className="sb-modal-close" onClick={() => setIsCreateOpen(false)}>
+                <button className="sb-modal-close" onClick={() => setIsCreateOpen(false)} aria-label={t('common.close')}>
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                     <line x1="18" y1="6" x2="6" y2="18" />
                     <line x1="6" y1="6" x2="18" y2="18" />
@@ -726,7 +726,7 @@ export default function Sidebar({
             >
               <div className="sb-modal-header">
                 <h3 className="sb-modal-title">{t('layout.sidebar.editTitle')}</h3>
-                <button className="sb-modal-close" onClick={() => setEditState(null)}>
+                <button className="sb-modal-close" onClick={() => setEditState(null)} aria-label={t('common.close')}>
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                     <line x1="18" y1="6" x2="6" y2="18" />
                     <line x1="6" y1="6" x2="18" y2="18" />

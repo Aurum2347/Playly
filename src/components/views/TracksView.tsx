@@ -304,7 +304,7 @@ export default function TracksView({
             )}
           </div>
 
-          {tracks.length > 1 && (
+          {tracks.length > 1 && selectedCount === 0 && (
             <button className={styles.btn} onClick={() => setIsDuplicatesOpen(true)} title={t('duplicates.hint')}>
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="8" y="8" width="13" height="13" rx="2" /><path d="M4 16V5a2 2 0 012-2h11" /></svg>
               {t('duplicates.open')}
@@ -435,7 +435,7 @@ export default function TracksView({
 
       {totalPages > 1 && (
         <div className={styles.pagination}>
-          <button className={styles.pageBtn} disabled={safePage === 1} onClick={() => setCurrentPage(Math.max(1, safePage - 1))}>
+          <button className={styles.pageBtn} disabled={safePage === 1} onClick={() => setCurrentPage(Math.max(1, safePage - 1))} aria-label={t('views.tracks.prevPage')}>
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6" /></svg>
           </button>
           {paginationItems.map((item, i) =>
@@ -445,7 +445,7 @@ export default function TracksView({
               <button key={item} className={cx(styles.pageBtn, safePage === item && styles.pageBtnActive)} onClick={() => setCurrentPage(item)}>{item}</button>
             )
           )}
-          <button className={styles.pageBtn} disabled={safePage === totalPages} onClick={() => setCurrentPage(Math.min(totalPages, safePage + 1))}>
+          <button className={styles.pageBtn} disabled={safePage === totalPages} onClick={() => setCurrentPage(Math.min(totalPages, safePage + 1))} aria-label={t('views.tracks.nextPage')}>
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6" /></svg>
           </button>
           <div className={styles.pageInfo}>
