@@ -18,6 +18,24 @@ import { EQ_BANDS } from './equalizer'
 export type CrossfadeCurve = 'equal' | 'linear' | 'smooth'
 
 /**
+ * Каналы: original — как в файле; mono — всё сводится в один канал (одинаково в обоих ушах);
+ * stereo — ровно два канала: моно-запись звучит в обоих ушах, многоканальная сводится в стерео.
+ * Настоящую стереокартину из моно-записи stereo не восстанавливает.
+ */
+export type ChannelMode = 'original' | 'mono' | 'stereo'
+
+export const CHANNEL_MODES: ChannelMode[] = ['original', 'mono', 'stereo']
+
+export function normalizeChannelMode(v: unknown): ChannelMode {
+  return v === 'mono' || v === 'stereo' ? v : 'original'
+}
+
+/* Скорости кнопки в плеере; за пределами 1/16..16 Chromium глушит звук */
+export const SESSION_SPEEDS = [0.1, 0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2, 5]
+const MIN_RATE = 0.0625
+const MAX_RATE = 16
+
+/**
  * Итог смены трека:
  *  ok    — трек играет (или стоит на паузе, если autoplay выключен);
  *  stale — загрузку перебила более новая, ничего не изменилось;
@@ -29,6 +47,8 @@ export interface EngineTrack {
   id: number
   filePath: string
   playbackRate?: number
+  /* Уже с учётом общей настройки (своя у трека важнее общей) */
+  channelMode?: ChannelMode
 }
 
 export interface EngineEvents {
@@ -43,6 +63,13 @@ export interface EngineEvents {
 interface Deck {
   el: HTMLAudioElement
   gain: GainNode
+  /* Сведение каналов (моно/стерео) — у каждой деки своё: при кроссфейде у треков могут быть разные режимы */
+  channels: GainNode
+  /* Скорость самого трека (из его настроек); итоговая = baseRate × скорость сеанса */
+  baseRate: number
+  /* Сколько pause()/play() вызвал сам движок: так отличаем их от команд снаружи (медиакнопки, гарнитура) */
+  expectPause: number
+  expectPlay: number
   url: string | null
   trackId: number | null
   /* Растёт при каждой новой загрузке — устаревшие загрузки по нему отбрасываются */
@@ -147,6 +174,8 @@ export class AudioEngine {
   private pauseTimer: ReturnType<typeof setTimeout> | null = null
   private events: EngineEvents
   private cleanups: Array<() => void> = []
+  /* Скорость сеанса (кнопка в плеере); при следующем запуске снова 1× */
+  private speed = 1
 
   constructor(events: EngineEvents) {
     this.events = events
@@ -193,11 +222,15 @@ export class AudioEngine {
     for (let i = 0; i < 2; i++) {
       const el = new Audio()
       el.preload = 'auto'
+      /* Скорость меняется без изменения тональности */
+      el.preservesPitch = true
       const gain = this.ctx.createGain()
       gain.gain.value = i === 0 ? 1 : 0
+      const channels = this.ctx.createGain()
       this.ctx.createMediaElementSource(el).connect(gain)
-      gain.connect(this.fader)
-      this.decks.push({ el, gain, url: null, trackId: null, token: 0, pending: null })
+      gain.connect(channels)
+      channels.connect(this.fader)
+      this.decks.push({ el, gain, channels, baseRate: 1, expectPause: 0, expectPlay: 0, url: null, trackId: null, token: 0, pending: null })
       this.bindDeck(i)
     }
   }
@@ -263,10 +296,58 @@ export class AudioEngine {
   setRate(trackId: number, rate: number) {
     for (const d of this.decks) {
       if (d.trackId === trackId) {
-        d.el.defaultPlaybackRate = rate
-        d.el.playbackRate = rate
+        d.baseRate = rate
+        this.applyRate(d)
       }
     }
+  }
+
+  get sessionSpeed() { return this.speed }
+
+  /** Скорость сеанса поверх скорости трека, в реальном времени */
+  setSpeed(speed: number) {
+    this.speed = isFinite(speed) && speed > 0 ? speed : 1
+    this.decks.forEach((d) => this.applyRate(d))
+  }
+
+  /** Сведение каналов у деки с этим треком (null — у всех дек) */
+  setChannelMode(trackId: number | null, mode: ChannelMode) {
+    for (const d of this.decks) {
+      if (trackId === null || d.trackId === trackId) this.applyChannels(d, mode)
+    }
+  }
+
+  private applyRate(d: Deck) {
+    const rate = Math.max(MIN_RATE, Math.min(MAX_RATE, d.baseRate * this.speed))
+    d.el.defaultPlaybackRate = rate
+    d.el.playbackRate = rate
+  }
+
+  private applyChannels(d: Deck, mode: ChannelMode) {
+    const n = d.channels
+    if (mode === 'original') {
+      n.channelCountMode = 'max'
+      n.channelCount = 2
+    } else {
+      n.channelCount = mode === 'mono' ? 1 : 2
+      n.channelCountMode = 'explicit'
+    }
+    n.channelInterpretation = 'speakers'
+  }
+
+  private pauseEl(d: Deck) {
+    if (d.el.paused) return
+    d.expectPause++
+    d.el.pause()
+  }
+
+  private playEl(d: Deck): Promise<void> {
+    if (!d.el.paused) return d.el.play()
+    d.expectPlay++
+    return d.el.play().catch((e) => {
+      d.expectPlay = Math.max(0, d.expectPlay - 1)
+      throw e
+    })
   }
 
   /* ===== Загрузка и смена трека ===== */
@@ -328,7 +409,7 @@ export class AudioEngine {
     await this.ctx.resume().catch(() => {})
     if (seq !== this.loadSeq) return 'stale'
     try {
-      await toDeck.el.play()
+      await this.playEl(toDeck)
     } catch (e) {
       /* play() прервала более новая загрузка (она поставила деку на паузу) — это не ошибка */
       if (seq !== this.loadSeq) return 'stale'
@@ -423,11 +504,11 @@ export class AudioEngine {
     if (this.switching && !this.playing) return
     this.cancelPauseTimer()
     void this.ctx.resume().catch(() => {})
-    const active = this.decks[this.active].el
-    if (active.ended) active.currentTime = 0
-    active.play().catch((e) => console.warn('Не удалось воспроизвести:', e))
+    const active = this.decks[this.active]
+    if (active.el.ended) active.el.currentTime = 0
+    this.playEl(active).catch((e) => console.warn('Не удалось воспроизвести:', e))
     if (this.transition) {
-      this.decks[this.transition.outIdx].el.play().catch(() => {})
+      this.playEl(this.decks[this.transition.outIdx]).catch(() => {})
       this.armTransitionTimer()
     }
     this.rampTo(this.fader.gain, 1, PAUSE_FADE)
@@ -446,7 +527,7 @@ export class AudioEngine {
     this.cancelPauseTimer()
     this.pauseTimer = setTimeout(() => {
       this.pauseTimer = null
-      this.decks.forEach((d) => d.el.pause())
+      this.decks.forEach((d) => this.pauseEl(d))
       /* Вместе с контекстом замирают и кривые кроссфейда — после паузы переход продолжится с того же места */
       void this.ctx.suspend().catch(() => {})
     }, PAUSE_FADE * 1000 + 20)
@@ -489,7 +570,26 @@ export class AudioEngine {
     const onError = () => { if (isActive() && !this.switching && deck.trackId !== null) this.events.onError?.(deck.trackId) }
     el.addEventListener('error', onError)
     el.addEventListener('ended', onEnded)
+    /*
+     * Медиакнопки (наушники, клавиатура, Bluetooth-гарнитура) Chromium может отправить прямо в <audio>,
+     * мимо движка: элемент встаёт на паузу, а движок думает, что играет (или наоборот). Такие команды
+     * переводим в обычные play()/pause() движка, чтобы состояние плеера не расходилось со звуком.
+     */
+    const onPause = () => {
+      if (deck.expectPause > 0) { deck.expectPause--; return }
+      if (el.ended || !isActive() || this.switching) return
+      if (this.playing) this.pause()
+    }
+    const onPlay = () => {
+      if (deck.expectPlay > 0) { deck.expectPlay--; return }
+      if (!isActive() || this.switching) return
+      if (!this.playing) this.play()
+    }
+    el.addEventListener('pause', onPause)
+    el.addEventListener('play', onPlay)
     this.cleanups.push(() => {
+      el.removeEventListener('pause', onPause)
+      el.removeEventListener('play', onPlay)
       el.removeEventListener('timeupdate', onTime)
       el.removeEventListener('durationchange', onDuration)
       el.removeEventListener('loadedmetadata', onDuration)
@@ -503,8 +603,9 @@ export class AudioEngine {
     const rate = track.playbackRate ?? 1
     const rewind = (ok: boolean) => {
       if (ok && deck.trackId === track.id) {
-        deck.el.defaultPlaybackRate = rate
-        deck.el.playbackRate = rate
+        deck.baseRate = rate
+        this.applyRate(deck)
+        this.applyChannels(deck, track.channelMode ?? 'original')
         if (deck.el.currentTime !== 0) deck.el.currentTime = 0
       }
       return ok
@@ -600,10 +701,10 @@ export class AudioEngine {
       this.rampTo(inGain, 1, ABORT_FADE)
       const token = out.token
       setTimeout(() => {
-        if (out.token === token && this.decks[this.active] !== out) out.el.pause()
+        if (out.token === token && this.decks[this.active] !== out) this.pauseEl(out)
       }, ABORT_FADE * 1000 + 20)
     } else {
-      out.el.pause()
+      this.pauseEl(out)
       this.setNow(out.gain.gain, 0)
       this.setNow(inGain, 1)
     }
@@ -611,7 +712,7 @@ export class AudioEngine {
 
   private silence(idx: number) {
     const d = this.decks[idx]
-    d.el.pause()
+    this.pauseEl(d)
     this.setNow(d.gain.gain, 0)
   }
 

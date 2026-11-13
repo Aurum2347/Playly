@@ -1,8 +1,10 @@
 // Prevents additional console window on Windows in release, DO NOT REMOVE!!
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+mod library_fs;
 mod media_audio;
 mod storage;
+mod system;
 use base64::Engine as _;
 use discord_rich_presence::{activity, DiscordIpc, DiscordIpcClient};
 use lofty::file::{AudioFile, TaggedFileExt};
@@ -76,8 +78,13 @@ fn get_track_metadata(path: String) -> Result<TrackMeta, String> {
 
 /// Текст песни: сначала файл .lrc рядом с треком, затем встроенный тег (USLT / LYRICS / ©lyr)
 #[command]
-fn get_track_lyrics(path: String) -> Option<String> {
+fn get_track_lyrics(path: String, lrc_path: Option<String>) -> Option<String> {
     let sidecar = std::path::Path::new(&path).with_extension("lrc");
+    /* .lrc лежит не рядом с треком: его нашли после перемещения и запомнили путь */
+    let sidecar = match lrc_path {
+        Some(p) if !sidecar.is_file() && std::path::Path::new(&p).is_file() => std::path::PathBuf::from(p),
+        _ => sidecar,
+    };
     if sidecar.is_file() {
         if let Ok(bytes) = fs::read(&sidecar) {
             let text = String::from_utf8_lossy(&bytes);
@@ -764,6 +771,7 @@ fn mini_window(app: &tauri::AppHandle) -> Option<tauri::WebviewWindow> {
         .build()
         .map_err(|e| eprintln!("[mini] Не удалось создать окно: {}", e))
         .ok()?;
+    system::apply_capture_policy(&w);
 
     let handle = app.clone();
     let win = w.clone();
@@ -1192,6 +1200,7 @@ fn tray_menu_window(app: &tauri::AppHandle) -> Option<tauri::WebviewWindow> {
         .build()
         .map_err(|e| eprintln!("[tray] Не удалось создать меню: {}", e))
         .ok()
+        .inspect(system::apply_capture_policy)
 }
 
 fn hide_tray_menu_window(app: &tauri::AppHandle) {
@@ -1337,6 +1346,8 @@ fn main() {
         .manage(MiniState::default())
         .manage(TrayMenu::default())
         .manage(TrayMenuState::default())
+        .manage(library_fs::LibraryWatch::default())
+        .manage(system::NoticeState::default())
         .setup(|app| {
             wipe_webview_cache_if_requested(app.handle());
             if is_portable() {
@@ -1379,6 +1390,8 @@ fn main() {
                     if let tauri::WindowEvent::CloseRequested { api, .. } = event {
                         api.prevent_close();
                         let _ = w.hide();
+                        /* Главное окно само решит, показывать ли «Playly продолжает работать в трее» */
+                        let _ = w.emit_to("main", "playly://hidden-to-tray", ());
                     }
                 });
             }
@@ -1398,6 +1411,18 @@ fn main() {
         })
         .invoke_handler(tauri::generate_handler![
             media_audio::decode_media_audio,
+            library_fs::scan_audio_dir,
+            library_fs::file_status,
+            library_fs::hash_files,
+            library_fs::find_files_by_name,
+            library_fs::watch_library_folder,
+            library_fs::unwatch_library_folder,
+            system::system_specs,
+            system::set_capture_hidden,
+            system::capture_hide_supported,
+            system::show_tray_notice,
+            system::take_tray_notice,
+            system::hide_tray_notice,
             media_audio::cancel_media_decode,
             storage::save_track_lyrics,
             set_mini_enabled,

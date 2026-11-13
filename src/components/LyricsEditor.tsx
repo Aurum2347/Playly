@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { invoke } from '@tauri-apps/api/core'
-import { lyricsUpdated, parseLyrics } from '../lib/lyrics'
+import { lrcPathFor, lyricsUpdated, parseLyrics } from '../lib/lyrics'
 import { notify, reportError } from '../lib/feedback'
 import { positionOf } from '../lib/playbackClock'
 import { useI18n } from '../i18n'
@@ -41,7 +41,7 @@ export default function LyricsEditor({ path, onClose }: { path: string | null; o
   useEffect(() => {
     if (!path) return
     let active = true
-    invoke<string | null>('get_track_lyrics', { path })
+    invoke<string | null>('get_track_lyrics', { path, lrcPath: lrcPathFor(path) })
       .then((raw) => {
         if (!active) return
         setText(raw ?? '')

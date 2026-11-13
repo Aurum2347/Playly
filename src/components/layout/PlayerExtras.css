@@ -1,0 +1,106 @@
+/* ===== Скорость и очередь в плеербаре ===== */
+.p-speed { position: relative; display: flex; }
+
+.p-speed-btn {
+  min-width: 38px;
+  height: 28px;
+  padding: 0 6px;
+  border-radius: 6px;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+.p-speed-btn:hover:not(:disabled),
+.p-speed-btn.open { background: var(--hover); color: var(--text-secondary); }
+.p-speed-btn.changed { color: var(--text); background: var(--element-strong); }
+.p-speed-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+
+.p-speed-menu {
+  position: absolute;
+  bottom: calc(100% + 10px);
+  right: 50%;
+  transform: translateX(50%);
+  min-width: 150px;
+  padding: 6px;
+  border-radius: 12px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-soft);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.35);
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+  animation: pSpeedIn 0.14s ease-out;
+}
+@keyframes pSpeedIn {
+  from { opacity: 0; transform: translateX(50%) translateY(4px); }
+  to { opacity: 1; transform: translateX(50%) translateY(0); }
+}
+
+.p-speed-head,
+.p-speed-foot {
+  font-size: 11px;
+  color: var(--text-muted);
+  padding: 4px 8px 6px;
+}
+.p-speed-foot { padding: 6px 8px 2px; border-top: 1px solid var(--border-soft); margin-top: 4px; line-height: 1.35; }
+
+.p-speed-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 8px;
+  border-radius: 8px;
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  text-align: left;
+  cursor: pointer;
+}
+.p-speed-item:hover { background: var(--hover); color: var(--text); }
+.p-speed-item.active { background: var(--element-strong); color: var(--text); font-weight: 600; }
+.p-speed-note { font-size: 11px; color: var(--text-muted); font-weight: 400; }
+
+.p-queue-btn {
+  position: relative;
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+.p-queue-btn svg { width: 16px; height: 16px; }
+.p-queue-btn:hover:not(:disabled) { background: var(--hover); color: var(--text-secondary); }
+.p-queue-btn.active { color: var(--text); background: var(--element-strong); }
+.p-queue-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+
+.p-queue-count {
+  position: absolute;
+  top: -3px;
+  right: -4px;
+  min-width: 15px;
+  height: 15px;
+  padding: 0 4px;
+  border-radius: 8px;
+  background: var(--accent);
+  color: var(--accent-text);
+  font-size: 9px;
+  font-weight: 700;
+  line-height: 15px;
+  text-align: center;
+}

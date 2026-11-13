@@ -6,10 +6,13 @@ import TrackEditModal from './TrackEditModal'
 import type { TrackUpdates } from './TrackEditModal'
 import { useI18n } from '../../i18n'
 import TrackDetailsModal from './TrackDetailsModal'
-import { cx, inlineInput, inlineRow, parseDuration, useContextMenu } from './shared'
+import { cx, inlineInput, inlineRow, parseDuration, selectionRange, useContextMenu } from './shared'
 import styles from './TracksView.module.css'
 import SortSelect from '../SortSelect'
 import { sortIcons } from '../sortIcons'
+import { usePageSize } from '../../lib/prefs'
+import QueueAddButton, { CoverIcon, QueueIcon } from './QueueAddButton'
+import DuplicatesModal from './DuplicatesModal'
 
 type SortOption = 'name-az' | 'name-za' | 'dur-desc' | 'dur-asc' | 'date-new' | 'date-old'
 
@@ -28,16 +31,24 @@ interface TracksViewProps {
   onCopyArtist?: (trackId: number) => void
   onCopyPath?: (trackId: number) => void
   onRevealInDir?: (trackId: number) => void
+  /* Добавить в ручную очередь (в порядке списка) */
+  onAddToQueue?: (trackIds: number[]) => void
+  /* Одна обложка на все выбранные треки; confirm — подтверждение после выбора картинки */
+  onSetCovers?: (trackIds: number[], confirm?: (n: number) => boolean) => Promise<void>
+  /* Удалить файлы с диска (поиск дубликатов) */
+  onRemoveFiles?: (trackIds: number[]) => Promise<number[]>
 }
-
-const PAGE_SIZE = 100
 
 export default function TracksView({
   tracks, playlists, onSelectTrack, playingTrackId = null,
   onToggleLike, onDeleteTracks, onAddToPlaylist, onCreatePlaylist, onEditTrack, onAddTracks,
   onCopyTitle, onCopyArtist, onCopyPath, onRevealInDir,
+  onAddToQueue, onSetCovers, onRemoveFiles,
 }: TracksViewProps) {
   const { t } = useI18n()
+  /* В режиме экономии ресурсов — 25 треков на странице */
+  const PAGE_SIZE = usePageSize()
+  const [isDuplicatesOpen, setIsDuplicatesOpen] = useState(false)
   const [selectionMode, setSelectionMode] = useState(false)
   const [selectedTrackIds, setSelectedTrackIds] = useState<Set<number>>(new Set())
   const [currentSort, setCurrentSort] = useState<SortOption>('date-new')
@@ -88,9 +99,11 @@ export default function TracksView({
   const pageTracks = useMemo(() => {
     const start = (safePage - 1) * PAGE_SIZE
     return filteredTracks.slice(start, start + PAGE_SIZE)
-  }, [filteredTracks, safePage])
+  }, [filteredTracks, safePage, PAGE_SIZE])
 
   const selectedCount = selectedTrackIds.size
+  /* Выбранные — в том порядке, в каком они видны в списке */
+  const selectedInOrder = () => filteredTracks.map((tr) => tr.id).filter((id) => selectedTrackIds.has(id))
   const contextTrack = contextMenu.target !== null ? tracks.find((t) => t.id === contextMenu.target) ?? null : null
   /* Берём актуальную версию трека из props, чтобы после редактирования/лайка детали не устаревали */
   const detailsTrack = detailsTrackId !== null ? tracks.find((t) => t.id === detailsTrackId) ?? null : null
@@ -105,11 +118,12 @@ export default function TracksView({
 
   const [selectionAnchor, setSelectionAnchor] = useState<number | null>(null)
   const toggleSelection = (trackId: number, range = false) => {
-    if (range && selectionAnchor !== null) {
+    if (range) {
       const ids = filteredTracks.map((tr) => tr.id)
-      const a = ids.indexOf(selectionAnchor), b = ids.indexOf(trackId)
-      if (a >= 0 && b >= 0) {
-        setSelectedTrackIds(new Set(ids.slice(Math.min(a, b), Math.max(a, b) + 1)))
+      const span = selectionRange(ids, trackId, selectionAnchor, selectedTrackIds, playingTrackId)
+      if (span) {
+        setSelectionAnchor(span.anchor)
+        setSelectedTrackIds(new Set(span.ids))
         setSelectionMode(true)
         return
       }
@@ -119,12 +133,12 @@ export default function TracksView({
     if (next.has(trackId)) next.delete(trackId)
     else next.add(trackId)
     setSelectedTrackIds(next)
-    if (next.size === 0) setSelectionMode(false)
+    setSelectionMode(next.size > 0)
     setAnimatingCheckboxId(trackId)
     window.setTimeout(() => setAnimatingCheckboxId((cur) => (cur === trackId ? null : cur)), 240)
   }
 
-  const enterSelectionMode = (trackId: number) => { setSelectionMode(true); setSelectedTrackIds(new Set([trackId])) }
+  const enterSelectionMode = (trackId: number) => { setSelectionAnchor(trackId); setSelectionMode(true); setSelectedTrackIds(new Set([trackId])) }
   const exitSelectionMode = () => { setSelectionAnchor(null); setSelectionMode(false); setSelectedTrackIds(new Set()) }
 
   const deleteTracks = (ids: number[]) => {
@@ -164,7 +178,7 @@ export default function TracksView({
     window.setTimeout(() => setFlashingTrackId((cur) => (cur === trackId ? null : cur)), 750)
   }
 
-  const handleContextAction = (action: 'select' | 'edit' | 'playlist' | 'delete' | 'details' | 'like') => {
+  const handleContextAction = (action: 'select' | 'edit' | 'playlist' | 'queue' | 'delete' | 'details' | 'like') => {
     const id = contextMenu.target
     closeContextMenu()
     if (id === null) return
@@ -177,6 +191,9 @@ export default function TracksView({
         break
       case 'playlist':
         openPlaylistModal([id])
+        break
+      case 'queue':
+        onAddToQueue?.([id])
         break
       case 'delete':
         if (window.confirm(t('views.tracks.confirmDeleteOne'))) deleteTracks([id])
@@ -273,7 +290,26 @@ export default function TracksView({
               </svg>
               {t('views.tracks.addToPlaylist')}
             </button>
+            {onAddToQueue && (
+              <button className={styles.btn} onClick={() => { onAddToQueue(selectedInOrder()); exitSelectionMode() }}>
+                <QueueIcon />
+                {t('queue.addSelected')}
+              </button>
+            )}
+            {onSetCovers && (
+              <button className={styles.btn} onClick={() => { void onSetCovers(selectedInOrder(), (n) => window.confirm(t('views.tracks.confirmSetCovers', { n }))).then(() => exitSelectionMode()) }}>
+                <CoverIcon />
+                {t('views.tracks.setCover')}
+              </button>
+            )}
           </div>
+
+          {tracks.length > 1 && (
+            <button className={styles.btn} onClick={() => setIsDuplicatesOpen(true)} title={t('duplicates.hint')}>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="8" y="8" width="13" height="13" rx="2" /><path d="M4 16V5a2 2 0 012-2h11" /></svg>
+              {t('duplicates.open')}
+            </button>
+          )}
 
           <SortSelect
             label={t('views.tracks.sort')}
@@ -377,6 +413,7 @@ export default function TracksView({
                   </div>
                 </div>
                 <span className={styles.trDur}>
+                  {onAddToQueue && <QueueAddButton onAdd={() => onAddToQueue([track.id])} />}
                   {speed !== 1 && <span className={styles.speedBadge}>{String(Math.round(speed * 100) / 100)}×</span>}
                   {track.duration}
                 </span>
@@ -437,6 +474,12 @@ export default function TracksView({
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z" /></svg>
             {t('views.tracks.addToPlaylist')}
           </button>
+          {onAddToQueue && (
+            <button className={styles.contextItem} onClick={() => handleContextAction('queue')}>
+              <QueueIcon />
+              {t('queue.add')}
+            </button>
+          )}
           <div className={styles.dropdownDivider} />
           <button className={styles.contextItem} onClick={() => handleContextAction('details')}>
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><circle cx="12" cy="12" r="10" /><line x1="12" y1="16" x2="12" y2="12" /><line x1="12" y1="8" x2="12.01" y2="8" /></svg>
@@ -512,6 +555,14 @@ export default function TracksView({
       </div>,
       document.body
     )}
+
+      <DuplicatesModal
+        open={isDuplicatesOpen}
+        onClose={() => setIsDuplicatesOpen(false)}
+        tracks={tracks}
+        onDeleteTracks={onDeleteTracks}
+        onRemoveFiles={onRemoveFiles}
+      />
 
       <TrackEditModal track={editingTrack} onClose={() => setEditingTrack(null)} onSave={handleEditSave} tracks={tracks} />
       

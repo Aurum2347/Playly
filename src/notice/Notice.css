@@ -1,0 +1,91 @@
+/* ===== Уведомление «Playly работает в трее» (отдельное прозрачное окно) ===== */
+html.notice-window,
+html.notice-window body,
+html.notice-window #root {
+  background: transparent !important;
+  overflow: hidden;
+}
+
+.notice-shell {
+  width: 100vw;
+  height: 100vh;
+  padding: 8px;
+  box-sizing: border-box;
+  display: flex;
+  align-items: flex-end;
+  user-select: none;
+  font-family: 'Inter', system-ui, sans-serif;
+}
+
+.notice-card {
+  position: relative;
+  width: 100%;
+  display: flex;
+  gap: 12px;
+  padding: 12px 34px 12px 12px;
+  border-radius: 14px;
+  color: #f2f2f4;
+  background: linear-gradient(180deg, rgba(28, 28, 33, 0.97), rgba(16, 16, 19, 0.98));
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  animation: noticeIn 0.22s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@keyframes noticeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: none; }
+}
+
+.notice-icon {
+  flex-shrink: 0;
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.08);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #f2f2f4;
+}
+
+.notice-text { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.notice-title { font-size: 13px; font-weight: 600; }
+.notice-body { font-size: 12px; line-height: 1.4; color: rgba(242, 242, 244, 0.7); }
+
+.notice-actions { display: flex; gap: 6px; margin-top: 6px; }
+.notice-actions button {
+  padding: 4px 10px;
+  border-radius: 7px;
+  border: none;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  background: rgba(255, 255, 255, 0.12);
+  color: #f2f2f4;
+}
+.notice-actions button:hover { background: rgba(255, 255, 255, 0.18); }
+.notice-actions button.ghost { background: transparent; color: rgba(242, 242, 244, 0.6); }
+.notice-actions button.ghost:hover { color: #f2f2f4; background: rgba(255, 255, 255, 0.08); }
+
+.notice-close {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  border: none;
+  background: transparent;
+  color: rgba(242, 242, 244, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+.notice-close:hover { background: rgba(255, 255, 255, 0.1); color: #f2f2f4; }
+.notice-close svg { width: 13px; height: 13px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .notice-card { animation: none; }
+}

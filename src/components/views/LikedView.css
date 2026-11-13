@@ -305,8 +305,9 @@
 
 .track-row:last-child { margin-bottom: 0; }
 .track-row:hover { background: var(--hover); }
-.track-row.selected {
-  background: var(--element-strong);
+.track-row.selected,
+.track-row.selected:hover {
+  background: color-mix(in srgb, var(--accent) 16%, var(--element-strong));
   transition: background 0.2s ease;
 }
 .track-row.playing .tr-title { color: var(--text); }
@@ -839,6 +840,7 @@ border-color: var(--border);
 .inline-create-input::placeholder { color: var(--text-faint); }
 
 .tr-dur {
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: flex-end;

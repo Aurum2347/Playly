@@ -40,7 +40,13 @@ import {
   type AppBackdrop as AppBackdropSettings,
   type ParticleSettings,
 } from './lib/appearance'
-import { AudioEngine, type CrossfadeCurve, type EngineEvents } from './lib/audioEngine'
+import { AudioEngine, type ChannelMode, type CrossfadeCurve, type EngineEvents, type EngineTrack } from './lib/audioEngine'
+import { getPrefs, loadPrefs, updatePrefs, usePrefs } from './lib/prefs'
+import { watchOutputDevices } from './lib/deviceWatch'
+import { registerLrcPaths } from './lib/lyrics'
+import QueueModal, { type QueueItem } from './components/QueueModal'
+import PowerSavePrompt from './components/PowerSavePrompt'
+import RelinkModal from './components/RelinkModal'
 import { applyUiScale, clampUiScale, UI_SCALE_DEFAULT } from './lib/uiScale'
 import { DEFAULT_FRAME, normalizeFrame, type ImageFrame } from './lib/imageFrame'
 import { normalizeCustomPresets, normalizeGains, presetGains, type EqPreset } from './lib/equalizer'
@@ -85,6 +91,10 @@ export interface Track {
   /* Не показывать этот трек в статусе Discord */
   eqGains?: number[] | null
   discordHidden?: boolean
+  /* Моно/стерео только для этого трека (важнее общей настройки); null — как в настройках */
+  channelMode?: ChannelMode | null
+  /* Файл .lrc нашёлся не рядом с треком (его переместили отдельно) */
+  lrcPath?: string | null
 }
 
 export interface Playlist {
@@ -138,6 +148,8 @@ interface CrossfadePlan {
   shuffle: boolean
   repeat: RepeatMode
   failed: boolean
+  /* Следующий трек из ручной очереди: в системную очередь он встанет, только когда начнёт играть */
+  manualUid?: number
 }
 
 const SidebarM = memo(Sidebar)
@@ -183,6 +195,20 @@ function AppInner() {
   const [settingsSection, setSettingsSection] = useState<SettingsSection>('appearance')
   const [queue, setQueue] = useState<number[]>([])
   const [queueIndex, setQueueIndex] = useState(-1)
+  /* Ручная очередь пользователя: важнее системной, после неё воспроизведение продолжается по системной */
+  const [userQueue, setUserQueue] = useState<QueueItem[]>([])
+  const userQueueRef = useRef<QueueItem[]>([])
+  const queueUidRef = useRef(0)
+  const [isQueueOpen, setIsQueueOpen] = useState(false)
+  /* Скорость сеанса (кнопка в плеере); при следующем запуске снова 1× */
+  const [speed, setSpeed] = useState(1)
+  const speedRef = useRef(1)
+  const prefs = usePrefs()
+  /* Устройство, на которое сейчас должен идти звук (с учётом режима стримера), и реально применённое */
+  const effectiveDeviceRef = useRef('')
+  const appliedDeviceRef = useRef('')
+  /* Поиск перемещённых файлов (из useLibrary) — нужен обработчику ошибок чтения, объявленному раньше */
+  const relinkTracksRef = useRef<(ids: number[]) => Promise<unknown>>(async () => 0)
   const [isPlaying, setIsPlaying] = useState(false)
   const [currentTime, setCurrentTime] = useState(0)
   const [duration, setDuration] = useState(0)
@@ -240,6 +266,11 @@ function AppInner() {
     setQueueIndex(idx)
   }, [])
 
+  const applyUserQueue = useCallback((items: QueueItem[]) => {
+    userQueueRef.current = items
+    setUserQueue(items)
+  }, [])
+
   const {
     tracks,
     playlists,
@@ -275,6 +306,12 @@ function AppInner() {
     handleSyncModeChange,
     handleRescan,
     handleClearLibrary,
+    relinkTracks,
+    relinkChoices,
+    resolveRelink,
+    handleRelinkAll,
+    handleSetCovers,
+    handleRemoveFiles,
   } = useLibrary({
     navigate: (v) => setCurrentView(v),
     onTracksDeleted: (ids) => {
@@ -290,6 +327,7 @@ function AppInner() {
       /* Позиции в истории указывают на старую очередь — после удаления они ведут не туда */
       historyRef.current = []
       applyQueue(newQueue)
+      applyUserQueue(userQueueRef.current.filter((it) => !idSet.has(it.trackId)))
       if (curId === undefined) return
       if (!idSet.has(curId)) {
         if (activeRemoved) { pendingPlayRef.current = wasPlaying; setLoadTick((v) => v + 1) }
@@ -308,6 +346,7 @@ function AppInner() {
     },
     onLibraryCleared: () => {
       historyRef.current = []
+      applyUserQueue([])
       applyQueue([])
       applyIndex(-1)
       engineRef.current?.stop()
@@ -317,6 +356,15 @@ function AppInner() {
   useEffect(() => {
     repeatRef.current = repeatMode
   }, [repeatMode])
+
+  useEffect(() => {
+    relinkTracksRef.current = relinkTracks
+  }, [relinkTracks])
+
+  /* Тексты песен, найденные не рядом с треком после перемещения */
+  useEffect(() => {
+    registerLrcPaths(tracks)
+  }, [tracks])
 
   useEffect(() => {
     shuffleRef.current = isShuffle
@@ -391,8 +439,25 @@ function AppInner() {
     const q = queueRef.current
     const cur = queueIndexRef.current
     const p = xfadePlanRef.current
+    /* Ручная очередь важнее системной (повтор одного трека обрабатывается отдельно, до плана) */
+    const head = userQueueRef.current[0]
+    if (head) {
+      if (p && p.manualUid === head.uid && p.from === cur) return p
+      const manual: CrossfadePlan = {
+        from: cur,
+        idx: cur + 1,
+        trackId: head.trackId,
+        shuffle: shuffleRef.current,
+        repeat: repeatRef.current,
+        failed: false,
+        manualUid: head.uid,
+      }
+      xfadePlanRef.current = manual
+      return manual
+    }
     if (
       p &&
+      p.manualUid === undefined &&
       p.from === cur &&
       p.shuffle === shuffleRef.current &&
       p.repeat === repeatRef.current &&
@@ -416,6 +481,36 @@ function AppInner() {
     xfadePlanRef.current = plan
     return plan
   }, [computeNextIndex])
+
+  /**
+   * Трек из ручной очереди начинает играть: он встаёт в системную очередь сразу после текущего
+   * (оттуда воспроизведение потом продолжится как обычно) и уходит из ручной. Возвращает его позицию.
+   */
+  const materializePlan = useCallback(
+    (plan: CrossfadePlan): number => {
+      if (plan.manualUid === undefined) return plan.idx
+      applyUserQueue(userQueueRef.current.filter((it) => it.uid !== plan.manualUid))
+      const q = [...queueRef.current]
+      const at = Math.max(0, Math.min(q.length, queueIndexRef.current + 1))
+      q.splice(at, 0, plan.trackId)
+      historyRef.current = historyRef.current.map((i) => (i >= at ? i + 1 : i))
+      applyQueue(q)
+      xfadePlanRef.current = null
+      return at
+    },
+    [applyQueue, applyUserQueue]
+  )
+
+  /* Трек для движка: режим каналов уже с учётом общей настройки */
+  const toEngineTrack = useCallback(
+    (tr: Track): EngineTrack => ({
+      id: tr.id,
+      filePath: tr.filePath,
+      playbackRate: tr.playbackRate,
+      channelMode: tr.channelMode ?? getPrefs().channelMode,
+    }),
+    []
+  )
 
   /* Длительность визуальной смены трека в расширенном режиме: при кроссфейде — столько же, сколько звук */
   const [trackFadeMs, setTrackFadeMs] = useState(450)
@@ -499,35 +594,35 @@ function AppInner() {
     const cf = crossfadeRef.current
     if (!eng || cf <= 0 || autoXfadeRef.current || eng.isTransitioning) return
     if (!isPlayingRef.current || repeatRef.current === 'one') return
-    if (eng.duration / (selectedTrack?.playbackRate ?? 1) <= cf) return
+    if (eng.duration / ((selectedTrack?.playbackRate ?? 1) * speedRef.current) <= cf) return
     const remaining = eng.remaining()
     if (!isFinite(remaining) || remaining > cf + CROSSFADE_PRELOAD_LEAD) return
     const plan = getCrossfadePlan()
     if (!plan || plan.failed) return
     const next = tracksRef.current.find((t) => t.id === plan.trackId)
     if (!next) return
-    const nextDuration = next.duration.split(':').reduce((n, part) => n * 60 + Number(part), 0) / (next.playbackRate ?? 1)
+    const nextDuration = next.duration.split(':').reduce((n, part) => n * 60 + Number(part), 0) / ((next.playbackRate ?? 1) * speedRef.current)
     if (nextDuration > 0 && nextDuration <= cf) return
     if (remaining > cf + 0.3) {
-      eng.preload(next)
+      eng.preload(toEngineTrack(next))
       return
     }
     /* Слишком поздно — трек доиграет и переключится обычным способом */
     if (remaining < 0.2) return
     autoXfadeRef.current = true
     const fade = Math.min(cf, remaining)
-    eng.load(next, { autoplay: true, fade }).then((res) => {
+    eng.load(toEngineTrack(next), { autoplay: true, fade }).then((res) => {
       autoXfadeRef.current = false
       if (res !== 'ok') {
         /* Не прочитался — трек доиграет, и переход пойдёт обычным путём (там битый файл пропустится) */
         if (res === 'error') plan.failed = true
         return
       }
-      let idx = plan.idx
+      let idx = materializePlan(plan)
       if (queueRef.current[idx] !== next.id) idx = queueRef.current.indexOf(next.id)
       if (idx >= 0) commitQueueIndex(idx, fade)
     })
-  }, [getCrossfadePlan, commitQueueIndex, tracksRef, selectedTrack?.playbackRate])
+  }, [getCrossfadePlan, commitQueueIndex, tracksRef, selectedTrack?.playbackRate, materializePlan, toEngineTrack])
 
   /* Трек доиграл без кроссфейда */
   const handleEnded = useCallback(() => {
@@ -541,15 +636,15 @@ function AppInner() {
       setSeekTick((v) => v + 1)
       return
     }
-    if (queueRef.current.length === 0) return
+    if (queueRef.current.length === 0 && userQueueRef.current.length === 0) return
     /* Тот же план, что и для кроссфейда: при перемешивании включится именно предзагруженный трек */
     const plan = getCrossfadePlan()
     if (!plan) {
       eng.pause()
       return
     }
-    goToIndex(plan.idx, { autoplay: true, fadeSec: 0, history: true })
-  }, [getCrossfadePlan, goToIndex, recordPlay])
+    goToIndex(materializePlan(plan), { autoplay: true, fadeSec: 0, history: true })
+  }, [getCrossfadePlan, goToIndex, recordPlay, materializePlan])
 
   /* Файл не прочитался: пропускаем его и идём дальше по очереди, а если идти некуда — останавливаемся */
   const handleLoadErrorRef = useRef<(trackId: number, autoplay: boolean) => void>(() => {})
@@ -558,19 +653,23 @@ function AppInner() {
       const eng = engineRef.current
       const q = queueRef.current
       if (!eng || q[queueIndexRef.current] !== trackId) return
-      const title = tracksRef.current.find((tr) => tr.id === trackId)?.title ?? ''
+      const failed = tracksRef.current.find((tr) => tr.id === trackId)
+      const title = failed?.title ?? ''
+      /* Файла нет на месте — возможно, его переместили: ищем в фоне, трек из библиотеки не удаляем */
+      if (failed) void relinkTracksRef.current([failed.id])
       loadFailStreakRef.current += 1
-      const next = computeNextIndex()
-      if (next !== null && loadFailStreakRef.current < q.length) {
+      /* Дальше — по тому же плану, что и при обычном переходе: ручная очередь важнее системной */
+      const plan = getCrossfadePlan()
+      if (plan && loadFailStreakRef.current < q.length + userQueueRef.current.length) {
         notify('trackSkipped', { title })
-        goToIndex(next, { autoplay, fadeSec: 0, history: false })
+        goToIndex(materializePlan(plan), { autoplay, fadeSec: 0, history: false })
         return
       }
       loadFailStreakRef.current = 0
       notify('trackUnreadable', { title })
       eng.stop()
     }
-  }, [computeNextIndex, goToIndex, tracksRef])
+  }, [getCrossfadePlan, materializePlan, goToIndex, tracksRef])
 
   useEffect(() => {
     engineEventsRef.current = {
@@ -586,6 +685,14 @@ function AppInner() {
       onEnded: handleEnded,
     }
   }, [maybeAutoCrossfade, handleEnded])
+
+  /* Моно/стерео: своя настройка трека важнее общей; меняется на лету */
+  const trackChannelMode = selectedTrack?.channelMode ?? null
+  useEffect(() => {
+    const id = selectedTrack?.id
+    if (id === undefined) return
+    engineRef.current?.setChannelMode(id, trackChannelMode ?? prefs.channelMode)
+  }, [selectedTrack?.id, trackChannelMode, prefs.channelMode])
 
   /* У видео и редких форматов длительность из тегов не читается — берём её у движка, когда трек загрузится */
   useEffect(() => {
@@ -636,7 +743,7 @@ function AppInner() {
     setCurrentTime(0)
     setDuration(0)
     setSeekTick((v) => v + 1)
-    void eng.load(selectedTrack, { autoplay, fade }).then((res) => {
+    void eng.load(toEngineTrack(selectedTrack), { autoplay, fade }).then((res) => {
       if (res === 'ok') { loadFailStreakRef.current = 0; if (autoplay) recordPlay(trackId) }
       else if (res === 'error') handleLoadErrorRef.current(trackId, autoplay)
     })
@@ -686,7 +793,12 @@ function AppInner() {
 
   const handleOutputDeviceChange = useCallback(
     async (id: string) => {
-      if (!await applyOutputDevice(id)) return
+      /* Пока звук отведён режимом стримера на своё устройство, выбор только запоминается */
+      const s = getPrefs().streamer
+      if (!(s.audio && s.device)) {
+        if (!await applyOutputDevice(id)) return
+        appliedDeviceRef.current = id
+      }
       setOutputDevice(id)
       outputDeviceRef.current = id
       scheduleSettingsSave({ outputDevice: id })
@@ -731,7 +843,7 @@ function AppInner() {
   const rpcTitle = selectedTrack?.title
   const rpcArtist = selectedTrack?.artist
   const rpcAlbum = selectedTrack?.album
-  const rpcRate = selectedTrack?.playbackRate ?? 1
+  const rpcRate = (selectedTrack?.playbackRate ?? 1) * speed
   /* Трек, скрытый в его настройках, в Discord не раскрывается */
   const rpcHidden = selectedTrack?.discordHidden === true
 
@@ -851,6 +963,7 @@ function AppInner() {
         const playlyDir = await join(appDir, 'playly')
         const userFile = await join(playlyDir, 'user.json')
         const settings = await loadSettings()
+        const appPrefs = await loadPrefs()
         setVolume(settings.volume)
         setIsMuted(settings.isMuted)
         setCrossfade(settings.crossfade ?? 0)
@@ -864,9 +977,11 @@ function AppInner() {
         crossfadeRef.current = settings.crossfade ?? 0
         outputDeviceRef.current = settings.outputDevice ?? ''
         applyMasterGain()
-        if (settings.outputDevice) {
-          await applyOutputDevice(settings.outputDevice)
-        }
+        /* Режим стримера со своим устройством важнее обычного выбора */
+        const s = appPrefs.streamer
+        const device = s.audio && s.device ? s.device : settings.outputDevice ?? ''
+        effectiveDeviceRef.current = device
+        if (device && (await applyOutputDevice(device))) appliedDeviceRef.current = device
         const settingsFile = await join(playlyDir, 'settings.json')
         if (await exists(settingsFile)) {
           try {
@@ -908,6 +1023,63 @@ function AppInner() {
     }
     init()
   }, [applyMasterGain, applyOutputDevice, loadLibraryData, maybeAutoScan])
+
+  /* ===== Устройство вывода с учётом режима стримера ===== */
+  const effectiveDevice = prefs.streamer.audio && prefs.streamer.device ? prefs.streamer.device : outputDevice
+  useEffect(() => {
+    effectiveDeviceRef.current = effectiveDevice
+    if (appState !== 'main' || appliedDeviceRef.current === effectiveDevice) return
+    void applyOutputDevice(effectiveDevice).then((ok) => {
+      if (ok) appliedDeviceRef.current = effectiveDevice
+    })
+  }, [effectiveDevice, appState, applyOutputDevice])
+
+  /* Наушники или выбранное устройство отключились — пауза; после подключения музыка сама не включится */
+  useEffect(
+    () =>
+      watchOutputDevices({
+        device: () => effectiveDeviceRef.current,
+        onLost: () => {
+          const eng = engineRef.current
+          if (!getPrefs().pauseOnDeviceLoss || !eng?.isPlaying) return
+          eng.pause()
+          notify('devicePaused')
+        },
+        onBack: (id) => {
+          void applyOutputDevice(id)
+        },
+      }),
+    [applyOutputDevice]
+  )
+
+  /* Режим стримера: окна Playly не попадают в запись и демонстрацию экрана */
+  useEffect(() => {
+    invoke('set_capture_hidden', { hidden: prefs.streamer.window }).catch(() => {})
+  }, [prefs.streamer.window])
+
+  /* Экономия ресурсов: анимации и тяжёлые эффекты выключаются стилями (класс на корне) */
+  useEffect(() => {
+    document.documentElement.classList.toggle('power-save', prefs.powerSave)
+  }, [prefs.powerSave])
+
+  /* «Playly продолжает работать в трее» — один раз за запуск, тихо и без фокуса */
+  const tRef = useRef(t)
+  useEffect(() => {
+    tRef.current = t
+  }, [t])
+  useEffect(() => {
+    let shown = false
+    const unHidden = listen('playly://hidden-to-tray', () => {
+      if (shown || !getPrefs().trayNotice) return
+      shown = true
+      invoke('show_tray_notice', { title: tRef.current('trayNotice.title'), body: tRef.current('trayNotice.body') }).catch(() => {})
+    })
+    const unNever = listen('notice:never', () => updatePrefs({ trayNotice: false }))
+    return () => {
+      unHidden.then((fn) => fn())
+      unNever.then((fn) => fn())
+    }
+  }, [])
 
   /* Переключатель «Нормализация громкости» в настройках воспроизведения */
   useEffect(() => {
@@ -1030,20 +1202,93 @@ function AppInner() {
   )
 
   /* ===== Плеер ===== */
+  const playNextRef = useRef<() => void>(() => {})
   const handlePlayPause = useCallback(() => {
     const eng = engineRef.current
-    if (!eng || !eng.hasSource) return
+    if (!eng || !eng.hasSource) {
+      /* Ничего не играет, но в ручной очереди что-то есть — начинаем с неё */
+      if (userQueueRef.current.length > 0) playNextRef.current()
+      return
+    }
     if (eng.isPlaying) eng.pause()
     else eng.play()
   }, [])
 
   const handleNext = useCallback(() => {
-    if (queueRef.current.length === 0) return
+    if (queueRef.current.length === 0 && userQueueRef.current.length === 0) return
     /* Тот же выбор, что у кроссфейда: при перемешивании «Далее» включает уже предзагруженный трек */
     const plan = getCrossfadePlan()
     if (!plan) return
-    goToIndex(plan.idx, { autoplay: true, fadeSec: manualFadeSec(), history: true })
-  }, [getCrossfadePlan, goToIndex, manualFadeSec])
+    goToIndex(materializePlan(plan), { autoplay: true, fadeSec: manualFadeSec(), history: true })
+  }, [getCrossfadePlan, goToIndex, manualFadeSec, materializePlan])
+  useEffect(() => {
+    playNextRef.current = handleNext
+  }, [handleNext])
+
+  /* ===== Очередь ===== */
+  const handleAddToQueue = useCallback(
+    (ids: number[]) => {
+      if (ids.length === 0) return
+      const items = ids.map((trackId) => ({ uid: ++queueUidRef.current, trackId }))
+      applyUserQueue([...userQueueRef.current, ...items])
+      /* Предзагруженный «следующий» трек больше не следующий */
+      xfadePlanRef.current = null
+      notify('queueAdded', { n: ids.length })
+    },
+    [applyUserQueue]
+  )
+
+  const handleRemoveFromQueue = useCallback(
+    (uid: number) => {
+      applyUserQueue(userQueueRef.current.filter((it) => it.uid !== uid))
+      xfadePlanRef.current = null
+    },
+    [applyUserQueue]
+  )
+
+  const handleClearQueue = useCallback(() => {
+    applyUserQueue([])
+    xfadePlanRef.current = null
+  }, [applyUserQueue])
+
+  /* Элемент ручной очереди — сразу, остальные остаются в очереди */
+  const handlePlayQueued = useCallback(
+    (uid: number) => {
+      const item = userQueueRef.current.find((it) => it.uid === uid)
+      if (!item) return
+      applyUserQueue([item, ...userQueueRef.current.filter((it) => it.uid !== uid)])
+      xfadePlanRef.current = null
+      handleNext()
+    },
+    [applyUserQueue, handleNext]
+  )
+
+  const handleMoveQueued = useCallback(
+    (uid: number, dir: -1 | 1) => {
+      const list = [...userQueueRef.current]
+      const i = list.findIndex((it) => it.uid === uid)
+      const j = i + dir
+      if (i < 0 || j < 0 || j >= list.length) return
+      ;[list[i], list[j]] = [list[j], list[i]]
+      applyUserQueue(list)
+      xfadePlanRef.current = null
+    },
+    [applyUserQueue]
+  )
+
+  /* Трек из системной очереди — сразу */
+  const handlePlaySystemIndex = useCallback(
+    (idx: number) => goToIndex(idx, { autoplay: true, fadeSec: manualFadeSec(), history: true }),
+    [goToIndex, manualFadeSec]
+  )
+
+  const handleSpeedChange = useCallback((value: number) => {
+    speedRef.current = value
+    setSpeed(value)
+    engineRef.current?.setSpeed(value)
+    /* Discord и мини-плеер ведут полосу по реальному времени — пересчитываем */
+    setSeekTick((v) => v + 1)
+  }, [])
 
   const handlePrev = useCallback(() => {
     const eng = engineRef.current
@@ -1254,7 +1499,7 @@ function AppInner() {
         position: live ? eng.currentTime : 0,
         at: Date.now(),
         duration: live ? eng.duration : 0,
-        rate: selectedTrack?.playbackRate ?? 1,
+        rate: (selectedTrack?.playbackRate ?? 1) * speed,
         volume,
         muted: isMuted,
         shuffle: isShuffle,
@@ -1320,6 +1565,7 @@ function AppInner() {
     selectedTrack?.coverFile,
     selectedTrack?.animCoverFile,
     selectedTrack?.playbackRate,
+    speed,
     isPlaying,
     duration,
     seekTick,
@@ -1489,9 +1735,13 @@ function AppInner() {
       if (url) setTimeout(() => URL.revokeObjectURL(url as string), 1500)
     }
   }, [animFile])
+  /* В режиме экономии анимированная обложка не показывается — остаётся статичная */
   const displayTrack = useMemo(
-    () => (selectedTrack && animCover && animCover.file === animFile ? { ...selectedTrack, cover: animCover.url } : selectedTrack),
-    [selectedTrack, animCover, animFile]
+    () =>
+      selectedTrack && animCover && animCover.file === animFile && !prefs.powerSave
+        ? { ...selectedTrack, cover: animCover.url }
+        : selectedTrack,
+    [selectedTrack, animCover, animFile, prefs.powerSave]
   )
 
   /* Картинка фона читается из файла; blob освобождается при смене */
@@ -1527,7 +1777,8 @@ function AppInner() {
   )
   const particleOptions = useMemo(
     () => ({
-      kind: particleKind,
+      /* Частицы — необязательный эффект: в режиме экономии их нет */
+      kind: prefs.powerSave ? ('none' as const) : particleKind,
       density: particles.density,
       speed: particles.speed,
       size: particles.size,
@@ -1536,11 +1787,12 @@ function AppInner() {
       wind: particles.wind,
       custom: particleCustom,
     }),
-    [particleKind, particles.density, particles.speed, particles.size, particles.opacity, particles.blur, particles.wind, particleCustom]
+    [particleKind, particles.density, particles.speed, particles.size, particles.opacity, particles.blur, particles.wind, particleCustom, prefs.powerSave]
   )
   /* Фон рисуется, если выбран свой фон или вообще настроены частицы (хотя бы в правилах) */
   const hasBackdrop =
-    appState === 'main' && (backdrop.mode !== 'none' || particles.kind !== 'none' || particles.rules.length > 0)
+    appState === 'main' &&
+    (backdrop.mode !== 'none' || (!prefs.powerSave && (particles.kind !== 'none' || particles.rules.length > 0)))
 
   useEffect(() => {
     const root = document.documentElement
@@ -1647,7 +1899,7 @@ function AppInner() {
             trackFadeMs={trackFadeMs}
             getAnalyser={getAnalyser}
             getCurrentTime={getEngineTime}
-            visualizerEnabled={visualizerEnabled}
+            visualizerEnabled={visualizerEnabled && !prefs.powerSave}
             onToggleVisualizer={handleVisualizerChange}
           />
         )
@@ -1681,6 +1933,7 @@ function AppInner() {
             onSelectFolder={handleSelectFolder}
             onChangeSyncMode={handleSyncModeChange}
             onRescan={handleRescan}
+            onRelinkAll={handleRelinkAll}
             onClearLibrary={handleClearLibrary}
             discordRpc={discordRpc}
             onChangeDiscordRpc={handleDiscordRpcChange}
@@ -1713,6 +1966,9 @@ function AppInner() {
             onCopyArtist={handleCopyArtist}
             onCopyPath={handleCopyPath}
             onRevealInDir={handleRevealInDir}
+            onAddToQueue={handleAddToQueue}
+            onSetCovers={handleSetCovers}
+            onRemoveFiles={handleRemoveFiles}
           />
         )
       case 'liked':
@@ -1731,6 +1987,8 @@ function AppInner() {
             onCopyArtist={handleCopyArtist}
             onCopyPath={handleCopyPath}
             onRevealInDir={handleRevealInDir}
+            onAddToQueue={handleAddToQueue}
+            onSetCovers={handleSetCovers}
           />
         )
       case 'playlist':
@@ -1753,6 +2011,8 @@ function AppInner() {
             onCreatePlaylist={handleCreatePlaylist}
             onAddToPlaylist={handleAddToPlaylist}
             onImportTracks={handleAddTracks}
+            onAddToQueue={handleAddToQueue}
+            onSetCovers={handleSetCovers}
           />
         )
       default:
@@ -1834,6 +2094,7 @@ function AppInner() {
         isPlaying={isPlaying}
         onOpenNowPlaying={openNowPlaying}
         versionLabel={`Playly ${versionLabel(t)}`}
+        outputDevice={outputDevice}
       />
       <FeedbackHost />
       <PersonalizationHost
@@ -1895,6 +2156,11 @@ function AppInner() {
         onRepeatToggle={handleRepeatToggle}
         isLiked={selectedTrack?.liked ?? false}
         onToggleLike={handleToggleLike}
+        speed={speed}
+        onSpeedChange={handleSpeedChange}
+        queueCount={userQueue.length}
+        isQueueOpen={isQueueOpen}
+        onToggleQueue={() => setIsQueueOpen((v) => !v)}
         onCopyTitle={
           selectedTrack ? () => navigator.clipboard.writeText(selectedTrack.title) : undefined
         }
@@ -1912,6 +2178,24 @@ function AppInner() {
             : undefined
         }
       />
+      <QueueModal
+        open={isQueueOpen}
+        onClose={() => setIsQueueOpen(false)}
+        tracks={tracks}
+        current={selectedTrack}
+        userQueue={userQueue}
+        queue={queue}
+        queueIndex={queueIndex}
+        shuffle={isShuffle}
+        repeat={repeatMode}
+        onRemove={handleRemoveFromQueue}
+        onClear={handleClearQueue}
+        onPlayQueued={handlePlayQueued}
+        onMove={handleMoveQueued}
+        onPlaySystem={handlePlaySystemIndex}
+      />
+      <PowerSavePrompt />
+      <RelinkModal choices={relinkChoices} onResolve={resolveRelink} />
       <VideoGifHost />
       <UpdateToast />
       <ProfileModal

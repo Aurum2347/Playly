@@ -12,6 +12,8 @@ interface LibrarySectionProps {
   onChangeSyncMode?: (mode: SyncMode) => void
   onRescan?: () => void
   onClearLibrary?: () => void
+  /* Найти перемещённые файлы и тексты песен по всей библиотеке */
+  onRelinkAll?: () => Promise<void>
 }
 
 export default function LibrarySection({
@@ -22,8 +24,10 @@ export default function LibrarySection({
   onChangeSyncMode,
   onRescan,
   onClearLibrary,
+  onRelinkAll,
 }: LibrarySectionProps) {
   const { t } = useI18n()
+  const [relinking, setRelinking] = useState(false)
   const [isClearModalOpen, setIsClearModalOpen] = useState(false)
   const [clearTimer, setClearTimer] = useState(5)
   const [isClearBtnDisabled, setIsClearBtnDisabled] = useState(true)
@@ -133,6 +137,30 @@ export default function LibrarySection({
           </div>
         )}
       </div>
+
+      {/* ===== Перемещённые файлы ===== */}
+      {onRelinkAll && (
+        <div className="settings-section">
+          <div className="setting-row">
+            <div className="setting-info">
+              <div className="setting-name">{t('relink.setting')}</div>
+              <div className="setting-desc">{t('relink.settingDesc')}</div>
+            </div>
+            <div className="setting-control">
+              <button
+                className="btn"
+                disabled={relinking}
+                onClick={() => {
+           setRelinking(true)
+                  void onRelinkAll().finally(() => setRelinking(false))
+                }}
+              >
+                {relinking ? t('relink.searching') : t('relink.settingBtn')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ===== Опасная зона ===== */}
       <div className="settings-section">

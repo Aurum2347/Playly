@@ -610,3 +610,7 @@
 @media (max-width: 720px) {
   .cp-layout { grid-template-columns: 1fr; }
 }
+
+/* Моно / стерео: три кнопки в ряд */
+.channel-modes { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+.channel-modes .btn { padding: 7px 12px; font-size: 12px; }

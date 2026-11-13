@@ -1,6 +1,6 @@
 [package]
 name = "app"
-version = "2.0.6"
+version = "2.0.7"
 description = "Playly — offline music player"
 authors = ["Aurum2347"]
 license = ""
@@ -32,6 +32,8 @@ discord-rich-presence = "1.1"
 urlencoding = "2"
 tauri-plugin-shell = "2.3.5"
 tauri-plugin-process = "2"
+# Слежение за папкой библиотеки (режим «Автоматическая»)
+notify = "8"
 
 # Только для настольных систем: на телефонах этих плагинов нет
 [target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]

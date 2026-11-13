@@ -52,6 +52,7 @@ interface SettingsViewProps {
   onChangeSyncMode?: (mode: 'auto' | 'manual') => void
   onRescan?: () => void
   onClearLibrary?: () => void
+  onRelinkAll?: () => Promise<void>
   discordRpc?: boolean
   onChangeDiscordRpc?: (v: boolean) => void
   discordParts?: DiscordParts
@@ -133,6 +134,7 @@ export default function SettingsView({
   onChangeSyncMode,
   onRescan,
   onClearLibrary,
+  onRelinkAll,
   discordRpc,
   onChangeDiscordRpc,
   discordParts,
@@ -248,6 +250,7 @@ export default function SettingsView({
               onChangeSyncMode={onChangeSyncMode}
               onRescan={onRescan}
               onClearLibrary={onClearLibrary}
+              onRelinkAll={onRelinkAll}
             />
           )}
           {activeSection === 'system' && (
@@ -257,6 +260,7 @@ export default function SettingsView({
               discordParts={discordParts}
               onChangeDiscordParts={onChangeDiscordParts}
               getReferencedCovers={getReferencedCovers}
+              outputDevice={outputDevice}
             />
           )}
           {activeSection === 'profile' && (

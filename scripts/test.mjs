@@ -40,7 +40,7 @@ assert.ok(icon.ICON_PRESETS.every(([bg, fg]) => /^#[\da-f]{6}$/.test(bg) && /^#[
 
 const pkg = JSON.parse(readFileSync(new URL('../package.json', import.meta.url)))
 const conf = JSON.parse(readFileSync(new URL('../src-tauri/tauri.conf.json', import.meta.url)))
-assert.equal(pkg.version, '2.0.6')
+assert.equal(pkg.version, '2.0.7')
 assert.equal(conf.version, pkg.version)
 assert.match(readFileSync(new URL('../src/lib/version.ts', import.meta.url), 'utf8'), /APP_VERSION = '2\.0\.6'/)
 const updaterSource = readFileSync(new URL('../src/lib/updater.ts', import.meta.url), 'utf8')
@@ -76,4 +76,63 @@ for (const enabled of [false, true]) {
   assert.equal(fixture.checks, enabled ? 2 : 1)
 }
 delete globalThis.__updaterTest
-console.log('Regression checks passed: equalizer, lyrics, scaling, app icon, versions, startup update preference.')
+
+const lm = await moduleAt('src/lib/libraryMatch.ts')
+assert.equal(lm.sidecarLrc('/m/a/song.mp3'), '/m/a/song.lrc')
+assert.ok(lm.isInside('/m/a/song.mp3', '/m'))
+assert.ok(!lm.isInside('/music2/x.mp3', '/music'))
+assert.ok(!lm.searchRoots(['/x.mp3'], '').includes('/'))
+assert.equal(lm.pickCandidate(5000, [{ path: '/a', size: 1, mtime: 1 }]).path, '/a')
+assert.equal(lm.pickCandidate(5000, [{ path: '/a', size: 1, mtime: 5500 }, { path: '/b', size: 1, mtime: 90000 }]).path, '/a')
+assert.equal(lm.pickCandidate(5000, [{ path: '/a', size: 1, mtime: 1 }, { path: '/b', size: 1, mtime: 2 }]), null)
+assert.equal(lm.pickLrc('/m/b/s.mp3', [{ path: '/m/b/s.lrc', size: 1, mtime: 1 }]), null)
+assert.equal(lm.pickLrc('/m/b/s.mp3', [{ path: '/m/a/s.lrc', size: 1, mtime: 1 }]), '/m/a/s.lrc')
+{
+  const tracks = [{ id: 1, filePath: '/m/a/song.mp3', fileModifiedAt: 1000 }, { id: 2, filePath: '/m/gone.mp3', fileModifiedAt: 1 }, { id: 3, filePath: '/other/keep.mp3', fileModifiedAt: 1 }]
+  const diff = lm.diffFolder('/m', tracks, [{ path: '/m/b/song.mp3', size: 1, mtime: 1000 }, { path: '/m/new.mp3', size: 1, mtime: 1 }])
+  assert.equal(diff.moved.get(1).path, '/m/b/song.mp3')
+  assert.deepEqual(diff.added, ['/m/new.mp3'])
+  assert.deepEqual(diff.removed, [2])
+}
+assert.equal(lm.normTitle('Song (Remastered) [Official]'), 'song')
+{
+  const t = (id, title, duration) => ({ id, title, artist: 'A', duration, filePath: `/m/${id}.mp3` })
+  const groups = lm.findDuplicates([t(1, 'Song', '3:00'), t(2, 'Song', '3:00'), t(3, 'song (live)', '3:02'), t(4, 'Song', '5:00'), t(5, 'Other', '3:00')], new Map([[1, 'h'], [2, 'h']]))
+  assert.deepEqual(groups.find((g) => g.kind === 'exact').ids, [1, 2])
+  const similar = groups.filter((g) => g.kind === 'similar')
+  assert.ok(similar.every((g) => !g.ids.includes(4) && !g.ids.includes(5)))
+}
+
+const cl = await moduleAt('src/i18n/customLang.ts')
+{
+  const ref = { a: { b: 'Hi {name}', c: 'x' }, n: { one: '{n} item', other: '{n} items' }, list: ['B', 'KB'], changelog: { entries: [] } }
+  const builtIn = { ru: ref, en: ref }
+  const ok = cl.parseCustomTranslation(String.fromCharCode(0xfeff) + JSON.stringify({
+    config: { title: 'Мой\nязык', iconemoji: 5, base: 'xx' },
+    a: { b: 'Привет', c: 42, extra: 'y' },
+    n: { one: '{n} штука', bogus: 1 },
+    list: ['Б'],
+    changelog: { entries: ['hack'] },
+    zzz: 1,
+  }), 'my.json', builtIn)
+  assert.equal(ok.ok, true)
+  assert.equal(ok.config.title, 'Мой язык')
+  assert.equal(ok.config.iconemoji, '🏳️')
+  assert.equal(ok.config.base, 'en')
+  assert.equal(ok.dict.a.b, 'Привет')
+  assert.equal(ok.dict.a.c, undefined)
+  assert.deepEqual(ok.dict.n, { one: '{n} штука' })
+  assert.equal(ok.dict.list, undefined)
+  assert.equal(ok.dict.changelog, undefined)
+  assert.ok(ok.report.internalIgnored)
+  assert.deepEqual(ok.report.placeholders, ['a.b'])
+  assert.deepEqual(ok.report.invalid.sort(), ['a.c', 'list'])
+  assert.deepEqual(ok.report.unknown.sort(), ['a.extra', 'zzz'])
+  assert.equal(cl.parseCustomTranslation('{ "a": ', 'x.json', builtIn).kind, 'syntax')
+  assert.match(cl.parseCustomTranslation('{\n "a": }', 'x.json', builtIn).detail, /line 2/)
+  assert.equal(cl.parseCustomTranslation('[1]', 'x.json', builtIn).kind, 'notObject')
+  assert.equal(cl.parseCustomTranslation('  ', 'x.json', builtIn).kind, 'empty')
+  assert.equal(cl.parseCustomTranslation('{"zzz":"1"}', 'x.json', builtIn).kind, 'empty')
+  assert.ok(cl.isInternalKey('changelog.entries') && !cl.isInternalKey('changelogger'))
+}
+console.log('Regression checks passed: equalizer, lyrics, scaling, app icon, versions, startup update preference, library matching, custom translations.')

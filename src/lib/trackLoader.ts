@@ -125,6 +125,20 @@ async function persistCover(
   }
 }
 
+/** Записать файл в папку обложек без blob-ссылки (массовая смена обложки: ссылка одна на всех) */
+export async function writeCoverFile(name: string, bytes: Uint8Array): Promise<boolean> {
+  try {
+    if (bytes.length === 0) return false
+    await writeFile(await join(await ensureCoversDir(), name), bytes)
+    return true
+  } catch (e) {
+    console.error('Не удалось сохранить обложку:', e)
+    return false
+  }
+}
+
+export const coverBlobUrl = (bytes: Uint8Array, name: string) => bytesToObjectUrl(bytes, mimeFromExt(name))
+
 /** Сохранить обложку из уже прочитанных байтов (например, GIF, собранный из видео) */
 export async function saveCoverFromBytes(
   key: string,
@@ -376,6 +390,8 @@ export interface ParseOptions {
   onTrack?: (track: Track) => void
   shouldStop?: () => boolean
   existingPaths?: Set<string>
+  /* Файл не прочитался совсем: в библиотеку не попадает, вызывающий покажет понятную ошибку */
+  onSkip?: (path: string) => void
 }
 
 export async function parseAudioFiles(filePaths: string[], opts: ParseOptions = {}) {
@@ -418,6 +434,14 @@ export async function parseAudioFiles(filePaths: string[], opts: ParseOptions = 
 
     /* Видео и редкие контейнеры: тегов нет, но длительность можно узнать у самого движка */
     const durationSecs = meta?.durationSecs || (await probeDuration(path))
+
+    /* Ни тегов, ни длительности — такой файл не сыграет (повреждён или формат не поддерживается) */
+    if (!meta && !durationSecs && opts.onSkip) {
+      opts.onSkip(path)
+      opts.onProgress?.({ current: i + 1, total, fileName })
+      await nextTick()
+      continue
+    }
 
     if (meta) {
       opts.onTrack?.({

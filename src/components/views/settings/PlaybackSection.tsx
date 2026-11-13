@@ -6,6 +6,8 @@ import EqCurve from '../../EqCurve'
 import EqEditorModal, { type EqEditTarget } from '../../EqEditorModal'
 import { BUILTIN_EQ_PRESETS, EQ_BANDS, bandLabel, isBuiltinPreset, presetGains, type EqPreset } from '../../../lib/equalizer'
 import '../../Equalizer.css'
+import { CHANNEL_MODES } from '../../../lib/audioEngine'
+import { updatePrefs, usePrefs } from '../../../lib/prefs'
 
 type CurveKind = 'equal' | 'linear' | 'smooth'
 
@@ -78,6 +80,7 @@ export default function PlaybackSection({
   onPreviewEq = noopPreview,
 }: PlaybackSectionProps) {
   const { t } = useI18n()
+  const prefs = usePrefs()
   const [localCrossfade, setLocalCrossfade] = useState(0)
   const [localOutputDevice, setLocalOutputDevice] = useState('')
   const [outputDevices, setOutputDevices] = useState<{ id: string; label: string }[]>([])
@@ -341,6 +344,30 @@ export default function PlaybackSection({
             </label>
           </div>
         </div>
+        {/* ===== Моно / стерео ===== */}
+        <div className="setting-row">
+          <div className="setting-info">
+            <div className="setting-name">{t('channels.title')}</div>
+            <div className="setting-desc">{t('channels.desc')}</div>
+          </div>
+          <div className="setting-control">
+            <div className="channel-modes" role="radiogroup">
+              {CHANNEL_MODES.map((m) => (
+                <button
+                  key={m}
+                  type="button"
+                  role="radio"
+                  aria-checked={prefs.channelMode === m}
+                  className={`btn ${prefs.channelMode === m ? 'btn-primary' : ''}`}
+                  onClick={() => updatePrefs({ channelMode: m })}
+                >
+                  {t(`channels.${m}`)}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+        <p className="setting-desc" style={{ margin: '-4px 0 12px' }}>{t('channels.stereoNote')}</p>
         {/* ===== Устройство вывода ===== */}
         <div className="setting-row">
           <div className="setting-info">
@@ -402,6 +429,18 @@ export default function PlaybackSection({
           </button>
           {/* Храним ключ, а не готовый текст: при смене языка сообщение переведётся */}
           {deviceError && <p className="audio-device-error" role="status">{t(deviceError)}</p>}
+        </div>
+        <div className="setting-row">
+          <div className="setting-info">
+            <div className="setting-name">{t('devicePause.name')}</div>
+            <div className="setting-desc">{t('devicePause.desc')}</div>
+          </div>
+          <div className="setting-control">
+            <label className="toggle">
+              <input type="checkbox" checked={prefs.pauseOnDeviceLoss} onChange={(e) => updatePrefs({ pauseOnDeviceLoss: e.target.checked })} />
+              <span className="toggle-slider"></span>
+            </label>
+          </div>
         </div>
         {/* ===== Эквалайзер ===== */}
         <div className="setting-row">

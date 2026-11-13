@@ -11,6 +11,7 @@ import { invoke } from '@tauri-apps/api/core'
 import { reportError } from '../../lib/feedback'
 import EqEditorModal from '../EqEditorModal'
 import { FLAT_GAINS, normalizeGains } from '../../lib/equalizer'
+import { CHANNEL_MODES, type ChannelMode } from '../../lib/audioEngine'
 import './TrackEditModal.css'
 
 export interface TrackUpdates {
@@ -24,6 +25,8 @@ export interface TrackUpdates {
   playbackRate?: number
   animCoverFile?: string | null
   discordHidden?: boolean
+  /* Моно/стерео для этого трека; null — как в общих настройках */
+  channelMode?: ChannelMode | null
   /* Длительность, когда её не удалось прочитать из тегов (например, у видео) */
   duration?: string
 }
@@ -66,6 +69,7 @@ function TrackEditForm({ track, onClose, onSave, tracks }: TrackEditModalProps &
   const [animFile, setAnimFile] = useState<string | null>(track.animCoverFile ?? null)
   const [animUrl, setAnimUrl] = useState<string | null>(null)
   const [discordHidden, setDiscordHidden] = useState(track.discordHidden === true)
+  const [channelMode, setChannelMode] = useState<ChannelMode | null>(track.channelMode ?? null)
   const [isMakingGif, setIsMakingGif] = useState(false)
   const [isPickingCover, setIsPickingCover] = useState(false)
   const [isBorrowOpen, setIsBorrowOpen] = useState(false)
@@ -174,6 +178,7 @@ function TrackEditForm({ track, onClose, onSave, tracks }: TrackEditModalProps &
     if (speed !== (track.playbackRate ?? 1)) updates.playbackRate = speed
     if (animFile !== (track.animCoverFile ?? null)) updates.animCoverFile = animFile
     if (discordHidden !== (track.discordHidden === true)) updates.discordHidden = discordHidden
+    if (channelMode !== (track.channelMode ?? null)) updates.channelMode = channelMode
     setSaving(true)
     try {
       if (updates.title !== undefined || updates.artist !== undefined || updates.album !== undefined || updates.genre !== undefined) {
@@ -275,6 +280,21 @@ function TrackEditForm({ track, onClose, onSave, tracks }: TrackEditModalProps &
             </button>
           ))}
         </div>
+
+        <div className="tem-speed-head">
+          <span className="tem-label">{t('channels.trackLabel')}</span>
+        </div>
+        <div className="tem-presets">
+          <button className={`tem-preset ${channelMode === null ? 'active' : ''}`} onClick={() => setChannelMode(null)}>
+            {t('channels.global')}
+          </button>
+          {CHANNEL_MODES.map((m) => (
+            <button key={m} className={`tem-preset ${channelMode === m ? 'active' : ''}`} onClick={() => setChannelMode(m)}>
+              {t(`channels.${m}`)}
+            </button>
+          ))}
+        </div>
+        <div className="tem-hint" style={{ marginTop: 6 }}>{t('channels.stereoNote')}</div>
 
         <label className="tem-switch">
           <span className="tem-switch-text">

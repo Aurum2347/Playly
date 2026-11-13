@@ -8,10 +8,13 @@ import {
 import Twemoji from '../../../components/Twemoji'
 import Collapse from '../../Collapse'
 import { useI18n, LANGS } from '../../../i18n'
+import { LangNotices } from './LangNotices'
 import { DEFAULT_DISCORD_PARTS, DISCORD_PART_KEYS, type DiscordParts } from '../../../lib/discord'
 import DiscordPreview from './DiscordPreview'
 import MiniSettings from './MiniSettings'
 import CacheSettings from './CacheSettings'
+import { updatePrefs, usePrefs } from '../../../lib/prefs'
+import { StreamerToggles } from '../../layout/StreamerControl'
 
 interface SystemSectionProps {
   discordRpc?: boolean
@@ -20,6 +23,8 @@ interface SystemSectionProps {
   onChangeDiscordParts?: (parts: DiscordParts) => void
   /* Имена файлов обложек, которые сейчас используются, — их очистка кеша не трогает */
   getReferencedCovers?: () => Set<string>
+  /* Основное устройство вывода — для «отдельного звука» режима стримера нужно другое */
+  outputDevice?: string
 }
 
 export default function SystemSection({
@@ -28,7 +33,9 @@ export default function SystemSection({
   discordParts = DEFAULT_DISCORD_PARTS,
   onChangeDiscordParts,
   getReferencedCovers,
+  outputDevice = '',
 }: SystemSectionProps) {
+  const prefs = usePrefs()
   const {
     lang,
     setLang,
@@ -39,6 +46,7 @@ export default function SystemSection({
     selectCustom,
     openLanguagesFolder,
     langError,
+    langWarning,
   } = useI18n()
   const [tempLang, setTempLang] = useState(lang)
   const [isLangModalOpen, setIsLangModalOpen] = useState(false)
@@ -83,10 +91,11 @@ export default function SystemSection({
   const handleApply = async () => {
     if (tempLang === 'ru' || tempLang === 'en') {
       setLang(tempLang)
-    } else {
-      await selectCustom(tempLang)
+      setIsLangModalOpen(false)
+      return
     }
-    setIsLangModalOpen(false)
+    /* С ошибкой или замечаниями окно остаётся открытым — видно, что не так с файлом */
+    if ((await selectCustom(tempLang)) === 'ok') setIsLangModalOpen(false)
   }
 
   return (
@@ -125,6 +134,40 @@ export default function SystemSection({
             </button>
           </div>
         </div>
+      </div>
+
+      <div className="settings-section">
+        <div className="section-title">{t('powerSave.section')}</div>
+        <div className="setting-row">
+          <div className="setting-info">
+            <div className="setting-name">{t('powerSave.name')}</div>
+            <div className="setting-desc">{t('powerSave.desc')}</div>
+          </div>
+          <div className="setting-control">
+            <label className="toggle">
+              <input type="checkbox" checked={prefs.powerSave} onChange={(e) => updatePrefs({ powerSave: e.target.checked, powerSavePrompted: true })} />
+              <span className="toggle-slider"></span>
+            </label>
+          </div>
+        </div>
+        <div className="setting-row">
+          <div className="setting-info">
+            <div className="setting-name">{t('trayNotice.setting')}</div>
+            <div className="setting-desc">{t('trayNotice.settingDesc')}</div>
+          </div>
+          <div className="setting-control">
+            <label className="toggle">
+              <input type="checkbox" checked={prefs.trayNotice} onChange={(e) => updatePrefs({ trayNotice: e.target.checked })} />
+              <span className="toggle-slider"></span>
+            </label>
+          </div>
+        </div>
+      </div>
+
+      <div className="settings-section">
+        <div className="section-title">{t('streamer.title')}</div>
+        <p className="setting-desc" style={{ margin: '0 0 12px' }}>{t('streamer.settingsDesc')}</p>
+        <StreamerToggles outputDevice={outputDevice} />
       </div>
 
       <div className="settings-section">
@@ -199,20 +242,8 @@ export default function SystemSection({
         >
           <div className="modal" onClick={(e) => e.stopPropagation()}>
             <div className="modal-title">{t('settings.system.chooseLanguage')}</div>
-
-            {/* ===== Предупреждение: выбранный язык не найден ===== */}
-            {langError && (
-              <div className="lang-info-card" style={{ borderColor: 'rgba(255, 107, 107, 0.4)' }}>
-                <div className="lang-info-title" style={{ color: '#ff6b6b' }}>
-                  {lang === 'ru' ? '⚠️ Язык не найден' : '⚠️ Language not found'}
-                </div>
-                <div className="lang-info-text">
-                  {lang === 'ru'
-                    ? 'Файл выбранного языка отсутствует или повреждён, поэтому приложение переключилось на встроенный язык. Выбери язык из списка ниже.'
-                    : 'The selected language file is missing or corrupted, so the app switched to a built-in language. Pick a language from the list below.'}
-                </div>
-              </div>
-            )}
+            {/* ===== Свой перевод не включился или взят не целиком ===== */}
+            <LangNotices error={langError} warning={langWarning} />
 
             <div className="lang-info-card">
               <div className="lang-info-title">{t('settings.system.helpTitle')}</div>
@@ -265,14 +296,15 @@ export default function SystemSection({
               {customLangs.map((cl) => (
                 <div
                   key={cl.id}
-                  className={`language-item ${tempLang === cl.id ? 'selected' : ''}`}
+                  className={`language-item ${tempLang === cl.id ? 'selected' : ''} ${cl.error ? 'broken' : ''}`}
                   onClick={() => setTempLang(cl.id)}
+                  title={cl.error ? t('settings.system.langBroken') : undefined}
                 >
                   <span className="language-flag">
                     <Twemoji text={cl.iconemoji} />
                   </span>
                   <span className="language-name">{cl.title}</span>
-                  <span className="language-native">{cl.id}</span>
+                  <span className="language-native">{cl.error ? t('settings.system.langBroken') : cl.id}</span>
                 </div>
               ))}
             </div>

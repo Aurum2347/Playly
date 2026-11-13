@@ -4,7 +4,7 @@ import { getCurrentWindow } from '@tauri-apps/api/window'
 import './index.css'
 import '@fontsource/noto-color-emoji'
 
-/* Одна сборка на три окна: главное, мини-плеер у трея (метка «mini») и меню трея (метка «traymenu») */
+/* Одна сборка на четыре окна: главное, мини-плеер у трея («mini»), меню трея («traymenu») и уведомление («notice») */
 const label = (() => {
   try {
     return getCurrentWindow().label
@@ -14,10 +14,11 @@ const label = (() => {
 })()
 const isMini = label === 'mini'
 const isTrayMenu = label === 'traymenu'
+const isNotice = label === 'notice'
 
-if (isMini || isTrayMenu) {
-  /* Окно прозрачное: скруглённые углы рисует сам мини-плеер / меню */
-  document.documentElement.classList.add(isMini ? 'mini-window' : 'tray-window')
+if (isMini || isTrayMenu || isNotice) {
+  /* Окно прозрачное: скруглённые углы рисует сам мини-плеер / меню / уведомление */
+  document.documentElement.classList.add(isMini ? 'mini-window' : isTrayMenu ? 'tray-window' : 'notice-window')
   document.documentElement.style.backgroundColor = 'transparent'
 }
 
@@ -31,11 +32,13 @@ const MiniRoot = lazy(() => import('./mini/MiniApp'))
 const TrayMenuRoot = lazy(() => import('./tray/TrayMenu'))
 // eslint-disable-next-line react-refresh/only-export-components
 const MainRoot = lazy(() => import('./App'))
+// eslint-disable-next-line react-refresh/only-export-components
+const NoticeRoot = lazy(() => import('./notice/NoticeApp'))
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <Suspense fallback={null}>
-      {isMini ? <MiniRoot /> : isTrayMenu ? <TrayMenuRoot /> : <MainRoot />}
+      {isMini ? <MiniRoot /> : isTrayMenu ? <TrayMenuRoot /> : isNotice ? <NoticeRoot /> : <MainRoot />}
     </Suspense>
   </StrictMode>,
 )

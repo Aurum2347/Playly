@@ -14,10 +14,27 @@ import { invoke } from '@tauri-apps/api/core'
 import { readSettingsRaw, writeSettingsRaw } from '../components/views/settings/helpers'
 import { ru } from './ru'
 import { en } from './en'
+import {
+  INTERNAL_KEYS,
+  hasReportIssues,
+  isInternalKey,
+  MAX_FILE_BYTES,
+  parseCustomTranslation,
+  type BaseLang,
+  type CustomLangErrorKind,
+  type CustomLangReport,
+  type CustomLangResult,
+  type Dict,
+} from './customLang'
 
 /* ===== Встроенные переводы ===== */
-type Dict = Record<string, unknown>
-const builtIn: Record<string, Dict> = { ru, en }
+const builtIn: Record<BaseLang, Dict> = { ru, en }
+
+/*
+ * Список изменений и «Что нового» — только встроенные (русский и английский): свой перевод их не меняет
+ * и в шаблон перевода они не попадают. Пока выбран свой перевод, эти тексты показываются на том
+ * встроенном языке, который был включён последним. Проверка своих переводов — в customLang.ts.
+ */
 
 /* ===== Список встроенных языков ===== */
 // eslint-disable-next-line react-refresh/only-export-components
@@ -30,7 +47,25 @@ export interface CustomLangMeta {
   id: string // имя файла
   title: string // название из config.title
   iconemoji: string // флаг из config.iconemoji
+  /* Файл не подходит: в списке он виден, но выбрать его нельзя */
+  error?: CustomLangErrorKind
+  detail?: string
 }
+
+/* Почему свой перевод не включился (или не создался шаблон) */
+export interface LangError {
+  kind: CustomLangErrorKind | 'template' | 'folder'
+  file?: string
+  detail?: string
+}
+
+/* Перевод включён, но часть строк из него не взята */
+export interface LangWarning {
+  file: string
+  report: CustomLangReport
+}
+
+const errorText = (e: unknown) => (e instanceof Error ? e.message : String(e ?? ''))
 
 /* ===== Автоопределение языка ОС: ru/be → русский, иначе английский ===== */
 function detectLang(): string {
@@ -79,6 +114,20 @@ async function getLanguagesDir(): Promise<string> {
   return dir
 }
 
+/* Прочитать и проверить файл своего перевода */
+async function loadCustomFile(fileName: string): Promise<CustomLangResult> {
+  let text: string
+  try {
+    const path = await join(await getLanguagesDir(), fileName)
+    if (!(await exists(path))) return { ok: false, kind: 'missing' }
+    text = await readTextFile(path)
+  } catch (e) {
+    return { ok: false, kind: 'read', detail: errorText(e) }
+  }
+  if (text.length > MAX_FILE_BYTES) return { ok: false, kind: 'tooLarge' }
+  return parseCustomTranslation(text, fileName, builtIn)
+}
+
 interface I18nContextValue {
   lang: string
   setLang: (lang: string) => void
@@ -88,9 +137,12 @@ interface I18nContextValue {
   customLangs: CustomLangMeta[]
   refreshCustomLangs: () => Promise<void>
   createTemplate: (base: 'ru' | 'en') => Promise<void>
-  selectCustom: (id: string) => Promise<void>
+  /* ok — включён; warning — включён, но часть строк не взята; error — остался встроенный язык */
+  selectCustom: (id: string) => Promise<'ok' | 'warning' | 'error'>
   openLanguagesFolder: () => Promise<void>
-  langError: string | null
+  langError: LangError | null
+  langWarning: LangWarning | null
+  clearLangNotices: () => void
 }
 
 const I18nContext = createContext<I18nContextValue | null>(null)
@@ -107,16 +159,41 @@ export function I18nProvider({ children, persist = true }: { children: ReactNode
   const [lang, setLangState] = useState<string>(() => detectLang())
   const [custom, setCustom] = useState<{ lang: string; dict: Dict; base: 'ru' | 'en' } | null>(null)
   const [customLangs, setCustomLangs] = useState<CustomLangMeta[]>([])
-  const [langError, setLangError] = useState<string | null>(null)
+  const [langError, setLangError] = useState<LangError | null>(null)
+  const [langWarning, setLangWarning] = useState<LangWarning | null>(null)
+  const clearLangNotices = useCallback(() => {
+    setLangError(null)
+    setLangWarning(null)
+  }, [])
+  /* Последний включённый встроенный язык — на нём список изменений, пока выбран свой перевод */
+  const [lastBuiltIn, setLastBuiltIn] = useState<BaseLang | null>(null)
+  const lastBuiltInRef = useRef<BaseLang | null>(null)
+  const rememberBuiltIn = useCallback((language: BaseLang) => {
+    lastBuiltInRef.current = language
+    setLastBuiltIn(language)
+    if (persistRef.current) writeSettingsRaw({ changelogLanguage: language }).catch(() => {})
+  }, [])
 
   /* ===== Применить кастомный перевод ===== */
-  const applyCustom = useCallback((langId: string, dict: Dict) => {
-    const cfg = (dict as { config?: { base?: string } }).config
-    const base: 'ru' | 'en' = cfg?.base === 'ru' ? 'ru' : 'en'
-    setCustom({ lang: langId, dict, base })
+  const applyCustom = useCallback((langId: string, result: Extract<CustomLangResult, { ok: true }>) => {
+    const r = result.report
+    const hasIssues = hasReportIssues(r)
+    setCustom({ lang: langId, dict: result.dict, base: result.config.base })
     setLangState(langId)
     setLangError(null)
+    setLangWarning(hasIssues ? { file: langId, report: r } : null)
     saveLang(langId)
+  }, [saveLang])
+
+  /* ===== Свой перевод не загрузился: остаёмся на встроенном языке и объясняем почему ===== */
+  const failCustom = useCallback((file: string, kind: CustomLangErrorKind, detail?: string) => {
+    console.warn(`[i18n] Перевод "${file}" не загружен: ${kind}`, detail ?? '')
+    const fallback: BaseLang = lastBuiltInRef.current ?? (detectLang() === 'ru' ? 'ru' : 'en')
+    setCustom(null)
+    setLangState(fallback)
+    setLangError({ kind, file, detail })
+    setLangWarning(null)
+    saveLang(fallback)
   }, [saveLang])
 
   /* ===== Переключить на встроенный язык ===== */
@@ -125,9 +202,11 @@ export function I18nProvider({ children, persist = true }: { children: ReactNode
       setCustom(null)
       setLangState(next)
       setLangError(null)
+      setLangWarning(null)
       saveLang(next)
+      rememberBuiltIn(next)
     }
-  }, [saveLang])
+  }, [saveLang, rememberBuiltIn])
 
   /* ===== Сканируем папку languages ===== */
   const refreshCustomLangs = useCallback(async () => {
@@ -138,17 +217,11 @@ export function I18nProvider({ children, persist = true }: { children: ReactNode
       for (const e of entries) {
         const name = e.name ?? ''
         if (!name.toLowerCase().endsWith('.json')) continue
-        try {
-          const raw = await readTextFile(await join(dir, name))
-          const dict = JSON.parse(raw) as { config?: { title?: string; iconemoji?: string } }
-          list.push({
-            id: name,
-            title: dict.config?.title || name.replace(/\.json$/i, ''),
-            iconemoji: dict.config?.iconemoji || '🏳️',
-          })
-        } catch {
-          /* битый файл — пропускаем */
-        }
+        /* Битый файл не прячем: в списке видно, что с ним не так */
+        const result = await loadCustomFile(name)
+        const title = name.replace(/\.json$/i, '')
+        if (result.ok) list.push({ id: name, title: result.config.title, iconemoji: result.config.iconemoji })
+        else list.push({ id: name, title, iconemoji: '⚠️', error: result.kind, detail: result.detail })
       }
       setCustomLangs(list)
     } catch (e) {
@@ -162,6 +235,8 @@ export function I18nProvider({ children, persist = true }: { children: ReactNode
       try {
         const src = base === 'ru' ? ru : en
         const template: Dict = JSON.parse(JSON.stringify(src))
+        /* Список изменений переводит только Playly — в шаблоне его нет */
+        for (const k of INTERNAL_KEYS) delete template[k]
         ;(template as { config?: unknown }).config = {
           iconemoji: '🏳️',
           title: base === 'ru' ? 'Мой язык' : 'My Language',
@@ -180,6 +255,7 @@ export function I18nProvider({ children, persist = true }: { children: ReactNode
         await invoke('reveal_item_in_dir', { path: filePath }).catch(() => {})
       } catch (e) {
         console.error('Не удалось создать шаблон перевода:', e)
+        setLangError({ kind: 'template', detail: errorText(e) })
       }
     },
     [refreshCustomLangs]
@@ -187,26 +263,18 @@ export function I18nProvider({ children, persist = true }: { children: ReactNode
 
   /* ===== Выбрать кастомный язык (с обработкой ошибок) ===== */
   const selectCustom = useCallback(
-    async (id: string) => {
-      try {
-        const dir = await getLanguagesDir()
-        const path = await join(dir, id)
-        if (!(await exists(path))) throw new Error('missing')
-        const raw = await readTextFile(path)
-        const dict = JSON.parse(raw) as Dict
-        applyCustom(id, dict)
-      } catch (e) {
-        /* Файла нет или он битый: падаем на встроенный язык */
-        console.error('Не удалось загрузить перевод:', e)
-        const fallback = detectLang()
-        setCustom(null)
-        setLangState(fallback)
-        setLangError('missing')
-        saveLang(fallback)
-        await refreshCustomLangs()
+    async (id: string): Promise<'ok' | 'warning' | 'error'> => {
+      const result = await loadCustomFile(id)
+      if (result.ok) {
+        applyCustom(id, result)
+        return hasReportIssues(result.report) ? 'warning' : 'ok'
       }
+      /* Файла нет или он битый: остаёмся на встроенном языке */
+      failCustom(id, result.kind, result.detail)
+      await refreshCustomLangs()
+      return 'error'
     },
-    [applyCustom, refreshCustomLangs, saveLang]
+    [applyCustom, failCustom, refreshCustomLangs]
   )
 
   /* ===== Открыть папку languages ===== */
@@ -216,6 +284,7 @@ export function I18nProvider({ children, persist = true }: { children: ReactNode
       await invoke('reveal_item_in_dir', { path: dir })
     } catch (e) {
       console.error('Не удалось открыть папку languages:', e)
+      setLangError({ kind: 'folder', detail: errorText(e) })
     }
   }, [])
 
@@ -225,34 +294,26 @@ export function I18nProvider({ children, persist = true }: { children: ReactNode
     ;(async () => {
       const raw = await readSettingsRaw().catch(() => ({} as Record<string, unknown>))
       const saved = (raw as Record<string, unknown>).language
+      const savedChangelog = (raw as Record<string, unknown>).changelogLanguage
       if (cancelled) return
+      if (savedChangelog === 'ru' || savedChangelog === 'en') {
+        lastBuiltInRef.current = savedChangelog
+        setLastBuiltIn(savedChangelog)
+      }
 
       /* Встроенные языки есть всегда */
       if (saved === 'ru' || saved === 'en') {
         setLangState(saved)
+        if (savedChangelog !== saved) rememberBuiltIn(saved)
         return
       }
 
       /* Кастомный язык: пробуем загрузить файл */
       if (typeof saved === 'string' && saved) {
-        try {
-          const dir = await getLanguagesDir()
-          const path = await join(dir, saved)
-          if (!(await exists(path))) throw new Error('missing')
-          const text = await readTextFile(path)
-          const dict = JSON.parse(text) as Dict 
-          if (!cancelled) applyCustom(saved, dict)
-        } catch {
-          if (!cancelled) {
-            console.warn(
-              `[i18n] Язык "${saved}" не найден или повреждён. Переключаемся на встроенный.`
-            )
-            const fallback = detectLang()
-            setLangError('missing')
-            setLangState(fallback)
-            saveLang(fallback)
-          }
-        }
+        const result = await loadCustomFile(saved)
+        if (cancelled) return
+        if (result.ok) applyCustom(saved, result)
+        else failCustom(saved, result.kind, result.detail)
       }
     })()
     /* Список своих переводов читается асинхронно — состояние меняется уже после await */
@@ -261,15 +322,17 @@ export function I18nProvider({ children, persist = true }: { children: ReactNode
     return () => {
       cancelled = true
     }
-  }, [applyCustom, refreshCustomLangs, saveLang])
+  }, [applyCustom, failCustom, refreshCustomLangs, rememberBuiltIn])
 
   /* Цепочка словарей: свой перевод → его базовый язык → русский */
   const resolve = useCallback(
     (key: string) => {
       const isCustomActive = !!custom && custom.lang === lang
-      const rawBase = isCustomActive ? custom.base : lang
-      const baseLang = builtIn[rawBase] ? rawBase : 'ru' // защита от неизвестного языка
-      const dicts = [isCustomActive ? custom.dict : undefined, builtIn[baseLang], builtIn.ru]
+      const internal = isInternalKey(key)
+      /* Список изменений: свой перевод пропускаем, язык — последний встроенный (или базовый у перевода) */
+      const rawBase = isCustomActive ? (internal ? lastBuiltIn ?? custom.base : custom.base) : lang
+      const baseLang: BaseLang = rawBase === 'en' || rawBase === 'ru' ? rawBase : 'ru' // защита от неизвестного языка
+      const dicts = [isCustomActive && !internal ? custom.dict : undefined, builtIn[baseLang], builtIn.ru]
 
       let value: unknown
       for (const d of dicts) {
@@ -278,7 +341,7 @@ export function I18nProvider({ children, persist = true }: { children: ReactNode
       }
       return { value, baseLang }
     },
-    [lang, custom]
+    [lang, custom, lastBuiltIn]
   )
 
   const tm = useCallback(<T,>(key: string) => resolve(key).value as T | undefined, [resolve])
@@ -288,15 +351,17 @@ export function I18nProvider({ children, persist = true }: { children: ReactNode
       const { value, baseLang } = resolve(key)
 
       if (value !== null && typeof value === 'object') {
-        const obj = value as Record<string, string>
-        const n = Number(vars?.count ?? vars?.n ?? 0)
-        const form = pluralForm(baseLang, n)
+        /* Берём только строки: значение не того типа показывается ключом, а не роняет интерфейс */
+        const obj = value as Record<string, unknown>
+        const str = (v: unknown) => (typeof v === 'string' ? v : undefined)
+        const count = Number(vars?.count ?? vars?.n ?? 0)
+        const form = pluralForm(baseLang, Number.isFinite(count) ? count : 0)
         const template =
-          obj[form] ??
-          (baseLang === 'ru' ? obj.many : obj.other) ??
-          obj.other ??
-          obj.one ??
-          Object.values(obj)[0] ??
+          str(obj[form]) ??
+          str(baseLang === 'ru' ? obj.many : obj.other) ??
+          str(obj.other) ??
+          str(obj.one) ??
+          Object.values(obj).map(str).find((v) => v !== undefined) ??
           key
         return interpolate(template, vars)
       }
@@ -319,8 +384,10 @@ export function I18nProvider({ children, persist = true }: { children: ReactNode
       selectCustom,
       openLanguagesFolder,
       langError,
+      langWarning,
+      clearLangNotices,
     }),
-    [lang, setLang, t, tm, customLangs, refreshCustomLangs, createTemplate, selectCustom, openLanguagesFolder, langError]
+    [lang, setLang, t, tm, customLangs, refreshCustomLangs, createTemplate, selectCustom, openLanguagesFolder, langError, langWarning, clearLangNotices]
   )
 
   return <I18nContext.Provider value={value}>{children}</I18nContext.Provider>

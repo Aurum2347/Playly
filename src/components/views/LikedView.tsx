@@ -8,8 +8,9 @@ import type { TrackUpdates } from './TrackEditModal'
 import { useI18n } from '../../i18n'
 import SortSelect from '../SortSelect'
 import { sortIcons } from '../sortIcons'
-import { cx, inlineButton, inlineInput, inlineRow, parseDuration, shuffled, useContextMenu } from './shared'
+import { cx, inlineButton, inlineInput, inlineRow, parseDuration, selectionRange, shuffled, useContextMenu } from './shared'
 import './LikedView.css'
+import QueueAddButton, { CoverIcon, QueueIcon } from './QueueAddButton'
 
 interface LikedViewProps {
   tracks: Track[]
@@ -25,6 +26,10 @@ interface LikedViewProps {
   onCopyArtist?: (trackId: number) => void
   onCopyPath?: (trackId: number) => void
   onRevealInDir?: (trackId: number) => void
+  /* Добавить в ручную очередь (в порядке списка) */
+  onAddToQueue?: (trackIds: number[]) => void
+  /* Одна обложка на все выбранные треки; confirm — подтверждение после выбора картинки */
+  onSetCovers?: (trackIds: number[], confirm?: (n: number) => boolean) => Promise<void>
 }
 
 type SortOption = 'name-az' | 'name-za' | 'dur-desc' | 'dur-asc' | 'date-new' | 'date-old'
@@ -33,6 +38,7 @@ export default function LikedView({
   tracks, playlists, onSelectTrack, playingTrackId = null,
   onToggleLike, onDeleteTracks, onAddToPlaylist, onCreatePlaylist, onEditTrack,
   onCopyTitle, onCopyArtist, onCopyPath, onRevealInDir,
+  onAddToQueue, onSetCovers,
 }: LikedViewProps) {
   const { t, lang } = useI18n()
 
@@ -132,11 +138,12 @@ export default function LikedView({
 
   const [selectionAnchor, setSelectionAnchor] = useState<number | null>(null)
   const toggleSelection = (trackId: number, range = false) => {
-    if (range && selectionAnchor !== null) {
+    if (range) {
       const ids = filteredTracks.map((tr) => tr.id)
-      const a = ids.indexOf(selectionAnchor), b = ids.indexOf(trackId)
-      if (a >= 0 && b >= 0) {
-        setSelectedTrackIds(new Set(ids.slice(Math.min(a, b), Math.max(a, b) + 1)))
+      const span = selectionRange(ids, trackId, selectionAnchor, selectedTrackIds, playingTrackId)
+      if (span) {
+        setSelectionAnchor(span.anchor)
+        setSelectedTrackIds(new Set(span.ids))
         setSelectionMode(true)
         return
       }
@@ -146,10 +153,10 @@ export default function LikedView({
     if (next.has(trackId)) next.delete(trackId)
     else next.add(trackId)
     setSelectedTrackIds(next)
-    if (next.size === 0) setSelectionMode(false)
+    setSelectionMode(next.size > 0)
   }
 
-  const enterSelectionMode = (trackId: number) => { setSelectionMode(true); setSelectedTrackIds(new Set([trackId])) }
+  const enterSelectionMode = (trackId: number) => { setSelectionAnchor(trackId); setSelectionMode(true); setSelectedTrackIds(new Set([trackId])) }
   const exitSelectionMode = () => { setSelectionAnchor(null); setSelectionMode(false); setSelectedTrackIds(new Set()) }
 
   const handleUnlikeSelected = () => {
@@ -313,6 +320,18 @@ export default function LikedView({
                 </svg>
                 {t('views.liked.toPlaylist')}
               </button>
+            {onAddToQueue && (
+              <button className="btn" onClick={() => { onAddToQueue(filteredTracks.map((tr) => tr.id).filter((id) => selectedTrackIds.has(id))); exitSelectionMode() }}>
+                <QueueIcon />
+                {t('queue.addSelected')}
+              </button>
+            )}
+            {onSetCovers && (
+              <button className="btn" onClick={() => { void onSetCovers(filteredTracks.map((tr) => tr.id).filter((id) => selectedTrackIds.has(id)), (n) => window.confirm(t('views.tracks.confirmSetCovers', { n }))).then(() => exitSelectionMode()) }}>
+                <CoverIcon />
+                {t('views.tracks.setCover')}
+              </button>
+            )}
             </div>
           <SortSelect
             label={t('views.liked.sort')}
@@ -398,6 +417,7 @@ export default function LikedView({
                   </div>
                 </div>
                 <span className="tr-dur">
+                  {onAddToQueue && <QueueAddButton onAdd={() => onAddToQueue([track.id])} />}
                   {speed !== 1 && <span className="speed-badge">{String(Math.round(speed * 100) / 100)}×</span>}
                   {track.duration}
                 </span>
@@ -431,6 +451,12 @@ export default function LikedView({
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z" /></svg>
             {t('views.tracks.addToPlaylist')}
           </button>
+          {onAddToQueue && (
+            <button className="context-item" onClick={() => runContextAction((id) => onAddToQueue([id]))}>
+              <QueueIcon />
+              {t('queue.add')}
+            </button>
+          )}
           <div className="dropdown-divider"></div>
           
           {/* ЕДИНСТВЕННАЯ КНОПКА "ПОДРОБНЕЕ" */}

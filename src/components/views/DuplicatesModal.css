@@ -1,0 +1,97 @@
+.dup-body {
+  min-height: 160px;
+  max-height: min(56vh, 560px);
+  overflow-y: auto;
+  margin: 4px -4px 0;
+  padding: 0 4px;
+}
+
+.dup-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-height: 160px;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.dup-spinner {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 2px solid var(--element-strong);
+  border-top-color: var(--text-secondary);
+  animation: dupSpin 0.8s linear infinite;
+}
+@keyframes dupSpin { to { transform: rotate(360deg); } }
+
+.dup-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 13px;
+  color: var(--text-secondary);
+  margin-bottom: 10px;
+}
+.dup-auto { flex-shrink: 0; }
+
+.dup-groups { display: flex; flex-direction: column; gap: 10px; }
+
+.dup-group {
+  border: 1px solid var(--border, rgba(255, 255, 255, 0.08));
+  border-radius: 12px;
+  padding: 8px;
+  background: var(--element);
+}
+
+.dup-kind {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+  padding: 2px 6px 6px;
+}
+.dup-group.exact .dup-kind { color: var(--text-secondary); }
+
+.dup-item {
+  display: grid;
+  grid-template-columns: 20px 1fr auto;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 6px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+.dup-item:hover { background: var(--hover); }
+.dup-item.checked { background: var(--element-strong); }
+.dup-item input { margin: 0; accent-color: var(--accent); }
+
+.dup-text { display: flex; flex-direction: column; min-width: 0; }
+.dup-title {
+  font-size: 13px;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.dup-artist { color: var(--text-muted); }
+.dup-path {
+  font-size: 11px;
+  color: var(--text-faint, var(--text-muted));
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  direction: rtl;
+  text-align: left;
+}
+.dup-dur { font-size: 12px; color: var(--text-muted); font-variant-numeric: tabular-nums; }
+
+.dup-note {
+  margin-right: auto;
+  font-size: 12px;
+  color: var(--text-muted);
+  max-width: 46%;
+}

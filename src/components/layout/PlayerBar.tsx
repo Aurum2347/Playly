@@ -7,6 +7,7 @@ import CoverMenu from '../CoverMenu'
 import type { CoverMenuTarget } from '../CoverMenu'
 import { usePresence } from '../views/shared'
 import './PlayerBar.css'
+import { QueueButton, SpeedControl } from './PlayerExtras'
 
 interface PlayerBarProps {
   track: Track | null
@@ -33,6 +34,13 @@ interface PlayerBarProps {
   /* Расширенный режим: открыть / закрыть */
   isNowPlayingOpen?: boolean
   onToggleNowPlaying?: () => void
+  /* Скорость сеанса (сбрасывается при следующем запуске) */
+  speed?: number
+  onSpeedChange?: (v: number) => void
+  /* Очередь: сколько треков в ручной очереди, открыто ли окно */
+  queueCount?: number
+  isQueueOpen?: boolean
+  onToggleQueue?: () => void
 }
 
 const fmt = (s: number) => {
@@ -66,6 +74,11 @@ export default function PlayerBar({
   onCopyTitleArtist,
   isNowPlayingOpen = false,
   onToggleNowPlaying,
+  speed = 1,
+  onSpeedChange,
+  queueCount = 0,
+  isQueueOpen = false,
+  onToggleQueue,
 }: PlayerBarProps) {
   const { t } = useI18n()
   const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number } | null>(null)
@@ -291,6 +304,8 @@ export default function PlayerBar({
           </div>
         </div>
         <div className="p-right">
+          <QueueButton count={queueCount} active={isQueueOpen} onClick={onToggleQueue} />
+          <SpeedControl speed={speed} onChange={onSpeedChange} />
           <button className="p-like-btn" disabled title={t('layout.playerbar.likeAdd')}>
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
@@ -398,6 +413,8 @@ export default function PlayerBar({
             )}
           </button>
         )}
+        <QueueButton count={queueCount} active={isQueueOpen} onClick={onToggleQueue} />
+        <SpeedControl speed={speed} onChange={onSpeedChange} />
         <button
           className={`p-like-btn ${isLiked ? 'liked' : ''}`}
           onClick={() => onToggleLike?.(track.id, !isLiked)}

@@ -1,0 +1,34 @@
+/* Кнопка «В очередь» у строки трека: появляется при наведении, место в сетке строки не занимает */
+.tr-queue-btn {
+  position: absolute;
+  right: calc(100% + 4px);
+  top: 50%;
+  transform: translateY(-50%);
+  width: 26px;
+  height: 26px;
+  border-radius: 6px;
+  border: none;
+  background: var(--element-strong);
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s ease, background 0.15s ease, color 0.15s ease;
+}
+.tr-queue-btn svg { width: 15px; height: 15px; }
+.tr-queue-btn:hover { background: var(--hover-strong); color: var(--text); }
+.tr-queue-btn.done { color: var(--accent); opacity: 1; }
+
+[class*='trackRow']:hover .tr-queue-btn,
+.track-row:hover .tr-queue-btn,
+.tr-queue-btn:focus-visible {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* В режиме выделения клик по строке выделяет её — кнопка не нужна */
+[class*='selecting'] .tr-queue-btn,
+.selecting .tr-queue-btn { display: none; }

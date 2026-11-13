@@ -81,10 +81,25 @@ export function onLyricsUpdated(listener: (path: string) => void) {
   return () => window.removeEventListener(LYRICS_EVENT, handler)
 }
 
+/* .lrc, найденные после перемещения не рядом с треком: путь трека → путь текста */
+const lrcPaths = new Map<string, string>()
+
+/** Обновить список отдельно лежащих .lrc (зовёт главное окно при каждом изменении библиотеки) */
+export function registerLrcPaths(tracks: ReadonlyArray<{ filePath: string; lrcPath?: string | null }>) {
+  const next = new Map<string, string>()
+  for (const t of tracks) if (t.lrcPath) next.set(t.filePath, t.lrcPath)
+  for (const [path, lrc] of next) if (lrcPaths.get(path) !== lrc) cache.delete(path)
+  for (const path of lrcPaths.keys()) if (!next.has(path)) cache.delete(path)
+  lrcPaths.clear()
+  next.forEach((v, k) => lrcPaths.set(k, v))
+}
+
+export const lrcPathFor = (filePath: string) => lrcPaths.get(filePath) ?? null
+
 export function loadLyrics(filePath: string): Promise<Lyrics | null> {
   const hit = cache.get(filePath)
   if (hit) return hit
-  const job = invoke<string | null>('get_track_lyrics', { path: filePath })
+  const job = invoke<string | null>('get_track_lyrics', { path: filePath, lrcPath: lrcPathFor(filePath) })
     .then((raw) => (raw ? parseLyrics(raw) : null))
     .catch((e) => {
       console.warn('Не удалось прочитать текст песни:', e)

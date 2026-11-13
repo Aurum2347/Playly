@@ -1,7 +1,32 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { CSSProperties } from 'react'
+import { getPrefs } from '../../lib/prefs'
+import { nativeMenusAvailable, popupNativeMenu } from '../../lib/nativeMenu'
 
 export const cx = (...parts: Array<string | false | null | undefined>) => parts.filter(Boolean).join(' ')
+
+/**
+ * Shift+клик: диапазон от опорной строки до нажатой (в порядке списка на экране).
+ * Опора — последняя нажатая строка; если её нет в списке (поиск, удаление, выделение из меню) —
+ * последняя выделенная, затем играющий трек. Без опоры диапазона нет — строка выделяется одна.
+ */
+export function selectionRange(
+  ids: number[],
+  target: number,
+  anchor: number | null,
+  selected: Set<number>,
+  playing: number | null,
+): { anchor: number; ids: number[] } | null {
+  const b = ids.indexOf(target)
+  if (b < 0) return null
+  const candidates = [anchor, ...[...selected].reverse(), playing]
+  for (const c of candidates) {
+    if (c === null || c === target) continue
+    const a = ids.indexOf(c)
+    if (a >= 0) return { anchor: c, ids: ids.slice(Math.min(a, b), Math.max(a, b) + 1) }
+  }
+  return null
+}
 
 export const parseDuration = (dur: string | undefined | null): number => {
   if (!dur) return 0
@@ -88,7 +113,21 @@ export function useContextMenu<T>() {
 
   useLayoutEffect(() => {
     if (!state.measuring || !ref.current) return
-    const rect = ref.current.getBoundingClientRect()
+    const el = ref.current
+    /* Экономия ресурсов: вместо стилизованного меню — системное с теми же пунктами */
+    if (getPrefs().powerSave && nativeMenusAvailable()) {
+      el.dataset.nativeMenu = '1'
+      const seq = state.seq
+      void popupNativeMenu(el, state.anchor, () =>
+        setState((s) => (s.seq === seq && s.open ? { ...s, open: false } : s))
+      ).then((ok) => {
+        /* Системное меню не открылось — показываем обычное */
+        if (!ok) delete el.dataset.nativeMenu
+      })
+    } else {
+      delete el.dataset.nativeMenu
+    }
+    const rect = el.getBoundingClientRect()
     const pos = computeMenuPosition(state.anchor.x, state.anchor.y, rect.width, rect.height)
     setState((s) => ({ ...s, measuring: false, pos }))
   }, [state.seq, state.measuring, state.anchor])

@@ -236,7 +236,8 @@
 
 .trackRow:last-child { margin-bottom: 0; }
 .trackRow:hover { background: var(--hover); }
-.trackRow.selected { background: var(--element); }
+.trackRow.selected,
+.trackRow.selected:hover { background: color-mix(in srgb, var(--accent) 16%, var(--element-strong)); }
 .trackRow.playing .trTitle { color: var(--text); }
 
 .trNum {
@@ -292,6 +293,7 @@
 }
 
 .trDur {
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: flex-end;
