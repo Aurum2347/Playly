@@ -367,7 +367,7 @@ function MiniPlayer() {
         <div className="mini-main">
           <div className="mini-text">
             <div className="mini-title" title={track?.title}>{track ? track.title : t('layout.playerbar.nothingPlaying')}</div>
-            <div className="mini-artist">{track ? track.artist : t('layout.playerbar.chooseTrack')}</div>
+            <div className="mini-artist">{track ? (track.artist || t('views.nowPlaying.unknownArtist')) :t('layout.playerbar.chooseTrack')}</div>
           </div>
 
           <div className="mini-progress">

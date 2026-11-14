@@ -395,6 +395,8 @@ export default function Sidebar({
 
       d.settling = true
       suppressClickRef.current = true
+      /* Клик после отпускания мог уйти на ручку или мимо пункта: флаг не должен съесть следующий клик */
+      window.setTimeout(() => { suppressClickRef.current = false }, 0)
 
       document.body.classList.remove('is-dragging')
       listRef.current?.classList.remove('zone-active')

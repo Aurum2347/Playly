@@ -92,7 +92,7 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
                   autoComplete="off"
                   value={nickname}
                   onChange={(e) => setNickname(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && handleContinue()}
+                  onKeyDown={(e) => e.key === 'Enter' && !isSaving && handleContinue()}
                 />
               </div>
               <button 

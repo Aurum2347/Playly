@@ -32,16 +32,40 @@ export async function popupNativeMenu(root: HTMLElement, at: { x: number; y: num
   collect(root, items)
   while (items.length > 0 && 'item' in items[items.length - 1]) items.pop()
   if (items.length === 0) return false
+  /*
+   * Меню закрывается один раз: сразу после выбора пункта или, если выбора не было, с запасом по времени
+   * (событие выбора приходит отдельно и может отстать). Затем освобождаем само меню: ресурс Tauri
+   * сам не удаляется и держит пункты и их обработчики
+   */
+  let menu: Menu | null = null
+  let finished = false
+  let timer = 0
+  const finish = () => {
+    if (finished) return
+    finished = true
+    clearTimeout(timer)
+    onDone()
+    void menu?.close().catch(() => {})
+  }
+  for (const it of items) {
+    if ('action' in it && it.action) {
+      const run = it.action
+      it.action = (id) => {
+        run(id)
+        finish()
+      }
+    }
+  }
   try {
-    const menu = await Menu.new({ items })
+    menu = await Menu.new({ items })
     /* Координаты мыши — в CSS-пикселях с учётом масштаба интерфейса (зум WebView), меню ждёт логические */
     const zoom = parseFloat(document.documentElement.style.getPropertyValue('--ui-scale')) || 1
     await menu.popup(new LogicalPosition(at.x * zoom, at.y * zoom))
-    /* Событие выбора пункта приходит отдельно и может отстать от закрытия меню */
-    setTimeout(onDone, 250)
+    if (!finished) timer = window.setTimeout(finish, 1000)
     return true
   } catch (e) {
     console.warn('Системное меню недоступно:', e)
+    void menu?.close().catch(() => {})
     return false
   }
 }

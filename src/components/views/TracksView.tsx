@@ -409,7 +409,7 @@ export default function TracksView({
                   </div>
                   <div className={styles.trText}>
                     <div className={styles.trTitle}>{track.title}</div>
-                    <div className={styles.trArtist}>{track.artist}</div>
+                    <div className={styles.trArtist}>{track.artist || t('views.nowPlaying.unknownArtist')}</div>
                   </div>
                 </div>
                 <span className={styles.trDur}>

@@ -4,6 +4,7 @@ import { readDir, remove, exists } from '@tauri-apps/plugin-fs'
 import { invoke } from '@tauri-apps/api/core'
 import { listen } from '@tauri-apps/api/event'
 import { notify, reportError } from '../lib/feedback'
+import { useI18n } from '../i18n'
 import {
   baseName,
   diffFolder,
@@ -130,8 +131,11 @@ export default function useLibrary(options: UseLibraryOptions) {
   /* Колбэки приходят новыми на каждой перерисовке — держим их в ref, чтобы обработчики библиотеки
      оставались стабильными и memo-страницы не перерисовывались на каждом тике плеера */
   const optionsRef = useRef(options)
+  const { t } = useI18n()
+  const tRef = useRef(t)
   useEffect(() => {
     optionsRef.current = options
+    tRef.current = t
   })
   const navigate = useCallback((view: ViewType) => optionsRef.current.navigate(view), [])
   const onTracksDeleted = useCallback((ids: number[]) => optionsRef.current.onTracksDeleted(ids), [])
@@ -173,12 +177,18 @@ export default function useLibrary(options: UseLibraryOptions) {
     syncModeRef.current = syncMode
   }, [syncMode])
 
+  /* Файл библиотеки не прочитался: пустой список в памяти не должен затереть его на диске */
+  const tracksReadFailedRef = useRef(false)
+  const playlistsReadFailedRef = useRef(false)
+
   const scheduleSave = useCallback((next: Track[]) => {
+    if (tracksReadFailedRef.current) return
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current)
     saveTimerRef.current = setTimeout(() => saveTracksToConfig(next), 300)
   }, [])
 
   const schedulePlaylistsSave = useCallback((lists: Playlist[]) => {
+    if (playlistsReadFailedRef.current) return
     if (playlistsSaveTimerRef.current) clearTimeout(playlistsSaveTimerRef.current)
     playlistsSaveTimerRef.current = setTimeout(() => savePlaylists(lists), 300)
   }, [])
@@ -254,7 +264,7 @@ export default function useLibrary(options: UseLibraryOptions) {
     try {
       const selected = await open({
         multiple: true,
-        filters: [{ name: 'Аудио и видео', extensions: SUPPORTED_EXT }],
+        filters: [{ name: tRef.current('settings.profile.audioFilter'), extensions: SUPPORTED_EXT }],
       })
       if (!selected) return []
       return await addTracksFromPaths(Array.isArray(selected) ? selected : [selected])
@@ -405,7 +415,7 @@ export default function useLibrary(options: UseLibraryOptions) {
           if (pick) {
             known.add(normPath(pick.path))
             patches.set(t.id, { filePath: pick.path, fileModifiedAt: pick.mtime || t.fileModifiedAt, lrcPath: pickLrc(pick.path, lrcs) })
-          } else if (cands.length > 1) {
+          } else if (cands.length > 0) {
             choices.push({ trackId: t.id, title: t.title, oldPath: t.filePath, candidates: cands.map((c) => c.path), lrcs })
           }
         }
@@ -426,8 +436,24 @@ export default function useLibrary(options: UseLibraryOptions) {
   const resolveRelink = useCallback(
     (trackId: number, path: string | null) => {
       const choice = relinkChoices.find((c) => c.trackId === trackId)
+      const key = path ? normPath(path) : ''
+      /* Один файл - один трек: иначе поиск повторов принял бы его за копию и предложил удалить */
+      if (path && tracksRef.current.some((t) => t.id !== trackId && normPath(t.filePath) === key)) {
+        notify('relinkTaken')
+        setRelinkChoices((prev) =>
+          prev
+            .map((c) => (c.trackId === trackId ? { ...c, candidates: c.candidates.filter((p) => normPath(p) !== key) } : c))
+            .filter((c) => c.candidates.length > 0)
+        )
+        return
+      }
       setRelinkChoices((prev) => prev.filter((c) => c.trackId !== trackId))
       if (!choice || !path) return
+      setRelinkChoices((prev) =>
+        prev
+          .map((c) => ({ ...c, candidates: c.candidates.filter((p) => normPath(p) !== key) }))
+          .filter((c) => c.candidates.length > 0)
+      )
       patchTracks(new Map([[trackId, { filePath: path, lrcPath: pickLrc(path, choice.lrcs) }]]))
       notify('tracksRelinked', { n: 1 })
     },
@@ -451,7 +477,7 @@ export default function useLibrary(options: UseLibraryOptions) {
       if (ids.length === 0) return
       let picked
       try {
-        picked = await pickVisual({ filterName: 'Изображения', purpose: 'cover', maxBytes: COVER_MAX_BYTES })
+        picked = await pickVisual({ filterName: tRef.current('settings.profile.imagesFilter'), purpose: 'cover', maxBytes: COVER_MAX_BYTES })
       } catch (e) {
         reportError('coversFailed', e, { failed: ids.length, n: ids.length })
         return
@@ -492,9 +518,11 @@ export default function useLibrary(options: UseLibraryOptions) {
       const list = tracksRef.current.filter((t) => wanted.has(t.id))
       const done: number[] = []
       const failed: string[] = []
+      /* Файл, на который ссылается и другой (оставшийся) трек, с диска не удаляем: убираем только запись */
+      const stillUsed = new Set(tracksRef.current.filter((t) => !wanted.has(t.id)).map((t) => normPath(t.filePath)))
       for (const t of list) {
         try {
-          if (await exists(t.filePath)) await remove(t.filePath)
+          if (!stillUsed.has(normPath(t.filePath)) && (await exists(t.filePath))) await remove(t.filePath)
           done.push(t.id)
         } catch (e) {
           console.error('Не удалось удалить файл:', t.filePath, e)
@@ -600,9 +628,17 @@ export default function useLibrary(options: UseLibraryOptions) {
         setSyncMode(sm)
         syncModeRef.current = sm
       }
-      const loaded = await loadTracksFromConfig((l, t) => setLoadProgress({ loaded: l, total: t }))
+      const loaded = await loadTracksFromConfig((l, t) => setLoadProgress({ loaded: l, total: t })).catch((e) => {
+        tracksReadFailedRef.current = true
+        reportError('libraryLoad', e)
+        return [] as Track[]
+      })
       setTracks(loaded)
-      const pls = await loadPlaylists()
+      const pls = await loadPlaylists().catch((e) => {
+        playlistsReadFailedRef.current = true
+        reportError('libraryLoad', e)
+        return [] as Awaited<ReturnType<typeof loadPlaylists>>
+      })
       setPlaylists(pls)
       const hist = await loadPlayHistory()
       playHistoryRef.current = hist
@@ -674,7 +710,7 @@ export default function useLibrary(options: UseLibraryOptions) {
 
   const handleChangePlaylistCover = useCallback(async (id: number) => {
     try {
-      const picked = await pickVisual({ filterName: 'Изображения', purpose: 'cover', maxBytes: COVER_MAX_BYTES })
+      const picked = await pickVisual({ filterName: tRef.current('settings.profile.imagesFilter'), purpose: 'cover', maxBytes: COVER_MAX_BYTES })
       if (!picked) return
       const saved = await saveCoverFromBytes(`pl-${id}-${Date.now()}`, picked.bytes, picked.ext)
       if (saved) {
@@ -691,7 +727,7 @@ export default function useLibrary(options: UseLibraryOptions) {
 
   const handlePickImage = useCallback(async (): Promise<CoverPick | null> => {
     try {
-      const picked = await pickVisual({ filterName: 'Изображения', purpose: 'cover', maxBytes: COVER_MAX_BYTES })
+      const picked = await pickVisual({ filterName: tRef.current('settings.profile.imagesFilter'), purpose: 'cover', maxBytes: COVER_MAX_BYTES })
       if (!picked) return null
       return await saveCoverFromBytes(`pl-${Date.now()}`, picked.bytes, picked.ext)
     } catch (e) {
@@ -703,7 +739,7 @@ export default function useLibrary(options: UseLibraryOptions) {
   /* Картинка для баннера: GIF тоже подходит, поэтому лимит размера выше, чем у обложек */
   const handlePickBanner = useCallback(async (): Promise<CoverPick | null> => {
     try {
-      const picked = await pickVisual({ filterName: 'Изображения', purpose: 'banner', maxBytes: BANNER_MAX_BYTES })
+      const picked = await pickVisual({ filterName: tRef.current('settings.profile.imagesFilter'), purpose: 'banner', maxBytes: BANNER_MAX_BYTES })
       if (!picked) return null
       return await saveCoverFromBytes(`plb-${Date.now()}`, picked.bytes, picked.ext)
     } catch (e) {

@@ -209,7 +209,7 @@ pub async fn read_library_json(
         .join(name);
     tauri::async_runtime::spawn_blocking(move || {
         let _lock = JSON_LOCK.lock().unwrap_or_else(|e| e.into_inner());
-        Ok(read_with_backup(&path))
+        read_with_backup(&path)
     })
     .await
     .map_err(|e| e.to_string())?
@@ -223,14 +223,25 @@ fn valid_json(bytes: Vec<u8>) -> Option<String> {
     Some(text.to_string())
 }
 
-fn read_with_backup(path: &Path) -> Option<String> {
+/// Ok(None) - файла нет или он повреждён без рабочей копии (повреждённый при записи уйдёт
+/// в .corrupt.json). Err - файл есть, но прочитать его не дали (заблокирован антивирусом,
+/// OneDrive, нет прав): тогда библиотеку нельзя считать пустой, иначе следующая запись её сотрёт
+fn read_with_backup(path: &Path) -> Result<Option<String>, String> {
     if !path.exists() {
-        return None;
+        return Ok(None);
     }
-    fs::read(path)
-        .ok()
-        .and_then(valid_json)
-        .or_else(|| fs::read(path.with_extension("json.bak")).ok().and_then(valid_json))
+    let main = fs::read(path);
+    let main_err = main.as_ref().err().map(|e| e.to_string());
+    if let Some(text) = main.ok().and_then(valid_json) {
+        return Ok(Some(text));
+    }
+    if let Some(text) = fs::read(path.with_extension("json.bak")).ok().and_then(valid_json) {
+        return Ok(Some(text));
+    }
+    match main_err {
+        Some(e) => Err(e),
+        None => Ok(None),
+    }
 }
 
 /// Рабочую прежнюю версию кладём в .json.bak. Повреждённую не затираем поверх
@@ -289,9 +300,10 @@ pub async fn write_track_tags(
                 .primary_tag_mut()
                 .ok_or("Формат не поддерживает теги")?;
             tag.set_title(title);
-            tag.set_artist(artist);
-            tag.set_album(album);
-            tag.set_genre(genre);
+            /* Пустое поле — тега нет, а не пустая строка: другие плееры тогда пишут своё «неизвестно» */
+            if artist.trim().is_empty() { tag.remove_artist() } else { tag.set_artist(artist) }
+            if album.trim().is_empty() { tag.remove_album() } else { tag.set_album(album) }
+            if genre.trim().is_empty() { tag.remove_genre() } else { tag.set_genre(genre) }
             audio
                 .save_to_path(&tmp, WriteOptions::default())
                 .map_err(|e| e.to_string())?;
@@ -341,10 +353,10 @@ mod tests {
         assert_eq!(fs::read(dir.join("settings.json.bak")).unwrap(), b"{\"theme\":\"dark\"}");
         assert_eq!(fs::read(dir.join("settings.corrupt.json")).unwrap(), b"{broken");
         fs::write(&path, b"{broken").unwrap();
-        assert_eq!(read_with_backup(&path).as_deref(), Some("{\"theme\":\"dark\"}"));
+        assert_eq!(read_with_backup(&path).unwrap().as_deref(), Some("{\"theme\":\"dark\"}"));
         fs::write(&path, "\u{feff}{\"theme\":\"light\"}").unwrap();
-        assert_eq!(read_with_backup(&path).as_deref(), Some("{\"theme\":\"light\"}"));
-        assert_eq!(read_with_backup(&dir.join("missing.json")), None);
+        assert_eq!(read_with_backup(&path).unwrap().as_deref(), Some("{\"theme\":\"light\"}"));
+        assert_eq!(read_with_backup(&dir.join("missing.json")), Ok(None));
         fs::remove_dir_all(dir).unwrap();
     }
 

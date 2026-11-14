@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useI18n } from '../i18n'
 import { FEEDBACK_EVENT, type FeedbackMessage } from '../lib/feedback'
 import PlayerDialog from './PlayerDialog'
+import './FeedbackHost.css'
 
 interface Item extends FeedbackMessage {
   id: number

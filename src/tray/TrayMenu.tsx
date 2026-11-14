@@ -118,7 +118,7 @@ function TrayMenu() {
           <span className="tray-now-text">
             <span className="tray-now-status">{status}</span>
             <span className="tray-now-title">{track ? track.title : 'Playly'}</span>
-            {track && <span className="tray-now-artist">{track.artist}</span>}
+            {track && <span className="tray-now-artist">{track.artist || t('views.nowPlaying.unknownArtist')}</span>}
           </span>
         </div>
 

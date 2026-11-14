@@ -53,7 +53,11 @@ const sameTime = (a: number, b: number) => a > 0 && b > 0 && Math.abs(a - b) < 2
 
 /** Выбрать новый путь трека: один кандидат или ровно один с тем же временем изменения; иначе — спросить */
 export function pickCandidate(oldMtime: number, candidates: DiskFile[]): DiskFile | null {
-  if (candidates.length === 1) return candidates[0]
+  /*
+   * Единственный файл с тем же именем ещё не значит «тот самый»: у «01.mp3» из другого альбома
+   * имя совпадёт, а песня другая. Без совпадения времени берём его, только если время не записано
+   */
+  if (candidates.length === 1 && (oldMtime <= 0 || sameTime(candidates[0].mtime, oldMtime))) return candidates[0]
   const timed = candidates.filter((c) => sameTime(c.mtime, oldMtime))
   return timed.length === 1 ? timed[0] : null
 }

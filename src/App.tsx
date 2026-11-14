@@ -249,6 +249,7 @@ function AppInner() {
   const outputDeviceRef = useRef('')
   /* Идёт загрузка трека для автоматического кроссфейда */
   const autoXfadeRef = useRef(false)
+  const handleEndedRef = useRef<() => void>(() => {})
   const xfadePlanRef = useRef<CrossfadePlan | null>(null)
 
   /*
@@ -415,7 +416,7 @@ function AppInner() {
     const idx = queueIndexRef.current
     if (q.length === 0) return null
     if (shuffleRef.current) {
-      if (q.length === 1) return null
+      if (q.length === 1) return repeatRef.current === 'all' ? 0 : null
       let n: number
       do {
         n = Math.floor(Math.random() * q.length)
@@ -616,6 +617,8 @@ function AppInner() {
       if (res !== 'ok') {
         /* Не прочитался — трек доиграет, и переход пойдёт обычным путём (там битый файл пропустится) */
         if (res === 'error') plan.failed = true
+        /* Пока файл читался, текущий трек доиграл, а его конец был отложен: переходим сейчас */
+        if (eng.activeEnded && !eng.isSwitching) handleEndedRef.current()
         return
       }
       let idx = materializePlan(plan)
@@ -645,6 +648,7 @@ function AppInner() {
     }
     goToIndex(materializePlan(plan), { autoplay: true, fadeSec: 0, history: true })
   }, [getCrossfadePlan, goToIndex, recordPlay, materializePlan])
+  useEffect(() => { handleEndedRef.current = handleEnded }, [handleEnded])
 
   /* Файл не прочитался: пропускаем его и идём дальше по очереди, а если идти некуда — останавливаемся */
   const handleLoadErrorRef = useRef<(trackId: number, autoplay: boolean) => void>(() => {})
@@ -1205,6 +1209,12 @@ function AppInner() {
   const playNextRef = useRef<() => void>(() => {})
   const handlePlayPause = useCallback(() => {
     const eng = engineRef.current
+    if (eng?.isSwitching) {
+      /* Трек ещё читается: переключаем то, что случится после загрузки */
+      if (eng.willPlay) eng.pause()
+      else eng.play()
+      return
+    }
     if (!eng || !eng.hasSource) {
       /* Ничего не играет, но в ручной очереди что-то есть — начинаем с неё */
       if (userQueueRef.current.length > 0) playNextRef.current()
@@ -1314,6 +1324,28 @@ function AppInner() {
       })
     }
   }, [goToIndex, manualFadeSec])
+
+  /*
+   * Медиаклавиши «Далее»/«Назад» (клавиатура, гарнитура) Chromium отдаёт в mediaSession.
+   * Play/Pause не трогаем: их получают сами <audio>, и движок это уже отслеживает
+   */
+  useEffect(() => {
+    const ms = typeof navigator !== 'undefined' ? navigator.mediaSession : undefined
+    if (!ms) return
+    const set = (action: MediaSessionAction, handler: MediaSessionActionHandler | null) => {
+      try {
+        ms.setActionHandler(action, handler)
+      } catch {
+        /* действие не поддерживается */
+      }
+    }
+    set('nexttrack', () => handleNext())
+    set('previoustrack', () => handlePrev())
+    return () => {
+      set('nexttrack', null)
+      set('previoustrack', null)
+    }
+  }, [handleNext, handlePrev])
 
   const handleSeek = useCallback(
     (time: number) => {

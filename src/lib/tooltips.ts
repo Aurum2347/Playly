@@ -24,15 +24,44 @@ function convert(el: Element) {
   if (!(el instanceof HTMLElement) && !(el instanceof SVGElement)) return
   const text = el.getAttribute('title')
   if (text === null) return
-  el.removeAttribute('title')
+  removeAttr.call(el, 'title')
   if (text.trim() === '') {
-    el.removeAttribute('data-tip')
+    dropTitleTip(el)
     return
   }
   el.setAttribute('data-tip', text)
+  el.setAttribute('data-tip-title', '')
   /* Кнопка-значок без текста: подсказка была её единственным названием для экранного диктора */
-  if (!el.hasAttribute('aria-label') && !el.textContent?.trim()) el.setAttribute('aria-label', text.replace(/\n/g, '. '))
+  const autoAria = el.hasAttribute('data-aria-auto')
+  if ((autoAria || !el.hasAttribute('aria-label')) && !el.textContent?.trim()) {
+    el.setAttribute('aria-label', text.replace(/\n/g, '. '))
+    el.setAttribute('data-aria-auto', '')
+  }
   if (el === target && tip) render(text)
+}
+
+/* Подсказка и название для диктора, взятые из title, уходят вместе с ним */
+function dropTitleTip(el: Element) {
+  if (!el.hasAttribute('data-tip-title')) return
+  removeAttr.call(el, 'data-tip-title')
+  removeAttr.call(el, 'data-tip')
+  if (el.hasAttribute('data-aria-auto')) {
+    removeAttr.call(el, 'data-aria-auto')
+    removeAttr.call(el, 'aria-label')
+  }
+}
+
+/*
+ * title уже перенесён в data-tip, поэтому когда React убирает title (title={cond ? x : undefined}),
+ * атрибута нет и MutationObserver ничего не видит. Перехватываем само удаление,
+ * иначе осталась бы старая подсказка
+ */
+const removeAttr = Element.prototype.removeAttribute
+function patchTitleRemoval() {
+  Element.prototype.removeAttribute = function (this: Element, name: string) {
+    if (name === 'title' && !this.hasAttribute('title')) dropTitleTip(this)
+    return removeAttr.call(this, name)
+  }
 }
 
 /*
@@ -151,6 +180,7 @@ let installed = false
 export function installTooltips() {
   if (installed || typeof document === 'undefined') return
   installed = true
+  patchTitleRemoval()
   sweep(document.body)
   new MutationObserver((records) => {
     for (const r of records) {

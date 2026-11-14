@@ -170,6 +170,8 @@ export class AudioEngine {
   private wantPlay = false
   /* Идёт смена трека (файл читается) */
   private switching = false
+  /** Трек, который не удалось предзагрузить: повторять чтение на каждый timeupdate незачем */
+  private failedPreloadId: number | null = null
   private playing = false
   private pauseTimer: ReturnType<typeof setTimeout> | null = null
   private events: EngineEvents
@@ -241,6 +243,12 @@ export class AudioEngine {
   get isTransitioning() { return this.transition !== null }
   get hasSource() { return this.decks[this.active].url !== null }
   get currentTrackId() { return this.decks[this.active].trackId }
+  /** Идёт смена трека (файл ещё читается) */
+  get isSwitching() { return this.switching }
+  /** Заиграет ли плеер, когда смена трека закончится; без смены совпадает с isPlaying */
+  get willPlay() { return this.switching ? this.wantPlay : this.playing }
+  /** Текущий трек доиграл до конца */
+  get activeEnded() { const d = this.decks[this.active]; return d.url !== null && d.el.ended }
   get currentTime() { return this.decks[this.active].el.currentTime || 0 }
 
   get duration() {
@@ -362,7 +370,13 @@ export class AudioEngine {
     if (idle.trackId === track.id && idle.pending) return
     /* Свободная дека ещё доигрывает затухание прерванного перехода — не обрываем, попробуем позже */
     if (!idle.el.paused) return
-    void this.prepare(1 - this.active, track)
+    if (this.failedPreloadId === track.id) return
+    const idx = 1 - this.active
+    const job = this.prepare(idx, track)
+    const token = idle.token
+    void job.then((ok) => {
+      if (!ok && this.decks[idx].token === token) this.failedPreloadId = track.id
+    })
   }
 
   /**
@@ -391,20 +405,23 @@ export class AudioEngine {
     const from = this.active
     const fromDeck = this.decks[from]
     const toDeck = this.decks[target]
-    const audible = this.playing && fromDeck.url !== null && !fromDeck.el.paused
-
-    this.active = target
-    this.events.onDuration(this.duration)
-    this.events.onTime(0)
 
     /* Пока файл читался, могли нажать паузу (или, наоборот, «играть») — побеждает последнее желание */
     if (!this.wantPlay) {
+      this.failedPreloadId = null
+      this.active = target
+      this.events.onDuration(this.duration)
+      this.events.onTime(0)
       this.silence(from)
       this.setNow(toDeck.gain.gain, 1)
       this.setPlaying(false)
       return 'ok'
     }
 
+    /*
+     * Новая дека запускается (пока беззвучно) до переключения активной: если в эти доли секунды
+     * начнётся другая загрузка или эту отменят, активной остаётся прежняя дека и ничего не играет молча
+     */
     this.cancelPauseTimer()
     await this.ctx.resume().catch(() => {})
     if (seq !== this.loadSeq) return 'stale'
@@ -415,12 +432,18 @@ export class AudioEngine {
       if (seq !== this.loadSeq) return 'stale'
       console.warn('Не удалось воспроизвести:', e)
       this.silence(target)
-      this.active = from
-      this.events.onDuration(this.duration)
-      this.events.onTime(this.currentTime)
       return 'error'
     }
-    if (seq !== this.loadSeq) return 'stale'
+    if (seq !== this.loadSeq) {
+      /* Загрузку отменили, а новая не началась — запущенную деку останавливаем */
+      if (!this.switching && this.active !== target) this.silence(target)
+      return 'stale'
+    }
+    const audible = this.playing && fromDeck.url !== null && !fromDeck.el.paused
+    this.failedPreloadId = null
+    this.active = target
+    this.events.onDuration(this.duration)
+    this.events.onTime(0)
     this.rampTo(this.fader.gain, 1, audible ? 0.02 : PAUSE_FADE)
     this.setPlaying(true)
 

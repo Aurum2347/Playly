@@ -91,7 +91,12 @@ pub async fn scan_audio_dir(root: String, exts: Vec<String>) -> Result<Vec<FileE
         let exts: Vec<String> = exts.iter().map(|e| e.to_ascii_lowercase()).collect();
         let mut out = Vec::new();
         walk(&root, 0, &mut |p, meta| {
-            if has_ext(p, &exts) {
+            /* Временная копия, в которую Playly пишет теги: это не новый трек */
+            let temp = p
+                .file_name()
+                .and_then(|n| n.to_str())
+                .is_some_and(|n| n.starts_with(".playly-edit-"));
+            if !temp && has_ext(p, &exts) {
                 out.push(FileEntry {
                     path: p.to_string_lossy().into_owned(),
                     size: meta.len(),

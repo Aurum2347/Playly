@@ -249,7 +249,7 @@ export default function HistoryView({ tracks, onSelectTrack, playingTrackId, isP
                     </span>
                     <span className="history-text">
                       <span className="history-title">{entry.track.title}</span>
-                      <span className="history-artist">{entry.track.artist}</span>
+                      <span className="history-artist">{entry.track.artist || t('views.nowPlaying.unknownArtist')}</span>
                     </span>
                     <span className="history-album" title={entry.track.album || undefined}>{entry.track.album}</span>
                     <span className="history-dur">{entry.track.duration}</span>

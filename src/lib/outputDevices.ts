@@ -110,8 +110,10 @@ export function pickPrivateDevice(info: OutputInfo, current = ''): string | null
 
 /** Короткий звук на выбранном устройстве: проверить, что вы его слышите, а индикатор в OBS молчит */
 export async function playTestTone(deviceId: string): Promise<boolean> {
+  let opened: AudioContext | null = null
   try {
     const ctx = new AudioContext() as AudioContext & { setSinkId?: (id: string) => Promise<void> }
+    opened = ctx
     if (deviceId && ctx.setSinkId) await ctx.setSinkId(deviceId)
     const now = ctx.currentTime + 0.05
     const gain = ctx.createGain()
@@ -131,6 +133,8 @@ export async function playTestTone(deviceId: string): Promise<boolean> {
     window.setTimeout(() => void ctx.close(), 900)
     return true
   } catch {
+    /* Устройство отключили или id неверный: контекст всё равно закрываем, иначе каждый тест его теряет */
+    void opened?.close().catch(() => {})
     return false
   }
 }

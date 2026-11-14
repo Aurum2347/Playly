@@ -40,13 +40,14 @@ export async function getSettingsPath(): Promise<string> {
   return await join(playlyDir, 'settings.json')
 }
 
+/** Как readSettingsRaw, но ошибка чтения не превращается в пустые настройки */
+async function readSettingsStrict(): Promise<Record<string, unknown>> {
+  const data = await readLibraryJson('settings.json')
+  return data && typeof data === 'object' && !Array.isArray(data) ? (data as Record<string, unknown>) : {}
+}
+
 export async function readSettingsRaw(): Promise<Record<string, unknown>> {
-  try {
-    const data = await readLibraryJson('settings.json')
-    return data && typeof data === 'object' && !Array.isArray(data) ? (data as Record<string, unknown>) : {}
-  } catch {
-    return {}
-  }
+  return readSettingsStrict().catch(() => ({}))
 }
 
 /*
@@ -58,7 +59,8 @@ let settingsQueue: Promise<void> = Promise.resolve()
 function updateSettings(mutate: (current: Record<string, unknown>) => void): Promise<void> {
   const job = settingsQueue.then(async () => {
     try {
-      const current = await readSettingsRaw()
+      /* Не прочитались - не пишем: иначе в файле остался бы только этот ключ, а остальные настройки пропали бы */
+      const current = await readSettingsStrict()
       mutate(current)
       await writeLibraryJson('settings.json', current, true)
     } catch (e) {

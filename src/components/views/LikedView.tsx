@@ -413,7 +413,7 @@ export default function LikedView({
                   <div className="tr-cover">{track.cover ? <SafeImage src={track.cover} alt="" /> : musicIconSVG}</div>
                   <div className="tr-text">
                     <div className="tr-title">{track.title}</div>
-                    <div className="tr-artist">{track.artist}</div>
+                    <div className="tr-artist">{track.artist || t('views.nowPlaying.unknownArtist')}</div>
                   </div>
                 </div>
                 <span className="tr-dur">

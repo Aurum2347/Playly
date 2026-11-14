@@ -249,7 +249,7 @@ export default function PlayerBar({
       </div>
       <div className="p-info">
         <div className="p-name">{tr.title}</div>
-        <div className="p-artist">{tr.artist}</div>
+        <div className="p-artist">{tr.artist || t('views.nowPlaying.unknownArtist')}</div>
       </div>
     </>
   )

@@ -102,6 +102,7 @@ interface CardProps {
   onContextMenu?: (e: React.MouseEvent, trackId: number) => void
 }
 function TrackCard({ track, index, queue, onSelectTrack, playing, leaving, cardRef, onContextMenu }: CardProps) {
+  const { t } = useI18n()
   return (
     <div
       ref={cardRef}
@@ -118,7 +119,7 @@ function TrackCard({ track, index, queue, onSelectTrack, playing, leaving, cardR
         )}
       </div>
       <div className="home-card-title">{track.title}</div>
-      <div className="home-card-artist">{track.artist}</div>
+      <div className="home-card-artist">{track.artist || t('views.nowPlaying.unknownArtist')}</div>
     </div>
   )
 }
@@ -437,7 +438,7 @@ export default function HomeView({
                 }}
               >
                 <div className="home-hero-title" title={heroTrack.title}>{heroTrack.title}</div>
-                <div className="home-hero-artist">{heroTrack.artist}</div>
+                <div className="home-hero-artist">{heroTrack.artist || t('views.nowPlaying.unknownArtist')}</div>
               </div>
               {isCurrent && getPlayback ? (
                 <HeroProgress getPlayback={getPlayback} />
@@ -487,7 +488,7 @@ export default function HomeView({
                   </span>
                   <span className="home-list-text">
                     <span className="home-list-title">{track.title}</span>
-                    <span className="home-list-artist">{track.artist}</span>
+                    <span className="home-list-artist">{track.artist || t('views.nowPlaying.unknownArtist')}</span>
                   </span>
                   <span className="home-list-dur">{track.duration}</span>
                 </button>

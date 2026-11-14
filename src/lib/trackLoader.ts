@@ -250,15 +250,23 @@ export async function saveCoverFromFile(
 
 /* ===== Конфиг треков ===== */
 
+const LEGACY_UNKNOWN_ARTIST = 'Неизвестный исполнитель'
+const LEGACY_UNKNOWN_ALBUM = 'Неизвестный альбом'
+
 export async function loadTracksFromConfig(
   onProgress?: (loaded: number, total: number) => void
 ): Promise<Track[]> {
+  /* Ошибка чтения уходит наверх: файл есть, но прочитать не дали, и пустой его считать нельзя */
+  const data = await readLibraryJson('tracks.json')
   try {
-    const data = await readLibraryJson('tracks.json')
     if (!Array.isArray(data)) return []
 
     const tracks = (data as Track[]).filter((t) => t && typeof t === 'object' && typeof t.id === 'number')
     noteTrackIds(tracks)
+    for (const tr of tracks) {
+      if (tr.artist === LEGACY_UNKNOWN_ARTIST) tr.artist = ''
+      if (tr.album === LEGACY_UNKNOWN_ALBUM) tr.album = ''
+    }
     /* Дубли id остались от старого импорта: второму и следующим даём новые id.
        Плейлисты и история продолжают указывать на первый трек с этим id */
     const seenIds = new Set<number>()
@@ -344,8 +352,8 @@ export interface PlaylistData {
 }
 
 export async function loadPlaylists(): Promise<PlaylistData[]> {
+  const data = await readLibraryJson('playlists.json')
   try {
-    const data = await readLibraryJson('playlists.json')
     if (!Array.isArray(data)) return []
 
     const lists = data as PlaylistData[]
@@ -447,8 +455,8 @@ export async function parseAudioFiles(filePaths: string[], opts: ParseOptions = 
       opts.onTrack?.({
         id: trackId,
         title: meta.title || fileName.replace(/\.[^.]+$/, ''),
-        artist: meta.artist || 'Неизвестный исполнитель',
-        album: meta.album || 'Неизвестный альбом',
+        artist: meta.artist || '',
+        album: meta.album || '',
         genre: meta.genre || '',
         duration: formatDuration(durationSecs),
         liked: false,
@@ -462,8 +470,8 @@ export async function parseAudioFiles(filePaths: string[], opts: ParseOptions = 
       opts.onTrack?.({
         id: trackId,
         title: fileName.replace(/\.[^.]+$/, ''),
-        artist: 'Неизвестный исполнитель',
-        album: 'Неизвестный альбом',
+        artist: '',
+        album: '',
         genre: '',
         duration: formatDuration(durationSecs),
         liked: false,

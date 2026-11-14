@@ -36,12 +36,13 @@ const MusicIcon = () => (
 )
 
 function Row({ track, children, onPlay, dim = false }: { track: Track; children?: React.ReactNode; onPlay?: () => void; dim?: boolean }) {
+  const { t } = useI18n()
   return (
     <div className={`q-row ${dim ? 'dim' : ''}`} onDoubleClick={onPlay}>
       <div className="q-cover">{track.cover ? <SafeImage src={track.cover} alt="" loading="lazy" /> : <MusicIcon />}</div>
       <div className="q-text">
         <div className="q-title">{track.title}</div>
-        <div className="q-artist">{track.artist}</div>
+        <div className="q-artist">{track.artist || t('views.nowPlaying.unknownArtist')}</div>
       </div>
       <span className="q-dur">{track.duration}</span>
       <div className="q-actions">{children}</div>
@@ -72,7 +73,9 @@ export default function QueueModal(props: QueueModalProps) {
   }, [open, queue, queueIndex, shuffle, repeat])
 
   const userItems = userQueue.filter((it) => byId.has(it.trackId))
-  const systemTotal = shuffle ? Math.max(0, queue.length - 1) : system.length
+  const ahead = Math.max(0, queue.length - queueIndex - 1)
+  const wrapped = repeat === 'all' ? Math.max(0, queueIndex) : 0
+  const systemTotal = shuffle ? Math.max(0, queue.length - 1) : ahead + wrapped
 
   return (
     <PlayerDialog open={open} title={t('queue.title')} onClose={onClose} wide>
