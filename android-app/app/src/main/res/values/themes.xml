@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Window colours only; everything visible is drawn by the Compose design system. -->
+    <style name="Theme.Playly" parent="android:Theme.Material.NoActionBar">
+        <item name="android:windowBackground">@color/playly_background</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+        <item name="android:windowLightStatusBar">false</item>
+    </style>
+    <color name="playly_background">#FF0A0A0C</color>
+</resources>

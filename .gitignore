@@ -35,3 +35,6 @@ release/
 
 # Описания релизов для npm run release --notes-file
 release-notes-*.md
+
+# Инструкции для Claude — локальные
+CLAUDE.md

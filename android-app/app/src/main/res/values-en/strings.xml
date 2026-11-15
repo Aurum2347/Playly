@@ -1,0 +1,182 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="nav_home">Home</string>
+    <string name="nav_library">Library</string>
+    <string name="nav_playlists">Playlists</string>
+    <string name="nav_search">Search</string>
+
+    <string name="action_back">Back</string>
+    <string name="action_cancel">Cancel</string>
+    <string name="action_clear">Clear</string>
+    <string name="action_retry">Try again</string>
+    <string name="action_search">Search</string>
+    <string name="action_settings">Settings</string>
+    <string name="action_pick_folder">Choose music folder</string>
+    <string name="action_remove">Remove</string>
+    <string name="action_remove_folder">Remove folder “%1$s”</string>
+    <string name="action_later">Later</string>
+
+    <string name="onboarding_title">Welcome to Playly</string>
+    <string name="onboarding_subtitle">Choose your music folder: Playly shows only its tracks, subfolders included.</string>
+    <string name="onboarding_point_offline">Works without the internet</string>
+    <string name="onboarding_point_account">No account, subscriptions or ads</string>
+    <string name="onboarding_point_device">Files, playlists and settings stay on the device</string>
+
+    <string name="all_tracks">All tracks</string>
+    <string name="state_loading_library">Loading your library…</string>
+    <string name="state_loading_playlists">Loading playlists…</string>
+    <string name="state_loading_settings">Loading settings…</string>
+    <string name="state_scanning">Looking for music on the device…</string>
+    <string name="state_not_scanned_title">Your library is still empty</string>
+    <string name="state_not_scanned_message">The folder is chosen but hasn\'t been scanned yet. Tracks will appear here after a scan.</string>
+    <string name="state_empty_title">No music in this folder</string>
+    <string name="state_empty_message">No audio files were found in the chosen folder or its subfolders. Choose another folder.</string>
+    <string name="state_error_title">Something went wrong</string>
+    <string name="state_error_library">Couldn\'t read the library. Your files are untouched.</string>
+    <string name="state_error_playlists">Couldn\'t read playlists. Nothing was deleted.</string>
+    <string name="state_no_playlists_title">No playlists yet</string>
+    <string name="state_no_playlists_message">Your playlists will appear here.</string>
+
+    <string name="search_hint">Tracks, artists, albums, playlists</string>
+    <string name="search_idle_title">Search your library</string>
+    <string name="search_idle_message">Looks through titles, artists, albums and playlists right on the device.</string>
+    <string name="search_not_ready_title">Nothing to search yet</string>
+    <string name="search_not_ready_message">The library has no tracks yet.</string>
+    <string name="search_indexing">The library is still being indexed…</string>
+    <string name="search_no_results_title">Nothing found</string>
+    <string name="search_no_results_message">No matches for “%1$s”.</string>
+    <string name="search_error">Search failed. Try a different query.</string>
+    <string name="search_section_tracks">Tracks</string>
+    <string name="search_section_playlists">Playlists</string>
+
+    <string name="settings_title">Settings</string>
+    <string name="settings_section_library">Library</string>
+    <string name="settings_section_appearance">Appearance</string>
+    <string name="settings_section_about">About</string>
+    <string name="settings_stats_title">Tracks in library</string>
+    <string name="settings_reduce_motion_title">Reduce motion</string>
+    <string name="settings_reduce_motion_subtitle">Turns off transitions and movement. If animations are off system-wide, Playly skips them too.</string>
+    <string name="settings_version_title">Version</string>
+    <string name="settings_version_value">%1$s (%2$d)</string>
+    <string name="settings_offline_title">No internet</string>
+    <string name="settings_offline_subtitle">Playly has no network permission: the library, search and settings work only on the device.</string>
+    <string name="settings_source_title">Source code</string>
+
+    <string name="dialog_remove_folder_title">Remove folder?</string>
+    <string name="dialog_remove_folder_message">“%1$s” will no longer be the music folder and the library will be empty. Files on the device are not deleted.</string>
+    <string name="action_rescan">Refresh library</string>
+    <string name="state_scanning_found">Refreshing library… found: %1$d</string>
+    <string name="state_scan_failed">Couldn\'t scan the library. Files on the device are untouched.</string>
+    <string name="unknown_artist">Unknown artist</string>
+    <string name="message_scan_changes">Library updated · new: %1$d, changed: %2$d, missing: %3$d</string>
+    <string name="message_scan_no_changes">Library is up to date</string>
+    <string name="message_scan_unreadable">Skipped unreadable files: %1$d</string>
+    <string name="message_scan_folders_inaccessible">No access to the music folder. Choose it again in Settings.</string>
+    <string name="message_scan_failed">Couldn\'t refresh the library. Files on the device are untouched.</string>
+    <string name="settings_folder_inaccessible">%1$s · no access. Tap to choose the folder again</string>
+    <string name="settings_rescan_subtitle_last">Last refreshed %1$s</string>
+    <string name="settings_rescan_subtitle_never">Not run yet</string>
+    <string name="settings_rescan_subtitle_just_now">Last refreshed just now</string>
+    <string name="settings_stats_unavailable">%1$s · unavailable: %2$d</string>
+    <string name="message_folder_added">Music folder: “%1$s”</string>
+    <string name="message_folder_already_added">“%1$s” is already the music folder; refreshing</string>
+    <string name="message_folder_refused">Couldn\'t keep access to this folder. Choose another one.</string>
+    <string name="message_folder_removed">Folder “%1$s” removed</string>
+    <string name="message_picker_unavailable">This device has no system folder picker</string>
+    <string name="message_no_browser">No app found to open the link</string>
+
+    <string name="summary_separator">%1$s · %2$s</string>
+    <string name="duration_hours_minutes">%1$d h %2$d min</string>
+    <string name="duration_minutes">%1$d min</string>
+    <plurals name="tracks_count">
+        <item quantity="one">%d track</item>
+        <item quantity="other">%d tracks</item>
+    </plurals>
+
+    <!-- Playback (stage 3) -->
+    <string name="playback_channel_name">Playback</string>
+    <string name="playback_shuffle_on">Shuffle on</string>
+    <string name="playback_shuffle_off">Shuffle off</string>
+    <string name="playback_repeat_off">Repeat off</string>
+    <string name="playback_repeat_all">Repeat all</string>
+    <string name="playback_repeat_one">Repeat track</string>
+    <string name="playback_now_playing">Now playing</string>
+    <string name="playback_error_missing">File “%1$s” was not found</string>
+    <string name="playback_error_no_access">No access to “%1$s”</string>
+    <string name="playback_error_unsupported">The format of “%1$s” is not supported</string>
+    <string name="playback_error_damaged">File “%1$s” is damaged</string>
+    <string name="playback_error_other">Could not play “%1$s”</string>
+    <string name="playback_error_skipped">%1$s. Playing the next track</string>
+    <string name="playback_error_stopped">%1$s. Playback stopped</string>
+    <string name="playback_unknown_track">track</string>
+    <string name="playback_nothing_playable">This track is unavailable: the file was deleted or its folder is disconnected. Refresh the library.</string>
+    <string name="action_change_folder">Change folder</string>
+    <string name="state_no_folder_title">No music folder chosen</string>
+    <string name="state_no_folder_message">Playly shows tracks only from the folder you choose and its subfolders. Nothing else on the phone is read.</string>
+    <string name="settings_folder_title">Music folder</string>
+    <string name="settings_pick_folder_subtitle">The library is built only from this folder and its subfolders</string>
+    <string name="settings_change_folder_subtitle">The current folder will be replaced</string>
+
+    <!-- Stage 4: Home, Now playing button, player -->
+    <string name="home_recent">Recently played</string>
+    <string name="action_see_all">See all</string>
+    <string name="action_see_all_description">All recently played</string>
+    <string name="action_play_all">Play</string>
+    <string name="action_shuffle_all">Shuffle</string>
+    <string name="sort_current">Sort: %1$s</string>
+    <string name="sort_title">By title</string>
+    <string name="sort_artist">By artist</string>
+    <string name="sort_album">By album</string>
+    <string name="sort_date_added">Newest first</string>
+    <string name="sort_duration">Longest first</string>
+    <string name="recent_empty_title">Nothing played yet</string>
+    <string name="recent_empty_message">Tracks you play will appear here.</string>
+    <string name="now_playing_open">Now playing: %1$s — %2$s, open player</string>
+    <string name="now_playing_open_no_artist">Now playing: %1$s, open player</string>
+    <string name="now_playing_state_playing">Playing</string>
+    <string name="now_playing_state_paused">Paused</string>
+    <string name="player_collapse">Collapse player</string>
+    <string name="player_queue_position">%1$d of %2$d</string>
+    <string name="player_play">Play</string>
+    <string name="player_pause">Pause</string>
+    <string name="player_next">Next track</string>
+    <string name="player_previous">Previous track</string>
+    <string name="player_seek">Track position</string>
+    <string name="player_position_of">%1$s of %2$s</string>
+    <string name="settings_open_player_title">Open the player when a track starts</string>
+    <string name="settings_open_player_subtitle">When off, the track just starts and the player opens from the Now playing button at the top</string>
+
+    <!-- Stage 5: full-screen player -->
+    <string name="settings_player_tint_title">Artwork tint in the player</string>
+    <string name="settings_player_tint_subtitle">A faint colour from the cover behind the full-screen player</string>
+    <string name="player_source_search">Search: “%1$s”</string>
+    <string name="player_open_queue">Open queue</string>
+    <string name="player_track_menu">Track options</string>
+    <string name="player_buffering">Loading</string>
+    <string name="player_retry">Try again</string>
+    <string name="queue_title">Queue</string>
+    <string name="queue_up_next">Up next</string>
+    <string name="queue_shuffled">shuffled</string>
+    <string name="queue_nothing_next">Nothing else in the queue</string>
+    <string name="queue_then_repeat_all">Then the queue starts over</string>
+    <string name="queue_then_repeat_one">The current track repeats</string>
+    <string name="track_menu_details">File details</string>
+    <string name="track_menu_share">Share file</string>
+    <string name="share_chooser_title">Share track</string>
+    <string name="share_failed">Couldn\'t share the file</string>
+    <string name="details_field_title">Title</string>
+    <string name="details_field_artist">Artist</string>
+    <string name="details_field_album">Album</string>
+    <string name="details_field_album_artist">Album artist</string>
+    <string name="details_field_genre">Genre</string>
+    <string name="details_field_year">Year</string>
+    <string name="details_field_track">Track number</string>
+    <string name="details_field_disc">Disc</string>
+    <string name="details_field_duration">Duration</string>
+    <string name="details_field_format">Format</string>
+    <string name="details_field_size">Size</string>
+    <string name="details_field_file">File</string>
+    <string name="details_field_folder">Folder</string>
+    <string name="details_unavailable">The file is unavailable right now: it was deleted or its folder is disconnected</string>
+    <string name="details_not_found">This track is no longer in the library</string>
+</resources>

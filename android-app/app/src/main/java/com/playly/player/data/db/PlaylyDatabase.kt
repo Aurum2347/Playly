@@ -1,0 +1,63 @@
+package com.playly.player.data.db
+
+import android.content.Context
+import androidx.room.Database
+import androidx.room.Room
+import androidx.room.RoomDatabase
+import androidx.room.migration.Migration
+import androidx.sqlite.db.SupportSQLiteDatabase
+
+@Database(
+    entities = [
+        LibrarySourceEntity::class,
+        TrackEntity::class,
+        PlaylistEntity::class,
+        PlaylistEntryEntity::class,
+        PlayHistoryEntity::class,
+    ],
+    version = PlaylyDatabase.VERSION,
+    exportSchema = true,
+)
+abstract class PlaylyDatabase : RoomDatabase() {
+    abstract fun trackDao(): TrackDao
+    abstract fun librarySourceDao(): LibrarySourceDao
+    abstract fun playlistDao(): PlaylistDao
+    abstract fun playHistoryDao(): PlayHistoryDao
+
+    companion object {
+        const val NAME = "playly.db"
+        const val VERSION = 3
+
+        /**
+         * Every schema change needs a Migration here and a new exported schema in app/schemas.
+         * There is deliberately no destructive fallback: an update must never wipe playlists.
+         */
+        val MIGRATION_1_2 = object : Migration(1, 2) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE library_sources ADD COLUMN is_accessible INTEGER NOT NULL DEFAULT 1")
+                db.execSQL("ALTER TABLE tracks ADD COLUMN album_id INTEGER")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_tracks_folder_path ON tracks (folder_path)")
+            }
+        }
+
+        /** Stage 4: play history for "Recently played". */
+        val MIGRATION_2_3 = object : Migration(2, 3) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS `play_history` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, " +
+                        "`track_id` INTEGER NOT NULL, `played_at` INTEGER NOT NULL, " +
+                        "FOREIGN KEY(`track_id`) REFERENCES `tracks`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+                )
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_play_history_track_id` ON `play_history` (`track_id`)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_play_history_played_at` ON `play_history` (`played_at`)")
+            }
+        }
+
+        val MIGRATIONS: Array<Migration> = arrayOf(MIGRATION_1_2, MIGRATION_2_3)
+
+        fun build(context: Context): PlaylyDatabase =
+            Room.databaseBuilder(context, PlaylyDatabase::class.java, NAME)
+                .addMigrations(*MIGRATIONS)
+                .build()
+    }
+}

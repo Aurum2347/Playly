@@ -1,0 +1,196 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name" translatable="false">Playly</string>
+
+    <!-- Navigation -->
+    <string name="nav_home">Главная</string>
+    <string name="nav_library">Медиатека</string>
+    <string name="nav_playlists">Плейлисты</string>
+    <string name="nav_search">Поиск</string>
+
+    <!-- Actions -->
+    <string name="action_back">Назад</string>
+    <string name="action_cancel">Отмена</string>
+    <string name="action_clear">Очистить</string>
+    <string name="action_retry">Повторить</string>
+    <string name="action_search">Поиск</string>
+    <string name="action_settings">Настройки</string>
+    <string name="action_pick_folder">Выбрать папку с музыкой</string>
+    <string name="action_remove">Убрать</string>
+    <string name="action_remove_folder">Убрать папку «%1$s»</string>
+    <string name="action_later">Позже</string>
+
+    <!-- Onboarding -->
+    <string name="onboarding_title">Добро пожаловать в Playly</string>
+    <string name="onboarding_subtitle">Выберите папку с музыкой: Playly покажет только её треки вместе с подпапками.</string>
+    <string name="onboarding_point_offline">Работает без интернета</string>
+    <string name="onboarding_point_account">Без аккаунта, подписок и рекламы</string>
+    <string name="onboarding_point_device">Файлы, плейлисты и настройки остаются на устройстве</string>
+
+    <!-- Library states -->
+    <string name="all_tracks">Все треки</string>
+    <string name="state_loading_library">Загружаем медиатеку…</string>
+    <string name="state_loading_playlists">Загружаем плейлисты…</string>
+    <string name="state_loading_settings">Загружаем настройки…</string>
+    <string name="state_scanning">Ищем музыку на устройстве…</string>
+    <string name="state_not_scanned_title">Медиатека ещё не заполнена</string>
+    <string name="state_not_scanned_message">Папка выбрана, но ещё не сканировалась. Треки появятся здесь после сканирования.</string>
+    <string name="state_empty_title">В папке нет музыки</string>
+    <string name="state_empty_message">В выбранной папке и её подпапках не нашлось аудиофайлов. Выберите другую папку.</string>
+    <string name="state_error_title">Что-то пошло не так</string>
+    <string name="state_error_library">Не удалось прочитать медиатеку. Ваши файлы не затронуты.</string>
+    <string name="state_error_playlists">Не удалось прочитать плейлисты. Данные не удалены.</string>
+    <string name="state_no_playlists_title">Плейлистов пока нет</string>
+    <string name="state_no_playlists_message">Здесь будут ваши плейлисты.</string>
+
+    <!-- Search -->
+    <string name="search_hint">Треки, исполнители, альбомы, плейлисты</string>
+    <string name="search_idle_title">Поиск по медиатеке</string>
+    <string name="search_idle_message">Ищет по названиям, исполнителям, альбомам и плейлистам прямо на устройстве.</string>
+    <string name="search_not_ready_title">Искать пока негде</string>
+    <string name="search_not_ready_message">В медиатеке ещё нет треков.</string>
+    <string name="search_indexing">Медиатека ещё индексируется…</string>
+    <string name="search_no_results_title">Ничего не найдено</string>
+    <string name="search_no_results_message">По запросу «%1$s» ничего нет.</string>
+    <string name="search_error">Не удалось выполнить поиск. Попробуйте изменить запрос.</string>
+    <string name="search_section_tracks">Треки</string>
+    <string name="search_section_playlists">Плейлисты</string>
+
+    <!-- Settings -->
+    <string name="settings_title">Настройки</string>
+    <string name="settings_section_library">Медиатека</string>
+    <string name="settings_section_appearance">Внешний вид</string>
+    <string name="settings_section_about">О приложении</string>
+    <string name="settings_stats_title">Треков в медиатеке</string>
+    <string name="settings_reduce_motion_title">Уменьшить анимацию</string>
+    <string name="settings_reduce_motion_subtitle">Отключает переходы и движение. Если анимация выключена в системе, Playly тоже её не показывает.</string>
+    <string name="settings_version_title">Версия</string>
+    <string name="settings_version_value">%1$s (%2$d)</string>
+    <string name="settings_offline_title">Без интернета</string>
+    <string name="settings_offline_subtitle">У Playly нет разрешения на доступ в сеть: медиатека, поиск и настройки работают только на устройстве.</string>
+    <string name="settings_source_title">Исходный код</string>
+
+    <!-- Library scanning (stage 2) -->
+    <string name="action_rescan">Обновить медиатеку</string>
+    <string name="state_scanning_found">Обновляем медиатеку… найдено: %1$d</string>
+    <string name="state_scan_failed">Не удалось просканировать медиатеку. Файлы на устройстве не затронуты.</string>
+    <string name="unknown_artist">Неизвестный исполнитель</string>
+    <string name="message_scan_changes">Медиатека обновлена · новых: %1$d, изменено: %2$d, пропало: %3$d</string>
+    <string name="message_scan_no_changes">Медиатека актуальна, изменений нет</string>
+    <string name="message_scan_unreadable">Не удалось прочитать файлов: %1$d. Они пропущены.</string>
+    <string name="message_scan_folders_inaccessible">Нет доступа к папке с музыкой. Выберите её снова в настройках.</string>
+    <string name="message_scan_failed">Не удалось обновить медиатеку. Файлы на устройстве не затронуты.</string>
+    <string name="settings_folder_inaccessible">%1$s · нет доступа. Нажмите, чтобы выбрать папку снова</string>
+    <string name="settings_rescan_subtitle_last">Последнее обновление: %1$s</string>
+    <string name="settings_rescan_subtitle_never">Ещё не выполнялось</string>
+    <string name="settings_rescan_subtitle_just_now">Последнее обновление: только что</string>
+    <string name="settings_stats_unavailable">%1$s · недоступно: %2$d</string>
+
+    <!-- Dialogs and messages -->
+    <string name="dialog_remove_folder_title">Убрать папку?</string>
+    <string name="dialog_remove_folder_message">«%1$s» больше не будет папкой с музыкой, медиатека станет пустой. Файлы на устройстве не удаляются.</string>
+    <string name="message_folder_added">Папка с музыкой: «%1$s»</string>
+    <string name="message_folder_already_added">Папка «%1$s» уже выбрана, обновляю</string>
+    <string name="message_folder_refused">Не удалось сохранить доступ к этой папке. Выберите другую.</string>
+    <string name="message_folder_removed">Папка «%1$s» убрана</string>
+    <string name="message_picker_unavailable">На устройстве нет системного выбора папок</string>
+    <string name="message_no_browser">Не найдено приложение для открытия ссылки</string>
+
+    <!-- Formatting -->
+    <string name="summary_separator">%1$s · %2$s</string>
+    <string name="duration_hours_minutes">%1$d ч %2$d мин</string>
+    <string name="duration_minutes">%1$d мин</string>
+    <plurals name="tracks_count">
+        <item quantity="one">%d трек</item>
+        <item quantity="few">%d трека</item>
+        <item quantity="many">%d треков</item>
+        <item quantity="other">%d трека</item>
+    </plurals>
+
+    <!-- Playback (stage 3) -->
+    <string name="playback_channel_name">Воспроизведение</string>
+    <string name="playback_shuffle_on">Перемешивание включено</string>
+    <string name="playback_shuffle_off">Перемешивание выключено</string>
+    <string name="playback_repeat_off">Повтор выключен</string>
+    <string name="playback_repeat_all">Повтор всех</string>
+    <string name="playback_repeat_one">Повтор трека</string>
+    <string name="playback_now_playing">Сейчас играет</string>
+    <string name="playback_error_missing">Файл «%1$s» не найден</string>
+    <string name="playback_error_no_access">Нет доступа к файлу «%1$s»</string>
+    <string name="playback_error_unsupported">Формат файла «%1$s» не поддерживается</string>
+    <string name="playback_error_damaged">Файл «%1$s» повреждён</string>
+    <string name="playback_error_other">Не удалось воспроизвести «%1$s»</string>
+    <string name="playback_error_skipped">%1$s. Включён следующий трек</string>
+    <string name="playback_error_stopped">%1$s. Воспроизведение остановлено</string>
+    <string name="playback_unknown_track">трек</string>
+    <string name="playback_nothing_playable">Трек недоступен: файл удалён или его папка отключена. Обновите медиатеку.</string>
+    <string name="action_change_folder">Сменить папку</string>
+    <string name="state_no_folder_title">Папка с музыкой не выбрана</string>
+    <string name="state_no_folder_message">Playly показывает треки только из выбранной папки и её подпапок. Другие файлы на телефоне он не читает.</string>
+    <string name="settings_folder_title">Папка с музыкой</string>
+    <string name="settings_pick_folder_subtitle">Медиатека строится только из этой папки и её подпапок</string>
+    <string name="settings_change_folder_subtitle">Текущая папка будет заменена новой</string>
+
+    <!-- Stage 4: Home, Now playing button, player -->
+    <string name="home_recent">Недавно слушали</string>
+    <string name="action_see_all">Все</string>
+    <string name="action_see_all_description">Все недавно прослушанные</string>
+    <string name="action_play_all">Слушать</string>
+    <string name="action_shuffle_all">Перемешать</string>
+    <string name="sort_current">Сортировка: %1$s</string>
+    <string name="sort_title">По названию</string>
+    <string name="sort_artist">По исполнителю</string>
+    <string name="sort_album">По альбому</string>
+    <string name="sort_date_added">Сначала новые</string>
+    <string name="sort_duration">Сначала длинные</string>
+    <string name="recent_empty_title">Вы ещё ничего не слушали</string>
+    <string name="recent_empty_message">Здесь появятся треки, которые вы включали.</string>
+    <string name="now_playing_open">Сейчас играет: %1$s — %2$s, открыть плеер</string>
+    <string name="now_playing_open_no_artist">Сейчас играет: %1$s, открыть плеер</string>
+    <string name="now_playing_state_playing">Воспроизводится</string>
+    <string name="now_playing_state_paused">На паузе</string>
+    <string name="player_collapse">Свернуть плеер</string>
+    <string name="player_queue_position">%1$d из %2$d</string>
+    <string name="player_play">Воспроизвести</string>
+    <string name="player_pause">Пауза</string>
+    <string name="player_next">Следующий трек</string>
+    <string name="player_previous">Предыдущий трек</string>
+    <string name="player_seek">Позиция в треке</string>
+    <string name="player_position_of">%1$s из %2$s</string>
+    <string name="settings_open_player_title">Открывать плеер при запуске трека</string>
+    <string name="settings_open_player_subtitle">Если выключено, трек просто начинает играть, а плеер открывается кнопкой «Сейчас играет» в шапке</string>
+
+    <!-- Stage 5: full-screen player -->
+    <string name="settings_player_tint_title">Оттенок обложки в плеере</string>
+    <string name="settings_player_tint_subtitle">Едва заметный цвет обложки на фоне полноэкранного плеера</string>
+    <string name="player_source_search">Поиск: «%1$s»</string>
+    <string name="player_open_queue">Открыть очередь</string>
+    <string name="player_track_menu">Действия с треком</string>
+    <string name="player_buffering">Загрузка</string>
+    <string name="player_retry">Повторить</string>
+    <string name="queue_title">Очередь</string>
+    <string name="queue_up_next">Далее</string>
+    <string name="queue_shuffled">в случайном порядке</string>
+    <string name="queue_nothing_next">Дальше в очереди ничего нет</string>
+    <string name="queue_then_repeat_all">Затем очередь начнётся сначала</string>
+    <string name="queue_then_repeat_one">Текущий трек повторяется</string>
+    <string name="track_menu_details">Сведения о файле</string>
+    <string name="track_menu_share">Поделиться файлом</string>
+    <string name="share_chooser_title">Поделиться треком</string>
+    <string name="share_failed">Не удалось поделиться файлом</string>
+    <string name="details_field_title">Название</string>
+    <string name="details_field_artist">Исполнитель</string>
+    <string name="details_field_album">Альбом</string>
+    <string name="details_field_album_artist">Исполнитель альбома</string>
+    <string name="details_field_genre">Жанр</string>
+    <string name="details_field_year">Год</string>
+    <string name="details_field_track">Номер трека</string>
+    <string name="details_field_disc">Диск</string>
+    <string name="details_field_duration">Длительность</string>
+    <string name="details_field_format">Формат</string>
+    <string name="details_field_size">Размер</string>
+    <string name="details_field_file">Файл</string>
+    <string name="details_field_folder">Папка</string>
+    <string name="details_unavailable">Файл сейчас недоступен: он удалён или его папка отключена</string>
+    <string name="details_not_found">Этого трека больше нет в медиатеке</string>
+</resources>
