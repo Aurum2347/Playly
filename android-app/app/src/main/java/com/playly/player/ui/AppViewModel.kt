@@ -16,6 +16,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
@@ -23,13 +24,14 @@ import kotlinx.coroutines.launch
 class AppViewModel(
     private val settings: SettingsRepository,
     playback: PlaybackController,
+    bus: UiMessageBus,
 ) : ViewModel() {
     val appSettings: StateFlow<AppSettings?> = settings.settings
         .map<AppSettings, AppSettings?> { it }
         .stateIn(viewModelScope, SharingStarted.Eagerly, null)
 
     /** Playback problems for the shared snackbar, whichever screen is open. */
-    val playbackMessages: Flow<UiMessage> = playback.events.map { it.toMessage() }
+    val playbackMessages: Flow<UiMessage> = merge(playback.events.map { it.toMessage() }, bus.messages)
 
     private val _openLibraryOnce = MutableStateFlow(false)
     /** After onboarding picks the music folder, the first screen is the library (spec §4). */
@@ -57,7 +59,7 @@ class AppViewModel(
     }
 
     companion object {
-        val Factory = viewModelFactory { initializer { AppViewModel(container.settings, container.playback) } }
+        val Factory = viewModelFactory { initializer { AppViewModel(container.settings, container.playback, container.messages) } }
     }
 }
 

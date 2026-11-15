@@ -27,6 +27,7 @@ import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.material3.Snackbar
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
@@ -40,6 +41,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.compose.dropUnlessResumed
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -55,10 +57,19 @@ import androidx.navigation.compose.navigation
 import androidx.navigation.compose.rememberNavController
 import com.playly.player.designsystem.PlaylyTheme
 import com.playly.player.designsystem.components.PlaylyIcon
+import com.playly.player.ui.actions.LocalTrackActions
+import com.playly.player.ui.actions.TrackActionsHost
+import com.playly.player.ui.actions.TrackActionsViewModel
 import com.playly.player.ui.navigation.HomeGraph
 import com.playly.player.ui.navigation.HomeRoute
 import com.playly.player.ui.navigation.RecentRoute
 import com.playly.player.ui.navigation.LibraryRoute
+import com.playly.player.ui.navigation.AddTracksRoute
+import com.playly.player.ui.navigation.CollectionRoute
+import com.playly.player.ui.screens.collections.CollectionScreen
+import com.playly.player.data.library.browse.CollectionKind
+import androidx.navigation.toRoute
+import com.playly.player.ui.navigation.PlaylistRoute
 import com.playly.player.ui.navigation.PlaylistsRoute
 import com.playly.player.ui.navigation.SearchRoute
 import com.playly.player.ui.navigation.SettingsRoute
@@ -73,6 +84,8 @@ import com.playly.player.ui.screens.library.LibraryScreen
 import com.playly.player.ui.screens.library.RecentScreen
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withTimeoutOrNull
+import com.playly.player.ui.screens.playlists.AddTracksScreen
+import com.playly.player.ui.screens.playlists.PlaylistScreen
 import com.playly.player.ui.screens.playlists.PlaylistsScreen
 import com.playly.player.ui.screens.search.SearchScreen
 import com.playly.player.ui.screens.settings.SettingsScreen
@@ -97,6 +110,8 @@ fun MainScaffold(
     val motion = PlaylyTheme.motion
 
     val playerViewModel: PlayerViewModel = viewModel(factory = PlayerViewModel.Factory)
+    // Activity-scoped: an open track sheet survives rotation and tab switches.
+    val trackActions: TrackActionsViewModel = viewModel(factory = TrackActionsViewModel.Factory)
     val badgeState = playerViewModel.badge.collectAsStateWithLifecycle()
     val badge by badgeState
     val launcher = rememberSaveable(saver = PlayerLauncher.Saver) { PlayerLauncher() }
@@ -123,8 +138,32 @@ fun MainScaffold(
     val openSearch = dropUnlessResumed { nav.navigateToTopLevel(TopLevelDestination.Search) }
     val openRecent = dropUnlessResumed { nav.navigate(RecentRoute) { launchSingleTop = true } }
     val goBack = dropUnlessResumed { nav.popBackStack() }
+    val openPlaylist: (Long) -> Unit = { id ->
+        // Same guard as dropUnlessResumed: a second tap during the transition does nothing.
+        if (nav.currentBackStackEntry?.lifecycle?.currentState?.isAtLeast(Lifecycle.State.RESUMED) == true) {
+            nav.navigate(PlaylistRoute(id)) { launchSingleTop = true }
+        }
+    }
+    val openAddTracks: (Long) -> Unit = { id ->
+        if (nav.currentBackStackEntry?.lifecycle?.currentState?.isAtLeast(Lifecycle.State.RESUMED) == true) {
+            nav.navigate(AddTracksRoute(id)) { launchSingleTop = true }
+        }
+    }
 
-    CompositionLocalProvider(LocalPlayerLauncher provides launcher, LocalNowPlayingBadge provides badge) {
+    val openCollection: (CollectionKind, String) -> Unit = { kind, key ->
+        val route = CollectionRoute(kind.name, key)
+        val current = nav.currentBackStackEntry
+        val alreadyHere = current?.destination?.hasRoute(CollectionRoute::class) == true && current.toRoute<CollectionRoute>() == route
+        // From the player's menu: close it so the page is visible.
+        launcher.close()
+        if (!alreadyHere && current?.lifecycle?.currentState?.isAtLeast(Lifecycle.State.RESUMED) == true) nav.navigate(route)
+    }
+
+    CompositionLocalProvider(
+        LocalPlayerLauncher provides launcher,
+        LocalNowPlayingBadge provides badge,
+        LocalTrackActions provides trackActions,
+    ) {
         Box(Modifier.fillMaxSize()) {
             Column(
                 Modifier
@@ -150,9 +189,23 @@ fun MainScaffold(
                             popExitTransition = { slideOutHorizontally(motion.exit()) { it / 4 } + fadeOut(motion.exit()) },
                         ) { RecentScreen(onBack = goBack) }
                     }
-                    composable<LibraryRoute> { LibraryScreen(onOpenSettings = openSettings) }
-                    composable<PlaylistsRoute> { PlaylistsScreen() }
-                    composable<SearchRoute> { SearchScreen(onBack = goBack) }
+                    composable<LibraryRoute> { LibraryScreen(onOpenSettings = openSettings, onOpenCollection = openCollection) }
+                    composable<PlaylistsRoute> { PlaylistsScreen(onOpenPlaylist = openPlaylist) }
+                    composable<PlaylistRoute>(
+                        enterTransition = { slideInHorizontally(motion.enter()) { it / 4 } + fadeIn(motion.enter()) },
+                        popExitTransition = { slideOutHorizontally(motion.exit()) { it / 4 } + fadeOut(motion.exit()) },
+                    ) { PlaylistScreen(onBack = goBack, onAddTracks = openAddTracks) }
+                    composable<AddTracksRoute>(
+                        enterTransition = { slideInHorizontally(motion.enter()) { it / 4 } + fadeIn(motion.enter()) },
+                        popExitTransition = { slideOutHorizontally(motion.exit()) { it / 4 } + fadeOut(motion.exit()) },
+                    ) { AddTracksScreen(onBack = goBack) }
+                    composable<SearchRoute> {
+                        SearchScreen(onBack = goBack, onOpenPlaylist = openPlaylist, onOpenCollection = openCollection)
+                    }
+                    composable<CollectionRoute>(
+                        enterTransition = { slideInHorizontally(motion.enter()) { it / 4 } + fadeIn(motion.enter()) },
+                        popExitTransition = { slideOutHorizontally(motion.exit()) { it / 4 } + fadeOut(motion.exit()) },
+                    ) { CollectionScreen(onBack = goBack, onOpenCollection = openCollection) }
                     composable<SettingsRoute>(
                         enterTransition = { slideInHorizontally(motion.enter()) { it / 4 } + fadeIn(motion.enter()) },
                         popExitTransition = { slideOutHorizontally(motion.exit()) { it / 4 } + fadeOut(motion.exit()) },
@@ -167,13 +220,14 @@ fun MainScaffold(
                 }
             }
             PlayerOverlay(launcher, playerViewModel)
+            TrackActionsHost(trackActions, onOpenCollection = openCollection)
             SnackbarHost(
                 hostState = LocalSnackbarHostState.current,
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
                     .windowInsetsPadding(WindowInsets.navigationBars)
                     .padding(bottom = if (onTopLevel && !playerVisible) PlaylyTheme.spacing.bottomBarHeight else 0.dp),
-            ) { data -> PlaylySnackbar(data.visuals.message) }
+            ) { data -> PlaylySnackbar(data.visuals.message, data.visuals.actionLabel, data::performAction) }
         }
     }
 }
@@ -181,12 +235,19 @@ fun MainScaffold(
 private const val PLAYER_REQUEST_TIMEOUT_MS = 5_000L
 
 @Composable
-fun PlaylySnackbar(message: String) {
+fun PlaylySnackbar(message: String, actionLabel: String? = null, onAction: () -> Unit = {}) {
     Snackbar(
         modifier = Modifier.padding(PlaylyTheme.spacing.md),
         containerColor = PlaylyTheme.colors.surfaceOverlay,
         contentColor = PlaylyTheme.colors.textPrimary,
         shape = PlaylyTheme.shapes.medium,
+        action = actionLabel?.let { label ->
+            {
+                TextButton(onClick = onAction) {
+                    Text(label, style = PlaylyTheme.typography.button, color = PlaylyTheme.colors.textPrimary)
+                }
+            }
+        },
     ) { Text(message, style = PlaylyTheme.typography.subtitle) }
 }
 

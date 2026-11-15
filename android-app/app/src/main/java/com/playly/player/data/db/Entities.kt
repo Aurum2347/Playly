@@ -85,14 +85,17 @@ data class PlaylistEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     val name: String,
     val description: String? = null,
+    /** A picture the user chose (persisted SAF grant); null means the automatic cover. */
     @ColumnInfo(name = "cover_uri") val coverUri: String? = null,
     @ColumnInfo(name = "created_at") val createdAt: Long,
     @ColumnInfo(name = "updated_at") val updatedAt: Long,
+    /** PlaylistSort.code of the playlist page; 0 = the user's own order. Since v4. */
+    @ColumnInfo(name = "sort_order", defaultValue = "0") val sortOrder: Int = 0,
 )
 
 /**
  * Ordered playlist membership. Entries have their own id, so the same track may appear
- * twice; whether the UI allows that is a stage 6 rule, the schema does not drop duplicates.
+ * twice: the UI adds a duplicate only after the user confirms it (stage 6 rule).
  */
 @Entity(
     tableName = "playlist_entries",
@@ -186,4 +189,30 @@ data class PlaylistSummary(
     @Embedded val playlist: PlaylistEntity,
     @ColumnInfo(name = "track_count") val trackCount: Int,
     @ColumnInfo(name = "total_duration_ms") val totalDurationMs: Long,
+)
+
+/** One row of a playlist page: the entry (its own id and order) and its track, available or not. */
+data class PlaylistTrackRow(
+    @ColumnInfo(name = "entry_id") val entryId: Long,
+    @ColumnInfo(name = "entry_added_at") val entryAddedAt: Long,
+    @ColumnInfo(name = "is_available") val isAvailable: Boolean,
+    @Embedded val track: TrackListItem,
+)
+
+/** One of the first tracks of a playlist, for its automatic cover. */
+data class PlaylistCoverTrack(
+    @ColumnInfo(name = "playlist_id") val playlistId: Long,
+    @Embedded val track: TrackListItem,
+)
+
+data class EntryPosition(val id: Long, val position: Int)
+
+/** A track with the tags the library tabs group by (stage 7): albums, artists, genres, folders. */
+data class BrowseTrack(
+    @Embedded val track: TrackListItem,
+    @ColumnInfo(name = "album_artist") val albumArtist: String?,
+    val genre: String?,
+    val year: Int?,
+    @ColumnInfo(name = "folder_path") val folderPath: String?,
+    @ColumnInfo(name = "search_key") val searchKey: String,
 )

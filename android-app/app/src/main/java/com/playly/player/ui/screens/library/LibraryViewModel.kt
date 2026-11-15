@@ -103,6 +103,10 @@ class LibraryViewModel(
     /** Plays [tracks] as the queue, starting at [index]: the list the user sees is the context. */
     fun play(tracks: List<TrackListItem>, index: Int) = playback.playTracks(tracks.map { it.id }, index, source = SOURCE)
 
+    /** A file of the music folder's root: the whole folder plays from it (Folders section). */
+    fun playFolder(queue: List<TrackListItem>, index: Int) =
+        playback.playTracks(queue.map { it.id }, index, source = PlaybackSource(PlaybackSource.Kind.Folder))
+
     /** "Play": the whole list in order from the top. "Shuffle": all of it, from a random track. */
     fun playAll(tracks: List<TrackListItem>, shuffle: Boolean) {
         if (tracks.isEmpty()) return

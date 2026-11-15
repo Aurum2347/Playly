@@ -45,6 +45,10 @@ internal class PlaybackSessionCallback(
             .add(PlaybackCommands.TOGGLE_SHUFFLE)
             .add(PlaybackCommands.CYCLE_REPEAT)
             .add(PlaybackCommands.PLAY_TRACKS)
+            .add(PlaybackCommands.QUEUE_ADD)
+            .add(PlaybackCommands.QUEUE_MOVE)
+            .add(PlaybackCommands.QUEUE_REMOVE)
+            .add(PlaybackCommands.QUEUE_CLEAR_UPCOMING)
             .build()
         return Futures.immediateFuture(
             ConnectionResult.AcceptedResultBuilder(session, controller)
@@ -63,6 +67,15 @@ internal class PlaybackSessionCallback(
             PlaybackCommands.PLAY_TRACKS.customAction -> return playTracks(session, args)
             PlaybackCommands.TOGGLE_SHUFFLE.customAction -> service.toggleShuffle()
             PlaybackCommands.CYCLE_REPEAT.customAction -> service.cycleRepeat()
+            PlaybackCommands.QUEUE_ADD.customAction -> return addToQueue(args)
+            PlaybackCommands.QUEUE_MOVE.customAction -> service.moveInQueue(
+                uid = args.getLong(PlaybackCommands.ARG_UID),
+                afterUid = args.getLong(PlaybackCommands.ARG_AFTER_UID),
+                toQueue = args.getBoolean(PlaybackCommands.ARG_QUEUED),
+            )
+            PlaybackCommands.QUEUE_REMOVE.customAction ->
+                service.removeFromQueue(args.getLongArray(PlaybackCommands.ARG_UIDS)?.toHashSet().orEmpty())
+            PlaybackCommands.QUEUE_CLEAR_UPCOMING.customAction -> service.clearUpcoming()
             else -> return Futures.immediateFuture(SessionResult(SessionError.ERROR_NOT_SUPPORTED))
         }
         return Futures.immediateFuture(SessionResult(SessionResult.RESULT_SUCCESS))
@@ -84,7 +97,19 @@ internal class PlaybackSessionCallback(
         SessionResult(SessionResult.RESULT_SUCCESS)
     }
 
-    /** "Play next" / "add to queue": ids in, playable items out; gone files are dropped. */
+    /** "Play next" / "Add to queue" from Playly's own menus. */
+    private fun addToQueue(args: Bundle): ListenableFuture<SessionResult> = scope.future {
+        val requested = args.getLongArray(PlaybackCommands.ARG_TRACK_IDS)?.toList().orEmpty()
+        val resolved = service.items.resolve(requested)
+        if (resolved.isEmpty()) return@future SessionResult(SessionError.ERROR_BAD_VALUE)
+        val started = service.addToQueue(resolved, args.getBoolean(PlaybackCommands.ARG_NEXT))
+        val result = Bundle()
+        result.putInt(PlaybackCommands.ARG_ADDED, resolved.size)
+        result.putBoolean(PlaybackCommands.ARG_STARTED, started)
+        SessionResult(SessionResult.RESULT_SUCCESS, result)
+    }
+
+    /** Standard addMediaItems from other controllers: ids in, playable items out; gone files are dropped. */
     override fun onAddMediaItems(
         mediaSession: MediaSession,
         controller: MediaSession.ControllerInfo,

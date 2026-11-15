@@ -1,7 +1,8 @@
 package com.playly.player.designsystem.components
 
 import androidx.annotation.DrawableRes
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
@@ -12,7 +13,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.customActions
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontWeight
@@ -26,7 +29,9 @@ import com.playly.player.designsystem.PlaylyTheme
 /**
  * Card for horizontal shelves (Home): square cover, title, one caption line.
  * The whole card is one touch target; [isActive] marks the current track like [MediaRow] does.
+ * [onLongClick] opens the item's menu (also offered to TalkBack as [longClickLabel]).
  */
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun MediaCard(
     title: String,
@@ -37,6 +42,8 @@ fun MediaCard(
     @DrawableRes placeholderIcon: Int = R.drawable.ic_music_note,
     isActive: Boolean = false,
     width: Dp = CARD_WIDTH,
+    onLongClick: (() -> Unit)? = null,
+    longClickLabel: String? = null,
 ) {
     val colors = PlaylyTheme.colors
     val nowPlaying = stringResource(R.string.playback_now_playing)
@@ -44,8 +51,13 @@ fun MediaCard(
         modifier = modifier
             .width(width + PADDING * 2)
             .clip(PlaylyTheme.shapes.medium)
-            .clickable(role = Role.Button, onClick = onClick)
-            .semantics(mergeDescendants = true) { if (isActive) stateDescription = nowPlaying }
+            .combinedClickable(role = Role.Button, onLongClick = onLongClick, onLongClickLabel = longClickLabel, onClick = onClick)
+            .semantics(mergeDescendants = true) {
+                if (isActive) stateDescription = nowPlaying
+                if (onLongClick != null && longClickLabel != null) {
+                    customActions = listOf(CustomAccessibilityAction(longClickLabel) { onLongClick(); true })
+                }
+            }
             .padding(PADDING),
     ) {
         TrackArtwork(

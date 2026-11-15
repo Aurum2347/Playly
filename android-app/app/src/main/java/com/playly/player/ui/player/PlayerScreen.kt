@@ -90,6 +90,8 @@ import com.playly.player.R
 import com.playly.player.core.formatClock
 import com.playly.player.designsystem.PlaylyMotion
 import com.playly.player.designsystem.PlaylyTheme
+import com.playly.player.ui.actions.LocalTrackActions
+import com.playly.player.ui.actions.TrackTarget
 import com.playly.player.designsystem.components.PlaylyIcon
 import com.playly.player.designsystem.components.PlaylyIconButton
 import com.playly.player.designsystem.components.PlaylySeekBar
@@ -152,9 +154,9 @@ private fun PlayerSheet(state: PlaybackState, viewModel: PlayerViewModel, onColl
     var height by remember { mutableIntStateOf(0) }
     val pane = stringResource(R.string.playback_now_playing)
 
-    // One sheet at a time (spec §12); kept across rotation.
-    var sheet by rememberSaveable { mutableStateOf(PlayerSheetKind.None) }
-    val closeSheet = { sheet = PlayerSheetKind.None }
+    // The queue sheet; the track menu lives in the shared TrackActionsHost (one sheet at a time, spec §12).
+    var queueOpen by rememberSaveable { mutableStateOf(false) }
+    val actions = LocalTrackActions.current
 
     // Optional cover tint (spec §10): a faint wash at the top, fading into the plain background.
     val tintEnabled by viewModel.artworkTint.collectAsStateWithLifecycle()
@@ -202,9 +204,12 @@ private fun PlayerSheet(state: PlaybackState, viewModel: PlayerViewModel, onColl
             val boxHeight = maxHeight
             val landscape = boxWidth > boxHeight
             val onTint: ((Color?) -> Unit)? = if (tintEnabled) { color -> tint = color } else null
-            val openMenu = { sheet = PlayerSheetKind.Menu }
+            val openMenu = {
+                actions?.open(TrackTarget(track.trackId, track.title, track.artist, track.artwork, queueActions = false))
+                Unit
+            }
             Column(Modifier.fillMaxSize()) {
-                PlayerTopBar(state, onCollapse, onQueue = { sheet = PlayerSheetKind.Queue })
+                PlayerTopBar(state, onCollapse, onQueue = { queueOpen = true })
                 if (landscape) {
                     val art = minOf(boxHeight - TOP_BAR - 32.dp, boxWidth * 0.42f)
                     Row(
@@ -232,42 +237,21 @@ private fun PlayerSheet(state: PlaybackState, viewModel: PlayerViewModel, onColl
         }
     }
 
-    PlayerSheets(sheet, track, state.shuffle, viewModel, onSheet = { sheet = it }, onDismiss = closeSheet)
+    if (queueOpen) PlayerQueue(state.shuffle, viewModel, onDismiss = { queueOpen = false })
 }
 
-private enum class PlayerSheetKind { None, Menu, Details, Queue }
-
 @Composable
-private fun PlayerSheets(
-    sheet: PlayerSheetKind,
-    track: NowPlaying,
-    shuffle: Boolean,
-    viewModel: PlayerViewModel,
-    onSheet: (PlayerSheetKind) -> Unit,
-    onDismiss: () -> Unit,
-) {
-    val context = LocalContext.current
-    val scope = rememberCoroutineScope()
-    val snackbar = LocalSnackbarHostState.current
-    val shareFailed = stringResource(R.string.share_failed)
-    when (sheet) {
-        PlayerSheetKind.None -> Unit
-        PlayerSheetKind.Menu -> TrackMenuSheet(
-            track = track,
-            onDismiss = onDismiss,
-            onDetails = { onSheet(PlayerSheetKind.Details) },
-            onShare = {
-                scope.launch {
-                    if (!shareTrack(context, viewModel.track(track.trackId))) snackbar.showSnackbar(shareFailed)
-                }
-            },
+private fun PlayerQueue(shuffle: Boolean, viewModel: PlayerViewModel, onDismiss: () -> Unit) {
+    val queue by viewModel.queue.collectAsStateWithLifecycle(initialValue = null)
+    val edits = remember(viewModel) {
+        QueueEdits(
+            onPlay = viewModel::playQueueEntry,
+            onMove = viewModel::moveQueueItem,
+            onRemove = viewModel::removeFromQueue,
+            onClear = viewModel::clearUpcoming,
         )
-        PlayerSheetKind.Details -> TrackDetailsSheet(track.trackId, viewModel::track, onDismiss)
-        PlayerSheetKind.Queue -> {
-            val queue by viewModel.queue.collectAsStateWithLifecycle(initialValue = null)
-            QueueSheet(queue, shuffle, onPlay = viewModel::playQueueEntry, onDismiss = onDismiss)
-        }
     }
+    QueueSheet(queue, shuffle, edits, onDismiss = onDismiss)
 }
 
 @Composable
@@ -306,6 +290,16 @@ private fun sourceLabel(source: PlaybackSource?): String = when (source?.kind) {
     PlaybackSource.Kind.Recent -> stringResource(R.string.home_recent)
     PlaybackSource.Kind.Search -> source.label?.let { stringResource(R.string.player_source_search, it) }
         ?: stringResource(R.string.playback_now_playing)
+    PlaybackSource.Kind.Playlist -> source.label?.let { stringResource(R.string.player_source_playlist, it) }
+        ?: stringResource(R.string.nav_playlists)
+    PlaybackSource.Kind.Album -> source.label?.let { stringResource(R.string.player_source_album, it) }
+        ?: stringResource(R.string.library_tab_albums)
+    PlaybackSource.Kind.Artist -> source.label?.let { stringResource(R.string.player_source_artist, it) }
+        ?: stringResource(R.string.library_tab_artists)
+    PlaybackSource.Kind.Genre -> source.label?.let { stringResource(R.string.player_source_genre, it) }
+        ?: stringResource(R.string.library_tab_genres)
+    PlaybackSource.Kind.Folder -> source.label?.let { stringResource(R.string.player_source_folder, it) }
+        ?: stringResource(R.string.library_tab_folders)
     null -> stringResource(R.string.playback_now_playing)
 }
 

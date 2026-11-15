@@ -55,6 +55,11 @@ class DatabaseTest {
                 assertTrue(it.moveToFirst())
                 assertEquals(1, it.getInt(0))
             }
+            // v4: existing playlists keep the user's own order.
+            migrated.query("SELECT sort_order FROM playlists WHERE id = 1").use {
+                assertTrue(it.moveToFirst())
+                assertEquals(0, it.getInt(0))
+            }
         } finally {
             migrated.close()
         }

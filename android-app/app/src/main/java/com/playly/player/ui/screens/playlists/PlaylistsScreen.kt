@@ -1,81 +1,64 @@
 package com.playly.player.ui.screens.playlists
 
-import android.util.Log
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
-import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
-import androidx.lifecycle.viewmodel.initializer
-import androidx.lifecycle.viewmodel.viewModelFactory
 import com.playly.player.R
-import com.playly.player.data.db.PlaylistSummary
-import com.playly.player.data.library.LibraryRepository
+import com.playly.player.data.playlists.PlaylistCard
 import com.playly.player.designsystem.PlaylyTheme
+import com.playly.player.designsystem.components.ConfirmDialog
 import com.playly.player.designsystem.components.EmptyState
 import com.playly.player.designsystem.components.ErrorState
 import com.playly.player.designsystem.components.LoadingState
-import com.playly.player.designsystem.components.MediaRow
+import com.playly.player.designsystem.components.PlaylistRow
+import com.playly.player.designsystem.components.PlaylyIconButton
 import com.playly.player.designsystem.components.PlaylyTopBar
-import com.playly.player.ui.container
+import com.playly.player.designsystem.components.StateAction
+import com.playly.player.ui.actions.PlaylistDialog
+import com.playly.player.ui.player.LocalPlayerLauncher
 import com.playly.player.ui.player.NowPlayingAction
 import com.playly.player.ui.tracksSummaryLabel
-import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.SharingStarted
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.catch
-import kotlinx.coroutines.flow.flatMapLatest
-import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.stateIn
-import kotlinx.coroutines.flow.update
 
-sealed interface PlaylistsUiState {
-    data object Loading : PlaylistsUiState
-    data object Error : PlaylistsUiState
-    data class Ready(val playlists: List<PlaylistSummary>) : PlaylistsUiState
-}
-
-class PlaylistsViewModel(library: LibraryRepository) : ViewModel() {
-    private val retryTick = MutableStateFlow(0)
-
-    @OptIn(ExperimentalCoroutinesApi::class)
-    val state: StateFlow<PlaylistsUiState> = retryTick
-        .flatMapLatest {
-            library.playlistSummaries
-                .map<_, PlaylistsUiState> { PlaylistsUiState.Ready(it) }
-                .catch { error ->
-                    Log.e("PlaylyPlaylists", "Playlists failed", error)
-                    emit(PlaylistsUiState.Error)
-                }
-        }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), PlaylistsUiState.Loading)
-
-    fun retry() = retryTick.update { it + 1 }
-
-    companion object {
-        val Factory = viewModelFactory { initializer { PlaylistsViewModel(container.library) } }
-    }
-}
-
-/** Read-only list for now; creating and editing playlists is stage 6. */
+/**
+ * Playlists tab (spec §7): cover, name, count and length; "+" creates one and opens it.
+ * A tap opens the page, "⋮" or a long press the playlist menu.
+ */
 @Composable
-fun PlaylistsScreen(viewModel: PlaylistsViewModel = viewModel(factory = PlaylistsViewModel.Factory)) {
+fun PlaylistsScreen(
+    onOpenPlaylist: (Long) -> Unit,
+    viewModel: PlaylistsViewModel = viewModel(factory = PlaylistsViewModel.Factory),
+) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val motion = PlaylyTheme.motion
+    var creating by rememberSaveable { mutableStateOf(false) }
+    var menuFor by rememberSaveable { mutableStateOf<Long?>(null) }
+    var editing by rememberSaveable { mutableStateOf<Long?>(null) }
+    var deleting by rememberSaveable { mutableStateOf<Long?>(null) }
+    val menuLabel = stringResource(R.string.playlist_menu)
+
     Column(Modifier.fillMaxSize()) {
-        PlaylyTopBar(title = stringResource(R.string.nav_playlists), actions = { NowPlayingAction() })
+        PlaylyTopBar(
+            title = stringResource(R.string.nav_playlists),
+            actions = {
+                NowPlayingAction()
+                PlaylyIconButton(R.drawable.ic_add, stringResource(R.string.action_create_playlist), { creating = true })
+            },
+        )
         AnimatedContent(
             targetState = state,
             contentKey = { it::class },
@@ -94,14 +77,20 @@ fun PlaylistsScreen(viewModel: PlaylistsViewModel = viewModel(factory = Playlist
                         icon = R.drawable.ic_playlists,
                         title = stringResource(R.string.state_no_playlists_title),
                         message = stringResource(R.string.state_no_playlists_message),
+                        primaryAction = StateAction(stringResource(R.string.action_create_playlist), { creating = true }, R.drawable.ic_add),
                     )
                 } else {
-                    LazyColumn(Modifier.fillMaxSize()) {
-                        items(current.playlists, key = { it.playlist.id }) { item ->
-                            MediaRow(
-                                title = item.playlist.name,
-                                subtitle = tracksSummaryLabel(item.trackCount, item.totalDurationMs),
-                                placeholderIcon = R.drawable.ic_playlists,
+                    LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = PlaylyTheme.spacing.md)) {
+                        items(current.playlists, key = { it.id }) { card ->
+                            PlaylistRow(
+                                name = card.name,
+                                subtitle = tracksSummaryLabel(card.summary.trackCount, card.summary.totalDurationMs),
+                                covers = card.covers,
+                                coverUri = card.coverUri,
+                                onClick = { onOpenPlaylist(card.id) },
+                                onMore = { menuFor = card.id },
+                                moreDescription = menuLabel,
+                                modifier = Modifier.animateItem(),
                             )
                         }
                     }
@@ -109,4 +98,70 @@ fun PlaylistsScreen(viewModel: PlaylistsViewModel = viewModel(factory = Playlist
             }
         }
     }
+
+    val cards = (state as? PlaylistsUiState.Ready)?.playlists.orEmpty()
+    val launcher = LocalPlayerLauncher.current
+    cards.firstOrNull { it.id == menuFor }?.let { card ->
+        PlaylistMenuSheet(
+            card = card,
+            actions = PlaylistMenuActions(
+                onPlay = { viewModel.commands.play(card.id, card.name, shuffle = false) { launcher.trackStarted(null) } },
+                onShuffle = { viewModel.commands.play(card.id, card.name, shuffle = true) { launcher.trackStarted(null) } },
+                onAddToQueue = { viewModel.commands.addToQueue(card.id) },
+                onEdit = { editing = card.id },
+                onDelete = { deleting = card.id },
+            ),
+            onDismiss = { menuFor = null },
+        )
+    }
+    if (creating) {
+        PlaylistDialog(
+            title = stringResource(R.string.playlist_new),
+            confirmLabel = stringResource(R.string.action_create),
+            onConfirm = { name, _ ->
+                creating = false
+                viewModel.commands.create(name, onCreated = onOpenPlaylist)
+            },
+            onDismiss = { creating = false },
+        )
+    }
+    cards.firstOrNull { it.id == editing }?.let { card ->
+        PlaylistEditDialog(card, viewModel.commands, onDone = { editing = null })
+    }
+    cards.firstOrNull { it.id == deleting }?.let { card ->
+        PlaylistDeleteDialog(card, onDone = { deleting = null }, onConfirm = { viewModel.commands.delete(card.id, card.name) })
+    }
+}
+
+/** Name and description of an existing playlist. */
+@Composable
+internal fun PlaylistEditDialog(card: PlaylistCard, commands: PlaylistCommands, onDone: () -> Unit) {
+    PlaylistDialog(
+        title = stringResource(R.string.playlist_dialog_edit_title),
+        confirmLabel = stringResource(R.string.action_save),
+        initialName = card.name,
+        initialDescription = card.summary.playlist.description,
+        withDescription = true,
+        onConfirm = { name, description ->
+            onDone()
+            commands.edit(card.id, name, description)
+        },
+        onDismiss = onDone,
+    )
+}
+
+/** Deleting always asks first; tracks and files are never touched. */
+@Composable
+internal fun PlaylistDeleteDialog(card: PlaylistCard, onDone: () -> Unit, onConfirm: () -> Unit) {
+    ConfirmDialog(
+        title = stringResource(R.string.dialog_delete_playlist_title),
+        message = stringResource(R.string.dialog_delete_playlist_message, card.name),
+        confirmLabel = stringResource(R.string.action_delete),
+        dangerous = true,
+        onConfirm = {
+            onDone()
+            onConfirm()
+        },
+        onDismiss = onDone,
+    )
 }

@@ -3,10 +3,13 @@ package com.playly.player
 import android.content.Context
 import com.playly.player.data.db.PlaylyDatabase
 import com.playly.player.data.library.LibraryRepository
+import com.playly.player.data.library.browse.LibraryBrowser
 import com.playly.player.data.library.scan.LibraryScanner
+import com.playly.player.data.playlists.PlaylistRepository
 import com.playly.player.data.settings.SettingsRepository
 import com.playly.player.data.settings.settingsDataStore
 import com.playly.player.playback.PlaybackController
+import com.playly.player.ui.UiMessageBus
 import com.playly.player.playback.PlaybackStateStore
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -26,8 +29,16 @@ class AppContainer(context: Context) {
         LibraryRepository(appContext.contentResolver, database, settings, scanner)
     }
 
+    val playlists: PlaylistRepository by lazy { PlaylistRepository(appContext.contentResolver, database) }
+
+    /** Albums, artists, genres and folders, grouped once and shared by every screen. */
+    val browser: LibraryBrowser by lazy { LibraryBrowser(database.trackDao(), appScope) }
+
     /** Saved queue and position; written by the playback service, outside of Room on purpose (one atomic file). */
     val playbackStore: PlaybackStateStore by lazy { PlaybackStateStore(appContext.filesDir) }
+
+    /** Snackbar messages that must outlive the screen that sent them. */
+    val messages: UiMessageBus by lazy { UiMessageBus() }
 
     /** The UI's view of the playback session (main thread). */
     val playback: PlaybackController by lazy { PlaybackController(appContext) }

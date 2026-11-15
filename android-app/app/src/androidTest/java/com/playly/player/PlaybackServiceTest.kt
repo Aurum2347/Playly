@@ -23,6 +23,7 @@ import com.playly.player.playback.ArtworkUri
 import com.playly.player.playback.PlaybackCommands
 import com.playly.player.playback.PlaybackService
 import com.playly.player.playback.PlaybackSource
+import com.playly.player.playback.QueueAddResult
 import com.playly.player.playback.QueueEntry
 import kotlinx.coroutines.flow.first
 import com.playly.player.playback.PlaybackStateStore
@@ -286,12 +287,55 @@ class PlaybackServiceTest {
             controller.sendCustomCommand(PlaybackCommands.TOGGLE_SHUFFLE, Bundle.EMPTY).await()
             waitUntil { !playback.state.value.shuffle }
             // Jump from the queue by id: a stale index (2 is not "a") still finds the right track.
-            playback.playQueueEntry(QueueEntry(index = 2, trackId = a, title = "", artist = null, artwork = null))
+            playback.playQueueEntry(QueueEntry(index = 2, uid = 0L, trackId = a, title = "", artist = null, artwork = null))
             waitUntil { playback.state.value.nowPlaying?.trackId == a }
             delay(SAVE_SETTLE_MS)
         }
         val saved = withContext(Dispatchers.IO) { container.playbackStore.read() }
         assertEquals(source, saved?.source)
+    }
+
+    /** Stage 6: the user's queue goes first, edits address rows by uid, the current track stays. */
+    @Test
+    fun queueEditsKeepTheCurrentTrackAndAreSaved() = runBlocking<Unit> {
+        val playback = container.playback
+        onMain {
+            playback.playTracks(listOf(a, b, c), 0)
+            waitUntil { playback.state.value.isPlaying }
+            playback.pause()
+            waitUntil { !playback.state.value.isPlaying }
+
+            assertEquals(QueueAddResult.Added(1, false), playback.addToQueue(listOf(c), next = false))
+            assertEquals(QueueAddResult.Added(1, false), playback.addToQueue(listOf(b), next = true))
+            var queue = withTimeout(5_000) { playback.queue.first { it.upNext.size == 4 } }
+            assertEquals(listOf(b, c, b, c), queue.upNext.map { it.trackId })
+            assertEquals(2, queue.queuedCount)
+            assertEquals(a, queue.current?.trackId)
+            assertEquals("every row has its own uid", 5, (queue.upNext + queue.current!!).map { it.uid }.toSet().size)
+
+            // The source's last row joins the user's queue at its top.
+            val last = queue.upNext.last()
+            playback.moveQueueItem(last.uid, afterUid = 0L, toQueue = true)
+            queue = withTimeout(5_000) { playback.queue.first { it.upNext.first().uid == last.uid } }
+            assertEquals(listOf(c, b, c, b), queue.upNext.map { it.trackId })
+            assertEquals(3, queue.queuedCount)
+
+            playback.removeFromQueue(listOf(queue.upNext[1].uid))
+            queue = withTimeout(5_000) { playback.queue.first { it.upNext.size == 3 } }
+            assertEquals(listOf(c, c, b), queue.upNext.map { it.trackId })
+            assertEquals(2, queue.queuedCount)
+            assertEquals(a, playback.state.value.nowPlaying?.trackId)
+            delay(SAVE_SETTLE_MS)
+        }
+        val saved = withContext(Dispatchers.IO) { container.playbackStore.read() }!!
+        assertEquals(listOf(a, c, c, b), saved.trackIds)
+        assertEquals(listOf(1, 2), saved.queuedIndices)
+
+        onMain {
+            playback.clearUpcoming()
+            val queue = withTimeout(5_000) { playback.queue.first { it.upNext.isEmpty() } }
+            assertEquals(a, queue.current?.trackId)
+        }
     }
 
     @Test

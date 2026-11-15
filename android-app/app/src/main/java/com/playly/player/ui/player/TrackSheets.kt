@@ -33,21 +33,6 @@ import com.playly.player.designsystem.components.SheetAction
 import com.playly.player.designsystem.components.SheetTrackHeader
 import com.playly.player.playback.NowPlaying
 
-/**
- * "⋮" of the player (spec §12): only actions that work for the current track today. Queue and
- * playlist actions join in stage 6, album / artist pages in stage 7, tag editing in stage 8.
- */
-@Composable
-internal fun TrackMenuSheet(track: NowPlaying, onDismiss: () -> Unit, onDetails: () -> Unit, onShare: () -> Unit) {
-    PlaylySheet(onDismiss = onDismiss) { close ->
-        SheetTrackHeader(track.title, track.artist, track.artwork)
-        Spacer(Modifier.height(PlaylyTheme.spacing.xs))
-        SheetAction(R.drawable.ic_info, stringResource(R.string.track_menu_details), onClick = { close(onDetails) })
-        SheetAction(R.drawable.ic_share, stringResource(R.string.track_menu_share), onClick = { close(onShare) })
-        Spacer(Modifier.navigationBarsPadding().height(PlaylyTheme.spacing.md))
-    }
-}
-
 private sealed interface Details {
     data object Loading : Details
     data object Gone : Details

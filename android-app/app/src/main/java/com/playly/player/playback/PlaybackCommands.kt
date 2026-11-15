@@ -24,6 +24,32 @@ object PlaybackCommands {
     /** Optional: [PlaybackSource] of the new queue, as [PlaybackSource.toBundle]. */
     const val ARG_SOURCE = "source"
 
+    /**
+     * Controller → session: put [ARG_TRACK_IDS] into the user's queue, right after the current
+     * track when [ARG_NEXT] is true, else after the queue's other user-added tracks. Starts
+     * playback when nothing is queued. Result extras: [ARG_ADDED], [ARG_STARTED].
+     */
+    val QUEUE_ADD = SessionCommand("com.playly.player.QUEUE_ADD", Bundle.EMPTY)
+    const val ARG_NEXT = "next"
+    const val ARG_ADDED = "added"
+    const val ARG_STARTED = "started"
+
+    /** Controller → session: move [ARG_UID] after [ARG_AFTER_UID] (0 = after the current track); [ARG_QUEUED]: dropped in the user's queue. */
+    val QUEUE_MOVE = SessionCommand("com.playly.player.QUEUE_MOVE", Bundle.EMPTY)
+    const val ARG_UID = "uid"
+    const val ARG_AFTER_UID = "after_uid"
+    const val ARG_QUEUED = "queued"
+
+    /** Controller → session: remove the rows [ARG_UIDS] (LongArray); the current track stays. */
+    val QUEUE_REMOVE = SessionCommand("com.playly.player.QUEUE_REMOVE", Bundle.EMPTY)
+    const val ARG_UIDS = "uids"
+
+    /** Controller → session: remove everything after the current track. */
+    val QUEUE_CLEAR_UPCOMING = SessionCommand("com.playly.player.QUEUE_CLEAR_UPCOMING", Bundle.EMPTY)
+
+    /** Session extras key: uids of the user's queue (LongArray), next to the [PlaybackSource]. */
+    const val EXTRA_QUEUED_UIDS = "playly.queued"
+
     /** Session → controllers: a track could not be played. Args: [ARG_KIND], [ARG_TITLE], [ARG_TRACK_ID], [ARG_SKIPPED]. */
     const val EVENT_ERROR = "com.playly.player.EVENT_ERROR"
 

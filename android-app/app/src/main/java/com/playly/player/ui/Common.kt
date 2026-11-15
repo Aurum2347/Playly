@@ -7,7 +7,9 @@ import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.StringRes
+import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarResult
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -24,18 +26,42 @@ import androidx.lifecycle.compose.LifecycleResumeEffect
 import com.playly.player.R
 import com.playly.player.core.splitDuration
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.launch
 
 /**
  * A one-off message for the snackbar, resolved against resources at display time.
  * An argument may itself be a [UiMessage] (e.g. "<reason>. Playing the next track").
+ * With [quantity], [text] is a plurals resource. [action] adds a button such as "Undo".
  */
-data class UiMessage(@StringRes val text: Int, val args: List<Any> = emptyList()) {
+data class UiMessage(
+    val text: Int,
+    val args: List<Any> = emptyList(),
+    val quantity: Int? = null,
+    val action: UiAction? = null,
+) {
     constructor(@StringRes text: Int, arg: String) : this(text, listOf(arg))
 
-    fun resolve(resources: Resources): String =
-        resources.getString(text, *args.map { if (it is UiMessage) it.resolve(resources) else it }.toTypedArray())
+    fun resolve(resources: Resources): String {
+        val resolved = args.map { if (it is UiMessage) it.resolve(resources) else it }.toTypedArray()
+        return if (quantity != null) resources.getQuantityString(text, quantity, *resolved) else resources.getString(text, *resolved)
+    }
 }
+
+/**
+ * App-wide messages for the shared snackbar, from screens that may close right after the
+ * action (a deleted playlist's page). One collector: the root of the UI.
+ */
+class UiMessageBus {
+    private val channel = Channel<UiMessage>(Channel.BUFFERED)
+    val messages: Flow<UiMessage> = channel.receiveAsFlow()
+
+    suspend fun send(message: UiMessage) = channel.send(message)
+}
+
+/** A snackbar button; [run] is called only if the user taps it. */
+data class UiAction(@StringRes val label: Int, val run: () -> Unit)
 
 val LocalSnackbarHostState = staticCompositionLocalOf<SnackbarHostState> { error("No SnackbarHostState provided") }
 
@@ -46,10 +72,19 @@ fun CollectMessages(messages: Flow<UiMessage>) {
     // LocalResources tracks configuration changes (e.g. a language switch), unlike LocalContext.
     val resources = LocalResources.current
     LaunchedEffect(messages, resources) {
-        messages.collect { message ->
-            snackbar.showSnackbar(message.resolve(resources))
-        }
+        messages.collect { message -> snackbar.show(message, resources) }
     }
+}
+
+/** Shows [message] and runs its action if tapped. Messages with an action stay a little longer. */
+suspend fun SnackbarHostState.show(message: UiMessage, resources: Resources) {
+    val action = message.action
+    val result = showSnackbar(
+        message = message.resolve(resources),
+        actionLabel = action?.let { resources.getString(it.label) },
+        duration = if (action != null) SnackbarDuration.Long else SnackbarDuration.Short,
+    )
+    if (result == SnackbarResult.ActionPerformed) action?.run?.invoke()
 }
 
 /** Returns a launcher for the system folder picker (SAF). Reports devices without a picker. */

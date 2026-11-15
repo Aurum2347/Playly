@@ -14,6 +14,9 @@ import com.playly.player.data.db.PlaylistSummary
 import com.playly.player.data.db.TrackEntity
 import com.playly.player.data.library.LibraryContent
 import com.playly.player.data.library.LibraryRepository
+import com.playly.player.data.library.browse.LibraryBrowser
+import com.playly.player.data.library.browse.TrackGroup
+import com.playly.player.data.library.browse.matching
 import com.playly.player.playback.PlaybackController
 import com.playly.player.playback.PlaybackSource
 import com.playly.player.ui.container
@@ -38,7 +41,14 @@ sealed interface SearchUiState {
     /** A scan is running, so results may be incomplete or missing. */
     data object Indexing : SearchUiState
     data class NoResults(val query: String) : SearchUiState
-    data class Results(val tracks: List<TrackEntity>, val playlists: List<PlaylistSummary>) : SearchUiState
+    data class Results(
+        val tracks: List<TrackEntity>,
+        val playlists: List<PlaylistSummary>,
+        val albums: List<TrackGroup> = emptyList(),
+        val artists: List<TrackGroup> = emptyList(),
+    ) : SearchUiState {
+        val isEmpty: Boolean get() = tracks.isEmpty() && playlists.isEmpty() && albums.isEmpty() && artists.isEmpty()
+    }
     data object Error : SearchUiState
 }
 
@@ -46,6 +56,7 @@ sealed interface SearchUiState {
 class SearchViewModel(
     private val library: LibraryRepository,
     private val playback: PlaybackController,
+    private val browser: LibraryBrowser,
 ) : ViewModel() {
     var query by mutableStateOf("")
         private set
@@ -91,8 +102,15 @@ class SearchViewModel(
         val tracks = library.searchTracks(text)
         val playlists = library.playlistSummaries.first()
             .filter { SearchText.normalize(it.playlist.name).contains(key) }
+        val index = browser.index.first()
+        val results = SearchUiState.Results(
+            tracks = tracks,
+            playlists = playlists,
+            albums = index.albums.matching(text).take(GROUP_LIMIT),
+            artists = index.artists.matching(text).take(GROUP_LIMIT),
+        )
         return when {
-            tracks.isNotEmpty() || playlists.isNotEmpty() -> SearchUiState.Results(tracks, playlists)
+            !results.isEmpty -> results
             content == LibraryContent.Scanning -> SearchUiState.Indexing
             content !is LibraryContent.Tracks -> SearchUiState.LibraryNotReady
             else -> SearchUiState.NoResults(text)
@@ -102,6 +120,7 @@ class SearchViewModel(
 
     companion object {
         const val DEBOUNCE_MS = 250L
-        val Factory = viewModelFactory { initializer { SearchViewModel(container.library, container.playback) } }
+        private const val GROUP_LIMIT = 20
+        val Factory = viewModelFactory { initializer { SearchViewModel(container.library, container.playback, container.browser) } }
     }
 }

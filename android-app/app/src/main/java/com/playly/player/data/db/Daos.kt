@@ -11,6 +11,9 @@ import kotlinx.coroutines.flow.Flow
 /** SQLite's bound-parameter limit is 999 on older Android versions; stay below it. */
 const val SQLITE_MAX_ARGS = 900
 
+/** How many leading entries per playlist are read to compose its automatic cover. */
+const val PLAYLIST_COVER_CANDIDATES = 12
+
 /** Columns of [TrackListItem]; queries select exactly these so rows stay light. */
 const val TRACK_LIST_COLUMNS = "id, uri, media_store_id, album_id, title, artist, album, duration_ms, size_bytes, " +
     "date_modified, date_added, track_number, disc_number"
@@ -35,6 +38,13 @@ interface TrackDao {
         "SELECT $TRACK_LIST_COLUMNS FROM tracks WHERE is_available = 1 ORDER BY search_key, id",
     )
     fun observeList(): Flow<List<TrackListItem>>
+
+    /** The visible library with grouping tags, in the same order as [observeList]. */
+    @Query(
+        "SELECT $TRACK_LIST_COLUMNS, album_artist, genre, year, folder_path, search_key FROM tracks " +
+            "WHERE is_available = 1 ORDER BY search_key, id",
+    )
+    fun observeBrowse(): Flow<List<BrowseTrack>>
 
     /** Pass at most [SQLITE_MAX_ARGS] ids per call. Order is not guaranteed. */
     @Query("SELECT * FROM tracks WHERE id IN (:ids)")
@@ -133,7 +143,74 @@ interface PlaylistDao {
     suspend fun insert(playlist: PlaylistEntity): Long
 
     @Insert
-    suspend fun insertEntries(entries: List<PlaylistEntryEntity>)
+    suspend fun insertEntries(entries: List<PlaylistEntryEntity>): List<Long>
+
+    @Query("SELECT * FROM playlists WHERE id = :id")
+    fun observe(id: Long): Flow<PlaylistEntity?>
+
+    @Query("SELECT * FROM playlists WHERE id = :id")
+    suspend fun get(id: Long): PlaylistEntity?
+
+    /** Every entry with its track, in the user's order; unavailable files included (shown dimmed). */
+    @Query(
+        "SELECT e.id AS entry_id, e.added_at AS entry_added_at, t.is_available, " +
+            "t.id, t.uri, t.media_store_id, t.album_id, t.title, t.artist, t.album, t.duration_ms, t.size_bytes, " +
+            "t.date_modified, t.date_added, t.track_number, t.disc_number " +
+            "FROM playlist_entries e JOIN tracks t ON t.id = e.track_id " +
+            "WHERE e.playlist_id = :playlistId ORDER BY e.position, e.id",
+    )
+    fun observeTracks(playlistId: Long): Flow<List<PlaylistTrackRow>>
+
+    /**
+     * The first [PLAYLIST_COVER_CANDIDATES] entries of every playlist (available files only), for
+     * automatic covers. A correlated count instead of a window function: Android 9 ships SQLite 3.22.
+     */
+    @Query(
+        "SELECT e.playlist_id AS playlist_id, " +
+            "t.id, t.uri, t.media_store_id, t.album_id, t.title, t.artist, t.album, t.duration_ms, t.size_bytes, " +
+            "t.date_modified, t.date_added, t.track_number, t.disc_number " +
+            "FROM playlist_entries e JOIN tracks t ON t.id = e.track_id " +
+            "WHERE t.is_available = 1 AND (SELECT COUNT(*) FROM playlist_entries e2 WHERE e2.playlist_id = e.playlist_id " +
+            "AND (e2.position < e.position OR (e2.position = e.position AND e2.id < e.id))) < $PLAYLIST_COVER_CANDIDATES " +
+            "ORDER BY e.playlist_id, e.position, e.id",
+    )
+    fun observeCoverTracks(): Flow<List<PlaylistCoverTrack>>
+
+    /** Playlists that already hold [trackId] ("Add to playlist" marks them). */
+    @Query("SELECT DISTINCT playlist_id FROM playlist_entries WHERE track_id = :trackId")
+    fun observeContaining(trackId: Long): Flow<List<Long>>
+
+    @Query("UPDATE playlists SET name = :name, description = :description, updated_at = :now WHERE id = :id")
+    suspend fun updateDetails(id: Long, name: String, description: String?, now: Long)
+
+    @Query("UPDATE playlists SET cover_uri = :coverUri, updated_at = :now WHERE id = :id")
+    suspend fun updateCover(id: Long, coverUri: String?, now: Long)
+
+    @Query("UPDATE playlists SET sort_order = :sortOrder WHERE id = :id")
+    suspend fun updateSort(id: Long, sortOrder: Int)
+
+    @Query("UPDATE playlists SET updated_at = :now WHERE id = :id")
+    suspend fun touch(id: Long, now: Long)
+
+    @Query("SELECT COALESCE(MAX(position), -1) FROM playlist_entries WHERE playlist_id = :playlistId")
+    suspend fun maxPosition(playlistId: Long): Int
+
+    @Query("SELECT track_id FROM playlist_entries WHERE playlist_id = :playlistId")
+    suspend fun trackIds(playlistId: Long): List<Long>
+
+    @Query("SELECT id, position FROM playlist_entries WHERE playlist_id = :playlistId ORDER BY position, id")
+    suspend fun positions(playlistId: Long): List<EntryPosition>
+
+    @Query("UPDATE playlist_entries SET position = :position WHERE id = :entryId")
+    suspend fun setPosition(entryId: Long, position: Int)
+
+    /** Pass at most [SQLITE_MAX_ARGS] ids per call. */
+    @Query("SELECT * FROM playlist_entries WHERE id IN (:ids)")
+    suspend fun entries(ids: List<Long>): List<PlaylistEntryEntity>
+
+    /** Pass at most [SQLITE_MAX_ARGS] ids per call. */
+    @Query("DELETE FROM playlist_entries WHERE id IN (:ids)")
+    suspend fun deleteEntries(ids: List<Long>)
 
     /** Re-points entries when two rows turn out to be the same file, so no playlist loses it. */
     @Query("UPDATE playlist_entries SET track_id = :to WHERE track_id = :from")

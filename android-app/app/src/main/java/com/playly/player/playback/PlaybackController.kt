@@ -17,6 +17,7 @@ import androidx.media3.common.util.UnstableApi
 import androidx.media3.common.util.Util
 import androidx.media3.session.MediaController
 import androidx.media3.session.SessionCommand
+import androidx.media3.session.SessionError
 import androidx.media3.session.SessionResult
 import androidx.media3.session.SessionToken
 import com.google.common.util.concurrent.Futures
@@ -92,24 +93,43 @@ data class PlaybackState(
     val issue: PlaybackErrorKind? = null,
 )
 
-/** One queue row: [index] is the position in the player's list, used to jump there. */
+/**
+ * One queue row: [index] is the position in the player's list, used to jump there; [uid]
+ * identifies the row for edits (the same track can be queued twice). [queued]: the user put it
+ * in the queue ("Play next" / "Add to queue"), it is not just the source playing on.
+ */
 data class QueueEntry(
     val index: Int,
+    val uid: Long,
     val trackId: Long,
     val title: String,
     val artist: String?,
     val artwork: Artwork?,
+    val queued: Boolean = false,
 )
 
 /**
- * The queue in play order (shuffle applied): the current track and what follows it.
+ * The queue in play order (shuffle applied): the current track and what follows it. The user's
+ * own queue comes first in [upNext] ([queuedCount] rows), then the rest of the source.
  * [repeat] tells what happens after the last one.
  */
 data class QueueSnapshot(
     val current: QueueEntry? = null,
     val upNext: List<QueueEntry> = emptyList(),
     val repeat: RepeatMode = RepeatMode.Off,
-)
+) {
+    val queuedCount: Int get() = upNext.takeWhile { it.queued }.size
+}
+
+/** What "Play next" / "Add to queue" did. */
+sealed interface QueueAddResult {
+    /** [started]: nothing was playing, so the tracks started right away. */
+    data class Added(val count: Int, val started: Boolean) : QueueAddResult
+    /** None of the tracks can be played (gone or unavailable). */
+    data object Unavailable : QueueAddResult
+    /** The playback service could not be reached. */
+    data object Failed : QueueAddResult
+}
 
 sealed interface PlaybackEvent {
     /** A track failed; [skipped] tells whether the next one started instead. */
@@ -238,21 +258,81 @@ class PlaybackController(context: Context) {
         Util.handlePlayButtonAction(c)
     }
 
+    /**
+     * "Play next" ([next] true) or "Add to queue": the tracks join the user's queue without
+     * interrupting what plays. With nothing playing they start right away.
+     */
+    suspend fun addToQueue(trackIds: List<Long>, next: Boolean): QueueAddResult {
+        if (trackIds.isEmpty()) return QueueAddResult.Unavailable
+        val c = connected() ?: return QueueAddResult.Failed
+        val args = Bundle()
+        args.putLongArray(PlaybackCommands.ARG_TRACK_IDS, trackIds.toLongArray())
+        args.putBoolean(PlaybackCommands.ARG_NEXT, next)
+        val result = try {
+            c.sendCustomCommand(PlaybackCommands.QUEUE_ADD, args).await()
+        } catch (e: ExecutionException) {
+            Log.w(TAG, "Cannot add to the queue", e)
+            return QueueAddResult.Failed
+        }
+        return when (result.resultCode) {
+            SessionResult.RESULT_SUCCESS -> QueueAddResult.Added(
+                result.extras.getInt(PlaybackCommands.ARG_ADDED),
+                result.extras.getBoolean(PlaybackCommands.ARG_STARTED),
+            )
+            SessionError.ERROR_BAD_VALUE -> QueueAddResult.Unavailable
+            else -> QueueAddResult.Failed
+        }
+    }
+
+    /** Moves a queue row right after [afterUid] (0 = right after the current track). */
+    fun moveQueueItem(uid: Long, afterUid: Long, toQueue: Boolean) = withController { c ->
+        val args = Bundle()
+        args.putLong(PlaybackCommands.ARG_UID, uid)
+        args.putLong(PlaybackCommands.ARG_AFTER_UID, afterUid)
+        args.putBoolean(PlaybackCommands.ARG_QUEUED, toQueue)
+        c.sendCustomCommand(PlaybackCommands.QUEUE_MOVE, args)
+    }
+
+    /** Takes rows out of the queue; the current track is never removed this way. */
+    fun removeFromQueue(uids: Collection<Long>) = withController { c ->
+        if (uids.isEmpty()) return@withController
+        val args = Bundle()
+        args.putLongArray(PlaybackCommands.ARG_UIDS, uids.toLongArray())
+        c.sendCustomCommand(PlaybackCommands.QUEUE_REMOVE, args)
+    }
+
+    /** Removes everything after the current track. */
+    fun clearUpcoming() = withController { it.sendCustomCommand(PlaybackCommands.QUEUE_CLEAR_UPCOMING, Bundle.EMPTY) }
+
+    private suspend fun connected(): MediaController? {
+        controller?.takeIf { it.isConnected }?.let { return it }
+        return try {
+            connect().await().takeIf { it.isConnected }
+        } catch (e: ExecutionException) {
+            Log.w(TAG, "Playback service unavailable", e)
+            null
+        }
+    }
+
     private fun buildQueue(): QueueSnapshot {
         val c = controller ?: return QueueSnapshot()
         val timeline = c.currentTimeline
         if (timeline.isEmpty) return QueueSnapshot()
+        val queuedUids = c.sessionExtras.getLongArray(PlaybackCommands.EXTRA_QUEUED_UIDS)?.toHashSet().orEmpty()
         val window = Timeline.Window()
         fun entryAt(index: Int): QueueEntry? {
             val item = timeline.getWindow(index, window).mediaItem
             val id = TrackMediaItems.trackId(item) ?: return null
             val metadata = item.mediaMetadata
+            val uid = TrackMediaItems.uid(item)
             return QueueEntry(
                 index = index,
+                uid = uid,
                 trackId = id,
                 title = metadata.title?.toString().orEmpty(),
                 artist = metadata.artist?.toString(),
                 artwork = ArtworkUri.parse(metadata.artworkUri),
+                queued = uid != 0L && uid in queuedUids,
             )
         }
         val shuffle = c.shuffleModeEnabled
@@ -400,7 +480,11 @@ class PlaybackController(context: Context) {
             return Futures.immediateFuture(SessionResult(SessionResult.RESULT_SUCCESS))
         }
 
-        override fun onExtrasChanged(controller: MediaController, extras: Bundle) = publish()
+        override fun onExtrasChanged(controller: MediaController, extras: Bundle) {
+            // Extras carry the user's queue too: the queue sheet may need new section headers.
+            queueChanges.value++
+            publish()
+        }
 
         override fun onDisconnected(controller: MediaController) {
             // The service went away (e.g. killed); reconnect on the next command or app start.

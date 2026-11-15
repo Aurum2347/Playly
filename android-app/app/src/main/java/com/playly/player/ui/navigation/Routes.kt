@@ -13,6 +13,12 @@ import kotlinx.serialization.Serializable
 @Serializable data object PlaylistsRoute
 @Serializable data object SearchRoute
 @Serializable data object SettingsRoute
+/** A playlist's page; outside the tab graphs, like Settings, so it opens from Search as well. */
+@Serializable data class PlaylistRoute(val id: Long)
+/** "Add tracks" picker of a playlist. */
+@Serializable data class AddTracksRoute(val playlistId: Long)
+/** An album, artist, genre or folder page (stage 7); [kind] is a CollectionKind name. */
+@Serializable data class CollectionRoute(val kind: String, val key: String)
 
 /**
  * The four bottom-bar destinations (spec §4). [route] is what the tab navigates to (a graph

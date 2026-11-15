@@ -30,7 +30,7 @@ class PlayerStageTest {
 
     @Test
     fun unknownSourceKindIsIgnoredNotFatal() {
-        assertNull(PlaybackSource.parse("Album", "x"))
+        assertNull(PlaybackSource.parse("Podcast", "x"))
         assertNull(PlaybackSource.parse(null, null))
         assertEquals(PlaybackSource(PlaybackSource.Kind.Recent), PlaybackSource.parse("Recent", "  "))
     }

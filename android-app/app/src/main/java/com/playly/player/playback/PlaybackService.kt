@@ -51,6 +51,7 @@ class PlaybackService : MediaSessionService() {
     private lateinit var store: PlaybackStateStore
     internal lateinit var items: TrackMediaItems
         private set
+    private lateinit var queue: QueueEditor
 
     private var saveJob: Job? = null
     private var periodicSaveJob: Job? = null
@@ -81,6 +82,7 @@ class PlaybackService : MediaSessionService() {
             .setWakeMode(C.WAKE_MODE_LOCAL)
             .build()
         player.addListener(PlayerEvents())
+        queue = QueueEditor(player)
 
         session = MediaSession.Builder(this, player)
             .setCallback(PlaybackSessionCallback(this, scope, store) { restoreSettled = true })
@@ -124,6 +126,7 @@ class PlaybackService : MediaSessionService() {
      */
     internal fun playQueue(queue: List<MediaItem>, index: Int, shuffle: Boolean? = null, source: PlaybackSource? = null) {
         consecutiveErrors = 0
+        this.queue.reset()
         setSource(source)
         if (shuffle != null) player.shuffleModeEnabled = shuffle
         player.setMediaItems(queue, index, 0)
@@ -138,26 +141,43 @@ class PlaybackService : MediaSessionService() {
      */
     internal fun setSource(value: PlaybackSource?) {
         source = value
-        session?.setSessionExtras(value?.toBundle() ?: Bundle.EMPTY)
+        publishExtras()
+    }
+
+    /** Source and the user's queue for every controller (session extras). */
+    private fun publishExtras() {
+        val extras = source?.toBundle() ?: Bundle()
+        extras.putLongArray(PlaybackCommands.EXTRA_QUEUED_UIDS, queue.queuedUids().toLongArray())
+        session?.setSessionExtras(extras)
     }
 
     internal fun applyModes(shuffle: Boolean, repeatMode: Int) {
+        val keep = queue.queuedIndicesInPlayOrder()
         player.shuffleModeEnabled = shuffle
         player.repeatMode = repeatMode
-        shuffleFromCurrent()
+        shuffleFromCurrent(keep)
     }
 
     internal fun toggleShuffle() {
-        player.shuffleModeEnabled = !player.shuffleModeEnabled
-        shuffleFromCurrent()
+        if (player.shuffleModeEnabled) {
+            queue.shuffleOff()
+        } else {
+            val keep = queue.queuedIndicesInPlayOrder()
+            player.shuffleModeEnabled = true
+            shuffleFromCurrent(keep)
+        }
+        publishExtras()
     }
 
-    /** With shuffle on, the current track comes first and every other one follows exactly once. */
-    private fun shuffleFromCurrent() {
+    /**
+     * With shuffle on, the current track comes first, then the user's own queue ([next], in
+     * order), then every other track exactly once.
+     */
+    private fun shuffleFromCurrent(next: List<Int> = emptyList()) {
         val count = player.mediaItemCount
         if (!player.shuffleModeEnabled || count < 2) return
         player.setShuffleOrder(
-            DefaultShuffleOrder(PlaybackPolicy.shuffledOrder(count, player.currentMediaItemIndex), System.nanoTime()),
+            DefaultShuffleOrder(PlaybackPolicy.shuffledOrder(count, player.currentMediaItemIndex, next = next), System.nanoTime()),
         )
     }
 
@@ -179,6 +199,42 @@ class PlaybackService : MediaSessionService() {
 
     internal fun cycleRepeat() {
         player.repeatMode = PlaybackPolicy.nextRepeatMode(player.repeatMode)
+    }
+
+    /**
+     * "Play next" / "Add to queue". With nothing queued, [items] become the queue and start;
+     * after a finished queue, playback continues with them. True when playback started.
+     */
+    internal fun addToQueue(items: List<MediaItem>, next: Boolean): Boolean {
+        if (items.isEmpty()) return false
+        if (player.mediaItemCount == 0) {
+            playQueue(items, 0)
+            return true
+        }
+        val ended = player.playbackState == Player.STATE_ENDED
+        queue.insert(items, next)
+        publishExtras()
+        if (ended) {
+            player.seekToNextMediaItem()
+            player.prepare()
+            player.play()
+        }
+        return ended
+    }
+
+    internal fun moveInQueue(uid: Long, afterUid: Long, toQueue: Boolean) {
+        queue.move(uid, afterUid, toQueue)
+        publishExtras()
+    }
+
+    internal fun removeFromQueue(uids: Set<Long>) {
+        queue.remove(uids)
+        publishExtras()
+    }
+
+    internal fun clearUpcoming() {
+        queue.clearUpcoming()
+        publishExtras()
     }
 
     /** Shuffle and repeat in the notification / system media controls, showing their state. */
@@ -223,6 +279,8 @@ class PlaybackService : MediaSessionService() {
                 val restored = PlaybackSessionCallback.resolveSaved(items, saved) ?: return@launch
                 if (player.mediaItemCount > 0) return@launch
                 player.setMediaItems(restored.mediaItems, restored.startIndex, restored.startPositionMs)
+                val restoredIds = restored.mediaItems.map { TrackMediaItems.trackId(it) ?: -1L }
+                queue.restore(PlaybackPolicy.survivingIndices(saved.trackIds, restoredIds, saved.queuedIndices))
                 applyModes(saved.shuffle, saved.repeatMode)
                 setSource(saved.source)
             } finally {
@@ -236,9 +294,16 @@ class PlaybackService : MediaSessionService() {
         if (count == 0) return null
         val ids = ArrayList<Long>(count)
         var index = player.currentMediaItemIndex
+        val queuedAt = queue.queuedIndices().toHashSet()
+        val queuedOut = ArrayList<Int>()
         for (i in 0 until count) {
             val id = TrackMediaItems.trackId(player.getMediaItemAt(i))
-            if (id != null) ids += id else if (i < index) index--
+            if (id != null) {
+                if (i in queuedAt) queuedOut += ids.size
+                ids += id
+            } else if (i < index) {
+                index--
+            }
         }
         if (ids.isEmpty()) return null
         val ended = player.playbackState == Player.STATE_ENDED
@@ -251,6 +316,7 @@ class PlaybackService : MediaSessionService() {
             repeatMode = player.repeatMode,
             sourceKind = source?.kind?.name,
             sourceLabel = source?.label,
+            queuedIndices = queuedOut,
         )
     }
 
@@ -313,6 +379,10 @@ class PlaybackService : MediaSessionService() {
                 )
             ) {
                 scheduleSave()
+            }
+            // A queued track started, or rows went around it: keep the user's queue exact.
+            if (events.containsAny(Player.EVENT_TIMELINE_CHANGED, Player.EVENT_MEDIA_ITEM_TRANSITION) && queue.normalize()) {
+                publishExtras()
             }
             if (events.containsAny(Player.EVENT_MEDIA_ITEM_TRANSITION, Player.EVENT_IS_PLAYING_CHANGED)) {
                 recordHistoryIfStarted()

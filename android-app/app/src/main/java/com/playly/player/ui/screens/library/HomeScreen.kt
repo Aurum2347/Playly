@@ -44,6 +44,8 @@ import com.playly.player.designsystem.components.PlaylyIconButton
 import com.playly.player.designsystem.components.PlaylyLogo
 import com.playly.player.designsystem.components.PlaylyTopBar
 import com.playly.player.ui.CollectMessages
+import com.playly.player.ui.actions.LocalTrackActions
+import com.playly.player.ui.actions.TrackTarget
 import com.playly.player.ui.player.LocalPlayerLauncher
 import com.playly.player.ui.player.NowPlayingAction
 import com.playly.player.ui.player.rememberListOrigin
@@ -187,6 +189,8 @@ private fun RecentShelf(recent: List<TrackListItem>, nowPlayingId: Long?, onPlay
     val rowState = rememberLazyListState()
     val origins = rememberListOrigin(rowState, Orientation.Horizontal)
     val unknown = stringResource(R.string.unknown_artist)
+    val actions = LocalTrackActions.current
+    val menuLabel = stringResource(R.string.player_track_menu)
     LazyRow(
         state = rowState,
         modifier = Modifier.fillMaxWidth().then(origins.modifier),
@@ -200,6 +204,8 @@ private fun RecentShelf(recent: List<TrackListItem>, nowPlayingId: Long?, onPlay
                 artwork = track.artwork(),
                 isActive = track.id == nowPlayingId,
                 onClick = { onPlay(index, origins.of(track.id)) },
+                onLongClick = actions?.let { a -> { a.open(TrackTarget(track.id, track.title, track.artist, track.artwork())) } },
+                longClickLabel = menuLabel,
             )
         }
     }

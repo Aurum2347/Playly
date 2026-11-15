@@ -42,11 +42,32 @@ object PlaybackPolicy {
      * ExoPlayer's own random order may put the current track in the middle, and "next" would then
      * never reach the items before it.
      */
-    fun shuffledOrder(count: Int, first: Int, random: Random = Random.Default): IntArray {
+    fun shuffledOrder(count: Int, first: Int, random: Random = Random.Default, next: List<Int> = emptyList()): IntArray {
         if (count <= 0) return IntArray(0)
         val start = first.coerceIn(0, count - 1)
-        val rest = (0 until count).filter { it != start }.shuffled(random)
-        return IntArray(count) { if (it == 0) start else rest[it - 1] }
+        // The user's own queue ([next], in order) stays right after the current track.
+        val kept = next.filter { it in 0 until count && it != start }.distinct()
+        val keptSet = kept.toHashSet()
+        val rest = (0 until count).filter { it != start && it !in keptSet }.shuffled(random)
+        return (listOf(start) + kept + rest).toIntArray()
+    }
+
+    /**
+     * Where [wanted] positions of [savedIds] ended up once missing tracks were dropped
+     * ([resolvedIds] keeps the saved order minus the gone ones). Positions of gone tracks vanish.
+     */
+    fun survivingIndices(savedIds: List<Long>, resolvedIds: List<Long>, wanted: List<Int>): List<Int> {
+        if (wanted.isEmpty()) return emptyList()
+        val wantedSet = wanted.toHashSet()
+        val result = ArrayList<Int>()
+        var j = 0
+        for (i in savedIds.indices) {
+            if (j < resolvedIds.size && resolvedIds[j] == savedIds[i]) {
+                if (i in wantedSet) result += j
+                j++
+            }
+        }
+        return result
     }
 
     /** Off → all → one → off, the order every player uses. */

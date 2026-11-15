@@ -41,7 +41,7 @@
     <string name="state_error_library">Не удалось прочитать медиатеку. Ваши файлы не затронуты.</string>
     <string name="state_error_playlists">Не удалось прочитать плейлисты. Данные не удалены.</string>
     <string name="state_no_playlists_title">Плейлистов пока нет</string>
-    <string name="state_no_playlists_message">Здесь будут ваши плейлисты.</string>
+    <string name="state_no_playlists_message">Создайте плейлист, а треки добавляйте через «⋮» или долгим нажатием.</string>
 
     <!-- Search -->
     <string name="search_hint">Треки, исполнители, альбомы, плейлисты</string>
@@ -193,4 +193,186 @@
     <string name="details_field_folder">Папка</string>
     <string name="details_unavailable">Файл сейчас недоступен: он удалён или его папка отключена</string>
     <string name="details_not_found">Этого трека больше нет в медиатеке</string>
+
+    <!-- Stage 6: playlists and queue -->
+    <string name="action_undo">Отменить</string>
+    <string name="action_create">Создать</string>
+    <string name="action_save">Сохранить</string>
+    <string name="action_delete">Удалить</string>
+    <string name="action_move_up">Переместить выше</string>
+    <string name="action_move_down">Переместить ниже</string>
+    <string name="track_menu_play_next">Слушать следующим</string>
+    <string name="track_menu_add_to_queue">Добавить в очередь</string>
+    <string name="track_menu_add_to_playlist">Добавить в плейлист</string>
+    <string name="track_menu_remove_from_playlist">Убрать из плейлиста</string>
+    <string name="track_menu_remove_from_queue">Убрать из очереди</string>
+    <string name="queue_message_started">Очередь была пуста, трек включён</string>
+    <string name="queue_message_next">Сыграет следующим</string>
+    <string name="queue_message_added">Добавлено в очередь</string>
+    <plurals name="queue_message_next_many">
+        <item quantity="one">%d трек сыграет следующим</item>
+        <item quantity="few">%d трека сыграют следующими</item>
+        <item quantity="many">%d треков сыграют следующими</item>
+        <item quantity="other">%d трека сыграют следующими</item>
+    </plurals>
+    <plurals name="queue_message_added_many">
+        <item quantity="one">В очередь добавлен %d трек</item>
+        <item quantity="few">В очередь добавлено %d трека</item>
+        <item quantity="many">В очередь добавлено %d треков</item>
+        <item quantity="other">В очередь добавлено %d трека</item>
+    </plurals>
+    <string name="queue_message_unavailable">Трек недоступен: файл удалён или его папка отключена</string>
+    <string name="queue_message_failed">Не удалось изменить очередь. Попробуйте ещё раз.</string>
+    <string name="queue_message_removed">Убрано из очереди</string>
+    <string name="queue_message_cleared">Очередь после текущего трека очищена</string>
+    <string name="queue_section_queued">В очереди</string>
+    <string name="queue_clear">Очистить</string>
+    <string name="queue_clear_description">Очистить очередь после текущего трека</string>
+    <string name="queue_remove">Убрать «%1$s» из очереди</string>
+    <string name="queue_drag">Перетащить «%1$s»</string>
+    <string name="dialog_clear_queue_title">Очистить очередь?</string>
+    <plurals name="dialog_clear_queue_message">
+        <item quantity="one">После текущего трека в очереди %d трек. Текущий продолжит играть.</item>
+        <item quantity="few">После текущего трека в очереди %d трека. Текущий продолжит играть.</item>
+        <item quantity="many">После текущего трека в очереди %d треков. Текущий продолжит играть.</item>
+        <item quantity="other">После текущего трека в очереди %d трека. Текущий продолжит играть.</item>
+    </plurals>
+    <string name="playlist_message_already">Уже есть в «%1$s»</string>
+    <string name="playlist_message_added_one">Добавлено в «%1$s»</string>
+    <plurals name="playlist_message_added_many">
+        <item quantity="one">В «%2$s» добавлен %1$d трек</item>
+        <item quantity="few">В «%2$s» добавлено %1$d трека</item>
+        <item quantity="many">В «%2$s» добавлено %1$d треков</item>
+        <item quantity="other">В «%2$s» добавлено %1$d трека</item>
+    </plurals>
+    <plurals name="playlist_message_added_skipped">
+        <item quantity="one">В «%2$s» добавлен %1$d трек, уже были: %3$d</item>
+        <item quantity="few">В «%2$s» добавлено %1$d трека, уже были: %3$d</item>
+        <item quantity="many">В «%2$s» добавлено %1$d треков, уже были: %3$d</item>
+        <item quantity="other">В «%2$s» добавлено %1$d трека, уже были: %3$d</item>
+    </plurals>
+    <plurals name="playlist_message_created_with">
+        <item quantity="one">Создан плейлист «%1$s» · %2$d трек</item>
+        <item quantity="few">Создан плейлист «%1$s» · %2$d трека</item>
+        <item quantity="many">Создан плейлист «%1$s» · %2$d треков</item>
+        <item quantity="other">Создан плейлист «%1$s» · %2$d трека</item>
+    </plurals>
+    <string name="playlist_message_removed">Убрано из «%1$s»</string>
+    <string name="playlist_message_created">Плейлист «%1$s» создан</string>
+    <string name="playlist_message_deleted">Плейлист «%1$s» удалён</string>
+    <string name="playlist_message_cover_failed">Не удалось сохранить доступ к картинке. Выберите другую.</string>
+    <string name="playlist_message_picker_unavailable">На устройстве нет системного выбора файлов</string>
+    <string name="add_to_playlist_title">Добавить в плейлист</string>
+    <plurals name="add_to_playlist_title_many">
+        <item quantity="one">Добавить %d трек в плейлист</item>
+        <item quantity="few">Добавить %d трека в плейлист</item>
+        <item quantity="many">Добавить %d треков в плейлист</item>
+        <item quantity="other">Добавить %d трека в плейлист</item>
+    </plurals>
+    <string name="add_to_playlist_search">Найти плейлист</string>
+    <string name="add_to_playlist_contains">Уже есть в этом плейлисте</string>
+    <string name="add_to_playlist_empty">Плейлистов пока нет. Создайте первый.</string>
+    <string name="add_to_playlist_no_match">Нет плейлистов с таким названием</string>
+    <string name="dialog_duplicate_title">Трек уже в плейлисте</string>
+    <string name="dialog_duplicate_message">«%1$s» уже есть в «%2$s». Добавить ещё раз?</string>
+    <string name="action_add_again">Добавить ещё раз</string>
+    <string name="playlist_new">Новый плейлист</string>
+    <string name="playlist_dialog_edit_title">Изменить плейлист</string>
+    <string name="playlist_field_name">Название</string>
+    <string name="playlist_field_description">Описание (необязательно)</string>
+    <string name="action_create_playlist">Создать плейлист</string>
+    <string name="playlist_menu">Действия с плейлистом</string>
+    <string name="playlist_menu_play">Слушать</string>
+    <string name="playlist_menu_shuffle">Перемешать</string>
+    <string name="playlist_menu_add_to_queue">Добавить в очередь</string>
+    <string name="playlist_menu_edit">Изменить название и описание</string>
+    <string name="playlist_menu_cover">Выбрать обложку</string>
+    <string name="playlist_menu_cover_reset">Вернуть автоматическую обложку</string>
+    <string name="playlist_menu_delete">Удалить плейлист</string>
+    <string name="dialog_delete_playlist_title">Удалить плейлист?</string>
+    <string name="dialog_delete_playlist_message">Плейлист «%1$s» будет удалён. Треки останутся в медиатеке и на устройстве.</string>
+    <string name="playlist_not_found">Этого плейлиста больше нет</string>
+    <string name="playlist_empty_title">Плейлист пуст</string>
+    <string name="playlist_empty_message">Добавьте треки из медиатеки кнопкой «Добавить треки» выше или через «⋮» у любого трека.</string>
+    <string name="playlist_all_unavailable">Все треки плейлиста недоступны: файлы удалены или папка отключена</string>
+    <string name="playlist_unavailable_count">недоступно: %1$d</string>
+    <string name="action_add_tracks">Добавить треки</string>
+    <string name="sort_manual">Свой порядок</string>
+    <string name="sort_recently_added">Недавно добавленные</string>
+    <string name="player_source_playlist">Плейлист «%1$s»</string>
+    <string name="add_tracks_title">Добавить в «%1$s»</string>
+    <string name="add_tracks_search">Поиск по медиатеке</string>
+    <plurals name="add_tracks_confirm">
+        <item quantity="one">Добавить %d трек</item>
+        <item quantity="few">Добавить %d трека</item>
+        <item quantity="many">Добавить %d треков</item>
+        <item quantity="other">Добавить %d трека</item>
+    </plurals>
+    <string name="add_tracks_none_selected">Выберите треки</string>
+    <string name="add_tracks_in_playlist">уже в плейлисте</string>
+    <!-- Library tabs and collections (stage 7) -->
+    <string name="library_tab_tracks">Треки</string>
+    <string name="library_tab_albums">Альбомы</string>
+    <string name="library_tab_artists">Исполнители</string>
+    <string name="library_tab_folders">Папки</string>
+    <string name="library_tab_genres">Жанры</string>
+    <string name="library_filter_tracks">Найти трек</string>
+    <string name="library_filter_albums">Найти альбом</string>
+    <string name="library_filter_artists">Найти исполнителя</string>
+    <string name="library_filter_folders">Найти папку</string>
+    <string name="library_filter_genres">Найти жанр</string>
+    <string name="library_filter_found">Найдено: %1$d из %2$d</string>
+    <string name="library_filter_no_match">В этом разделе нет «%1$s».</string>
+    <string name="library_albums_empty_title">Нет альбомов</string>
+    <string name="library_albums_empty_message">У треков не указан альбом в тегах.</string>
+    <string name="library_genres_empty_title">Нет жанров</string>
+    <string name="library_genres_empty_message">У треков не указан жанр в тегах.</string>
+    <plurals name="albums_count">
+        <item quantity="one">%d альбом</item>
+        <item quantity="few">%d альбома</item>
+        <item quantity="many">%d альбомов</item>
+        <item quantity="other">%d альбома</item>
+    </plurals>
+    <plurals name="artists_count">
+        <item quantity="one">%d исполнитель</item>
+        <item quantity="few">%d исполнителя</item>
+        <item quantity="many">%d исполнителей</item>
+        <item quantity="other">%d исполнителя</item>
+    </plurals>
+    <plurals name="genres_count">
+        <item quantity="one">%d жанр</item>
+        <item quantity="few">%d жанра</item>
+        <item quantity="many">%d жанров</item>
+        <item quantity="other">%d жанра</item>
+    </plurals>
+    <plurals name="folders_count">
+        <item quantity="one">%d папка</item>
+        <item quantity="few">%d папки</item>
+        <item quantity="many">%d папок</item>
+        <item quantity="other">%d папки</item>
+    </plurals>
+    <string name="various_artists">Разные исполнители</string>
+    <string name="sort_name">По имени</string>
+    <string name="sort_track_count">По числу треков</string>
+    <string name="sort_year">По году</string>
+    <string name="player_source_album">Альбом «%1$s»</string>
+    <string name="player_source_artist">Исполнитель: %1$s</string>
+    <string name="player_source_genre">Жанр: %1$s</string>
+    <string name="player_source_folder">Папка «%1$s»</string>
+    <string name="collection_menu">Действия</string>
+    <string name="collection_row_menu">Действия: %1$s</string>
+    <string name="collection_missing">Этого раздела больше нет в медиатеке</string>
+    <string name="collection_section_albums">Альбомы</string>
+    <string name="collection_section_folders">Папки</string>
+    <string name="collection_section_tracks">Треки</string>
+    <string name="track_menu_open_album">Открыть альбом</string>
+    <string name="track_menu_open_artist">Открыть исполнителя</string>
+    <string name="search_section_albums">Альбомы</string>
+    <string name="search_section_artists">Исполнители</string>
+    <string name="action_select">Выбрать</string>
+    <string name="selection_count">Выбрано: %1$d</string>
+    <string name="selection_all">Выбрать все</string>
+    <string name="selection_none">Снять выбор</string>
+    <string name="selection_close">Закончить выбор</string>
+    <string name="selection_nothing">Отметьте треки</string>
 </resources>

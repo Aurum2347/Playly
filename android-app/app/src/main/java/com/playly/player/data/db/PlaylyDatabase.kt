@@ -26,7 +26,7 @@ abstract class PlaylyDatabase : RoomDatabase() {
 
     companion object {
         const val NAME = "playly.db"
-        const val VERSION = 3
+        const val VERSION = 4
 
         /**
          * Every schema change needs a Migration here and a new exported schema in app/schemas.
@@ -53,7 +53,14 @@ abstract class PlaylyDatabase : RoomDatabase() {
             }
         }
 
-        val MIGRATIONS: Array<Migration> = arrayOf(MIGRATION_1_2, MIGRATION_2_3)
+        /** Stage 6: each playlist remembers how its page is sorted. */
+        val MIGRATION_3_4 = object : Migration(3, 4) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE playlists ADD COLUMN sort_order INTEGER NOT NULL DEFAULT 0")
+            }
+        }
+
+        val MIGRATIONS: Array<Migration> = arrayOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
 
         fun build(context: Context): PlaylyDatabase =
             Room.databaseBuilder(context, PlaylyDatabase::class.java, NAME)

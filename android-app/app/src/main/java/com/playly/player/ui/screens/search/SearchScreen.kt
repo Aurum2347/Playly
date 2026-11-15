@@ -54,10 +54,19 @@ import com.playly.player.designsystem.components.SectionHeader
 import com.playly.player.ui.player.LocalPlayerLauncher
 import com.playly.player.ui.player.NowPlayingAction
 import com.playly.player.ui.player.rememberListOrigin
+import com.playly.player.ui.actions.LocalTrackActions
+import com.playly.player.ui.actions.TrackTarget
+import com.playly.player.data.library.browse.CollectionKind
+import com.playly.player.ui.screens.collections.GroupRow
 import com.playly.player.ui.tracksSummaryLabel
 
 @Composable
-fun SearchScreen(onBack: () -> Unit, viewModel: SearchViewModel = viewModel(factory = SearchViewModel.Factory)) {
+fun SearchScreen(
+    onBack: () -> Unit,
+    onOpenPlaylist: (Long) -> Unit,
+    onOpenCollection: (CollectionKind, String) -> Unit,
+    viewModel: SearchViewModel = viewModel(factory = SearchViewModel.Factory),
+) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val nowPlayingId by viewModel.nowPlayingId.collectAsStateWithLifecycle()
     val launcher = LocalPlayerLauncher.current
@@ -86,7 +95,7 @@ fun SearchScreen(onBack: () -> Unit, viewModel: SearchViewModel = viewModel(fact
                     message = stringResource(R.string.search_error),
                     onRetry = null,
                 )
-                is SearchUiState.Results -> SearchResults(current, nowPlayingId) { tracks, index, origin ->
+                is SearchUiState.Results -> SearchResults(current, nowPlayingId, onOpenPlaylist, onOpenCollection) { tracks, index, origin ->
                     viewModel.play(tracks, index)
                     launcher.trackStarted(origin)
                 }
@@ -148,30 +157,43 @@ private fun SearchField(query: String, onQueryChange: (String) -> Unit, onBack: 
 }
 
 /**
- * Grouped results. A track plays within the found tracks; playlists open in stage 6, so their
- * rows stay display-only rather than pretend to work.
+ * Grouped results. A track plays within the found tracks; a playlist opens its page.
  */
 @Composable
 private fun SearchResults(
     results: SearchUiState.Results,
     nowPlayingId: Long?,
+    onOpenPlaylist: (Long) -> Unit,
+    onOpenCollection: (CollectionKind, String) -> Unit,
     onPlay: (List<TrackEntity>, Int, Offset?) -> Unit,
 ) {
     val listState = rememberLazyListState()
     val origins = rememberListOrigin(listState)
+    val actions = LocalTrackActions.current
     LazyColumn(Modifier.fillMaxSize().then(origins.modifier), state = listState) {
         if (results.tracks.isNotEmpty()) {
             item(key = "tracks-header") { SectionHeader(stringResource(R.string.search_section_tracks)) }
             itemsIndexed(results.tracks, key = { _, track -> "t${track.id}" }) { index, track ->
+                val subtitle = listOfNotNull(track.artist, track.album).filter { it.isNotBlank() }.joinToString(" · ")
+                val artwork = Artwork(track.uri, track.mediaStoreId, track.albumId, track.dateModified, track.sizeBytes)
                 MediaRow(
                     title = track.title,
-                    subtitle = listOfNotNull(track.artist, track.album).filter { it.isNotBlank() }.joinToString(" · "),
+                    subtitle = subtitle,
                     trailingText = if (track.durationMs > 0) formatClock(track.durationMs) else null,
-                    artwork = Artwork(track.uri, track.mediaStoreId, track.albumId, track.dateModified, track.sizeBytes),
+                    artwork = artwork,
                     isActive = track.id == nowPlayingId,
                     onClick = { onPlay(results.tracks, index, origins.of("t${track.id}")) },
+                    onMore = actions?.let { a -> { a.open(TrackTarget(track.id, track.title, subtitle, artwork)) } },
                 )
             }
+        }
+        if (results.albums.isNotEmpty()) {
+            item(key = "albums-header") { SectionHeader(stringResource(R.string.search_section_albums)) }
+            items(results.albums, key = { "a${it.key}" }) { group -> GroupRow(group, onOpenCollection) }
+        }
+        if (results.artists.isNotEmpty()) {
+            item(key = "artists-header") { SectionHeader(stringResource(R.string.search_section_artists)) }
+            items(results.artists, key = { "r${it.key}" }) { group -> GroupRow(group, onOpenCollection) }
         }
         if (results.playlists.isNotEmpty()) {
             item(key = "playlists-header") { SectionHeader(stringResource(R.string.search_section_playlists)) }
@@ -180,6 +202,7 @@ private fun SearchResults(
                     title = item.playlist.name,
                     subtitle = tracksSummaryLabel(item.trackCount, item.totalDurationMs),
                     placeholderIcon = R.drawable.ic_playlists,
+                    onClick = { onOpenPlaylist(item.playlist.id) },
                 )
             }
         }

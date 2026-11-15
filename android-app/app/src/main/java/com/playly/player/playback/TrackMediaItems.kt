@@ -1,6 +1,8 @@
 package com.playly.player.playback
 
 import android.net.Uri
+import android.os.Bundle
+import java.util.concurrent.atomic.AtomicLong
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
 import com.playly.player.data.artwork.Artwork
@@ -31,6 +33,15 @@ class TrackMediaItems(private val tracks: TrackDao) {
 
         fun trackId(item: MediaItem): Long? = item.mediaId.toLongOrNull()
 
+        private const val KEY_UID = "playly.uid"
+        private val nextUid = AtomicLong(1)
+
+        /**
+         * Identity of one queue row: unique per item the service creates, so the same track
+         * queued twice is still two rows. 0 for items that did not come from [toMediaItem].
+         */
+        fun uid(item: MediaItem): Long = item.mediaMetadata.extras?.getLong(KEY_UID, 0L) ?: 0L
+
         fun toMediaItem(track: TrackEntity): MediaItem {
             val metadata = MediaMetadata.Builder()
                 .setTitle(track.title)
@@ -46,6 +57,7 @@ class TrackMediaItems(private val tracks: TrackDao) {
                 .setMediaType(MediaMetadata.MEDIA_TYPE_MUSIC)
                 .setIsPlayable(true)
                 .setIsBrowsable(false)
+                .setExtras(Bundle().apply { putLong(KEY_UID, nextUid.getAndIncrement()) })
                 .build()
             return MediaItem.Builder()
                 .setMediaId(track.id.toString())

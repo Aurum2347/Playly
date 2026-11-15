@@ -33,6 +33,9 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.toggleableState
+import androidx.compose.ui.state.ToggleableState
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
@@ -50,6 +53,10 @@ import com.playly.player.designsystem.components.MediaRow
 import com.playly.player.designsystem.components.PlaylyButton
 import com.playly.player.designsystem.components.PlaylyButtonStyle
 import com.playly.player.designsystem.components.PlaylyIcon
+import com.playly.player.designsystem.components.PlaylyIconButton
+import com.playly.player.ui.actions.LocalTrackActions
+import com.playly.player.ui.actions.TrackSelection
+import com.playly.player.ui.actions.TrackTarget
 import com.playly.player.ui.tracksSummaryLabel
 
 /**
@@ -65,6 +72,10 @@ fun TrackListHeader(
     onPlayAll: () -> Unit,
     onShuffleAll: () -> Unit,
     modifier: Modifier = Modifier,
+    /** Replaces "N tracks · length", e.g. while a filter is on. */
+    summary: String? = null,
+    /** Adds "Select" (multi-select) next to "Play" and "Shuffle". */
+    onSelect: (() -> Unit)? = null,
 ) {
     val motion = PlaylyTheme.motion
     Column(modifier.fillMaxWidth().padding(start = PlaylyTheme.spacing.page, end = PlaylyTheme.spacing.xs)) {
@@ -78,7 +89,7 @@ fun TrackListHeader(
                 )
                 Spacer(Modifier.height(PlaylyTheme.spacing.xxs))
                 Text(
-                    tracksSummaryLabel(content.count, content.totalDurationMs),
+                    summary ?: tracksSummaryLabel(content.count, content.totalDurationMs),
                     style = PlaylyTheme.typography.subtitle,
                     color = PlaylyTheme.colors.textMuted,
                 )
@@ -104,17 +115,25 @@ fun TrackListHeader(
                 style = PlaylyButtonStyle.Secondary,
                 icon = R.drawable.ic_shuffle,
             )
+            if (onSelect != null) {
+                Spacer(Modifier.weight(1f))
+                PlaylyIconButton(R.drawable.ic_select, stringResource(R.string.action_select), onSelect, tint = PlaylyTheme.colors.textSecondary)
+            }
         }
         Spacer(Modifier.height(PlaylyTheme.spacing.xs))
     }
 }
 
+@Composable
+private fun SortButton(sort: TrackSort, onSort: (TrackSort) -> Unit) =
+    SortButton(TrackSort.entries, sort, { it.label }, onSort)
+
 /** Current order as a small label; the menu marks the chosen one with a check and for TalkBack. */
 @Composable
-private fun SortButton(sort: TrackSort, onSort: (TrackSort) -> Unit) {
+fun <T> SortButton(options: List<T>, sort: T, labelOf: (T) -> Int, onSort: (T) -> Unit) {
     val colors = PlaylyTheme.colors
     var open by remember { mutableStateOf(false) }
-    val label = stringResource(sort.label)
+    val label = stringResource(labelOf(sort))
     val description = stringResource(R.string.sort_current, label)
     Box {
         Row(
@@ -136,10 +155,10 @@ private fun SortButton(sort: TrackSort, onSort: (TrackSort) -> Unit) {
             containerColor = colors.surfaceOverlay,
             shape = PlaylyTheme.shapes.medium,
         ) {
-            TrackSort.entries.forEach { option ->
+            options.forEach { option ->
                 val chosen = option == sort
                 DropdownMenuItem(
-                    text = { Text(stringResource(option.label), style = PlaylyTheme.typography.body, color = colors.textPrimary) },
+                    text = { Text(stringResource(labelOf(option)), style = PlaylyTheme.typography.body, color = colors.textPrimary) },
                     onClick = {
                         open = false
                         if (!chosen) onSort(option)
@@ -168,23 +187,48 @@ val TrackSort.label: Int
 /**
  * Virtualised track rows keyed by track id: rows are recycled, covers load lazily at row size,
  * and the list keeps its place when tracks are added or re-sorted. [onPlay] gets the index and
- * the row's key (to anchor the player animation).
+ * the row's key (to anchor the player animation); "⋮" and a long press open the track menu.
  */
 fun LazyListScope.trackItems(
     tracks: List<TrackListItem>,
     nowPlayingId: Long?,
+    selection: TrackSelection? = null,
     onPlay: (index: Int, key: Any) -> Unit,
 ) {
     itemsIndexed(tracks, key = { _, track -> track.id }, contentType = { _, _ -> "track" }) { index, track ->
+        val actions = LocalTrackActions.current
+        val subtitle = trackSubtitle(track)
+        val selected = selection?.ids?.let { track.id in it }
         MediaRow(
             title = track.title,
-            subtitle = trackSubtitle(track),
+            subtitle = subtitle,
             trailingText = if (track.durationMs > 0) formatClock(track.durationMs) else null,
             artwork = track.artwork(),
             isActive = track.id == nowPlayingId,
-            onClick = { onPlay(index, track.id) },
+            onClick = { if (selected != null) selection?.toggle(track.id) else onPlay(index, track.id) },
+            onMore = if (selected != null) null else actions?.let { a -> { a.open(TrackTarget(track.id, track.title, subtitle, track.artwork())) } },
+            trailing = if (selected != null) { { SelectionCheck(selected) } } else null,
+            modifier = if (selected != null) {
+                Modifier.semantics {
+                    role = Role.Checkbox
+                    toggleableState = ToggleableState(selected)
+                }
+            } else {
+                Modifier
+            },
         )
     }
+}
+
+/** Check box at the end of a row while selecting; the row itself is the touch target. */
+@Composable
+fun SelectionCheck(checked: Boolean) {
+    PlaylyIcon(
+        if (checked) R.drawable.ic_checkbox_on else R.drawable.ic_checkbox_off,
+        contentDescription = null,
+        tint = if (checked) PlaylyTheme.colors.accent else PlaylyTheme.colors.textMuted,
+        modifier = Modifier.padding(horizontal = PlaylyTheme.spacing.sm),
+    )
 }
 
 @Composable

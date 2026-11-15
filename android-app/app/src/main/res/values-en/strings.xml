@@ -35,7 +35,7 @@
     <string name="state_error_library">Couldn\'t read the library. Your files are untouched.</string>
     <string name="state_error_playlists">Couldn\'t read playlists. Nothing was deleted.</string>
     <string name="state_no_playlists_title">No playlists yet</string>
-    <string name="state_no_playlists_message">Your playlists will appear here.</string>
+    <string name="state_no_playlists_message">Create a playlist, then add tracks with “⋮” or a long press.</string>
 
     <string name="search_hint">Tracks, artists, albums, playlists</string>
     <string name="search_idle_title">Search your library</string>
@@ -179,4 +179,162 @@
     <string name="details_field_folder">Folder</string>
     <string name="details_unavailable">The file is unavailable right now: it was deleted or its folder is disconnected</string>
     <string name="details_not_found">This track is no longer in the library</string>
+
+    <!-- Stage 6: playlists and queue -->
+    <string name="action_undo">Undo</string>
+    <string name="action_create">Create</string>
+    <string name="action_save">Save</string>
+    <string name="action_delete">Delete</string>
+    <string name="action_move_up">Move up</string>
+    <string name="action_move_down">Move down</string>
+    <string name="track_menu_play_next">Play next</string>
+    <string name="track_menu_add_to_queue">Add to queue</string>
+    <string name="track_menu_add_to_playlist">Add to playlist</string>
+    <string name="track_menu_remove_from_playlist">Remove from playlist</string>
+    <string name="track_menu_remove_from_queue">Remove from queue</string>
+    <string name="queue_message_started">The queue was empty, so it started playing</string>
+    <string name="queue_message_next">Plays next</string>
+    <string name="queue_message_added">Added to the queue</string>
+    <plurals name="queue_message_next_many">
+        <item quantity="one">%d track plays next</item>
+        <item quantity="other">%d tracks play next</item>
+    </plurals>
+    <plurals name="queue_message_added_many">
+        <item quantity="one">%d track added to the queue</item>
+        <item quantity="other">%d tracks added to the queue</item>
+    </plurals>
+    <string name="queue_message_unavailable">Track unavailable: the file was deleted or its folder is disconnected</string>
+    <string name="queue_message_failed">Could not change the queue. Please try again.</string>
+    <string name="queue_message_removed">Removed from the queue</string>
+    <string name="queue_message_cleared">Cleared the queue after the current track</string>
+    <string name="queue_section_queued">In the queue</string>
+    <string name="queue_clear">Clear</string>
+    <string name="queue_clear_description">Clear the queue after the current track</string>
+    <string name="queue_remove">Remove “%1$s” from the queue</string>
+    <string name="queue_drag">Drag “%1$s”</string>
+    <string name="dialog_clear_queue_title">Clear the queue?</string>
+    <plurals name="dialog_clear_queue_message">
+        <item quantity="one">%d track follows the current one. The current track keeps playing.</item>
+        <item quantity="other">%d tracks follow the current one. The current track keeps playing.</item>
+    </plurals>
+    <string name="playlist_message_already">Already in “%1$s”</string>
+    <string name="playlist_message_added_one">Added to “%1$s”</string>
+    <plurals name="playlist_message_added_many">
+        <item quantity="one">%1$d track added to “%2$s”</item>
+        <item quantity="other">%1$d tracks added to “%2$s”</item>
+    </plurals>
+    <plurals name="playlist_message_added_skipped">
+        <item quantity="one">%1$d track added to “%2$s”, already there: %3$d</item>
+        <item quantity="other">%1$d tracks added to “%2$s”, already there: %3$d</item>
+    </plurals>
+    <plurals name="playlist_message_created_with">
+        <item quantity="one">Created “%1$s” with %2$d track</item>
+        <item quantity="other">Created “%1$s” with %2$d tracks</item>
+    </plurals>
+    <string name="playlist_message_removed">Removed from “%1$s”</string>
+    <string name="playlist_message_created">Created “%1$s”</string>
+    <string name="playlist_message_deleted">Deleted “%1$s”</string>
+    <string name="playlist_message_cover_failed">Could not keep access to this picture. Pick another one.</string>
+    <string name="playlist_message_picker_unavailable">This device has no system file picker</string>
+    <string name="add_to_playlist_title">Add to playlist</string>
+    <plurals name="add_to_playlist_title_many">
+        <item quantity="one">Add %d track to a playlist</item>
+        <item quantity="other">Add %d tracks to a playlist</item>
+    </plurals>
+    <string name="add_to_playlist_search">Find a playlist</string>
+    <string name="add_to_playlist_contains">Already in this playlist</string>
+    <string name="add_to_playlist_empty">No playlists yet. Create the first one.</string>
+    <string name="add_to_playlist_no_match">No playlists with that name</string>
+    <string name="dialog_duplicate_title">Already in the playlist</string>
+    <string name="dialog_duplicate_message">“%1$s” is already in “%2$s”. Add it again?</string>
+    <string name="action_add_again">Add again</string>
+    <string name="playlist_new">New playlist</string>
+    <string name="playlist_dialog_edit_title">Edit playlist</string>
+    <string name="playlist_field_name">Name</string>
+    <string name="playlist_field_description">Description (optional)</string>
+    <string name="action_create_playlist">Create playlist</string>
+    <string name="playlist_menu">Playlist actions</string>
+    <string name="playlist_menu_play">Play</string>
+    <string name="playlist_menu_shuffle">Shuffle</string>
+    <string name="playlist_menu_add_to_queue">Add to queue</string>
+    <string name="playlist_menu_edit">Edit name and description</string>
+    <string name="playlist_menu_cover">Choose cover</string>
+    <string name="playlist_menu_cover_reset">Use automatic cover</string>
+    <string name="playlist_menu_delete">Delete playlist</string>
+    <string name="dialog_delete_playlist_title">Delete playlist?</string>
+    <string name="dialog_delete_playlist_message">“%1$s” will be deleted. Its tracks stay in the library and on the device.</string>
+    <string name="playlist_not_found">This playlist no longer exists</string>
+    <string name="playlist_empty_title">This playlist is empty</string>
+    <string name="playlist_empty_message">Add tracks from the library with “Add tracks” above or from “⋮” on any track.</string>
+    <string name="playlist_all_unavailable">All tracks of this playlist are unavailable: the files were deleted or the folder is disconnected</string>
+    <string name="playlist_unavailable_count">unavailable: %1$d</string>
+    <string name="action_add_tracks">Add tracks</string>
+    <string name="sort_manual">Custom order</string>
+    <string name="sort_recently_added">Recently added</string>
+    <string name="player_source_playlist">Playlist “%1$s”</string>
+    <string name="add_tracks_title">Add to “%1$s”</string>
+    <string name="add_tracks_search">Search the library</string>
+    <plurals name="add_tracks_confirm">
+        <item quantity="one">Add %d track</item>
+        <item quantity="other">Add %d tracks</item>
+    </plurals>
+    <string name="add_tracks_none_selected">Select tracks</string>
+    <string name="add_tracks_in_playlist">already in the playlist</string>
+    <!-- Library tabs and collections (stage 7) -->
+    <string name="library_tab_tracks">Tracks</string>
+    <string name="library_tab_albums">Albums</string>
+    <string name="library_tab_artists">Artists</string>
+    <string name="library_tab_folders">Folders</string>
+    <string name="library_tab_genres">Genres</string>
+    <string name="library_filter_tracks">Find a track</string>
+    <string name="library_filter_albums">Find an album</string>
+    <string name="library_filter_artists">Find an artist</string>
+    <string name="library_filter_folders">Find a folder</string>
+    <string name="library_filter_genres">Find a genre</string>
+    <string name="library_filter_found">Found: %1$d of %2$d</string>
+    <string name="library_filter_no_match">Nothing here matches “%1$s”.</string>
+    <string name="library_albums_empty_title">No albums</string>
+    <string name="library_albums_empty_message">Your tracks have no album tags.</string>
+    <string name="library_genres_empty_title">No genres</string>
+    <string name="library_genres_empty_message">Your tracks have no genre tags.</string>
+    <plurals name="albums_count">
+        <item quantity="one">%d album</item>
+        <item quantity="other">%d albums</item>
+    </plurals>
+    <plurals name="artists_count">
+        <item quantity="one">%d artist</item>
+        <item quantity="other">%d artists</item>
+    </plurals>
+    <plurals name="genres_count">
+        <item quantity="one">%d genre</item>
+        <item quantity="other">%d genres</item>
+    </plurals>
+    <plurals name="folders_count">
+        <item quantity="one">%d folder</item>
+        <item quantity="other">%d folders</item>
+    </plurals>
+    <string name="various_artists">Various artists</string>
+    <string name="sort_name">Name</string>
+    <string name="sort_track_count">Track count</string>
+    <string name="sort_year">Year</string>
+    <string name="player_source_album">Album “%1$s”</string>
+    <string name="player_source_artist">Artist: %1$s</string>
+    <string name="player_source_genre">Genre: %1$s</string>
+    <string name="player_source_folder">Folder “%1$s”</string>
+    <string name="collection_menu">Actions</string>
+    <string name="collection_row_menu">Actions: %1$s</string>
+    <string name="collection_missing">This is no longer in your library</string>
+    <string name="collection_section_albums">Albums</string>
+    <string name="collection_section_folders">Folders</string>
+    <string name="collection_section_tracks">Tracks</string>
+    <string name="track_menu_open_album">Go to album</string>
+    <string name="track_menu_open_artist">Go to artist</string>
+    <string name="search_section_albums">Albums</string>
+    <string name="search_section_artists">Artists</string>
+    <string name="action_select">Select</string>
+    <string name="selection_count">Selected: %1$d</string>
+    <string name="selection_all">Select all</string>
+    <string name="selection_none">Clear selection</string>
+    <string name="selection_close">Done selecting</string>
+    <string name="selection_nothing">Select tracks</string>
 </resources>
