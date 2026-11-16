@@ -1,6 +1,7 @@
 package com.playly.player.playback
 
 import android.app.PendingIntent
+import android.content.Context
 import android.content.Intent
 import android.os.Bundle
 import android.os.SystemClock
@@ -12,7 +13,10 @@ import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.annotation.OptIn
 import androidx.media3.common.util.UnstableApi
+import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.exoplayer.audio.AudioSink
+import androidx.media3.exoplayer.audio.DefaultAudioSink
 import androidx.media3.exoplayer.source.ShuffleOrder.DefaultShuffleOrder
 import androidx.media3.session.CacheBitmapLoader
 import androidx.media3.session.CommandButton
@@ -25,12 +29,18 @@ import com.playly.player.PlaylyApplication
 import com.playly.player.R
 import com.playly.player.data.db.PlayHistoryDao
 import com.playly.player.data.library.scan.ScanPlan
+import com.playly.player.data.settings.AppSettings
+import com.playly.player.data.settings.SettingsRepository
+import com.playly.player.playback.audio.PlaylyAudioProcessor
+import com.playly.player.playback.audio.SoundParams
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -66,6 +76,8 @@ class PlaybackService : MediaSessionService() {
     /** Stage 8.1: the running sleep timer, null when off. Not saved: a new process starts without one. */
     private var sleepTimer: SleepTimer? = null
     private var sleepJob: Job? = null
+    /** Stage 8.3: equaliser, mono and normalisation inside the audio sink. */
+    private val soundProcessor = PlaylyAudioProcessor()
 
     override fun onCreate() {
         super.onCreate()
@@ -74,7 +86,7 @@ class PlaybackService : MediaSessionService() {
         items = TrackMediaItems(container.database.trackDao())
         history = container.database.playHistoryDao()
 
-        player = ExoPlayer.Builder(this)
+        player = ExoPlayer.Builder(this, renderersFactory())
             // Audio focus: pause for calls and other players, duck for navigation prompts.
             .setAudioAttributes(
                 AudioAttributes.Builder().setUsage(C.USAGE_MEDIA).setContentType(C.AUDIO_CONTENT_TYPE_MUSIC).build(),
@@ -87,6 +99,7 @@ class PlaybackService : MediaSessionService() {
             .build()
         player.addListener(PlayerEvents())
         queue = QueueEditor(player)
+        observeSound(container.settings)
 
         session = MediaSession.Builder(this, player)
             .setCallback(PlaybackSessionCallback(this, scope, store) { restoreSettled = true })
@@ -103,6 +116,29 @@ class PlaybackService : MediaSessionService() {
         )
         setShowNotificationForIdlePlayer(SHOW_NOTIFICATION_FOR_IDLE_PLAYER_NEVER)
         restoreSavedQueue()
+    }
+
+    /** The app's sound chain runs first, before Media3's own silence skipping and speed change. */
+    private fun renderersFactory() = object : DefaultRenderersFactory(this) {
+        override fun buildAudioSink(context: Context, enableFloatOutput: Boolean, enableAudioTrackPlaybackParams: Boolean): AudioSink =
+            DefaultAudioSink.Builder(context)
+                .setEnableFloatOutput(enableFloatOutput)
+                .setEnableAudioOutputPlaybackParameters(enableAudioTrackPlaybackParams)
+                .setAudioProcessors(arrayOf(soundProcessor))
+                .build()
+    }
+
+    /** Sound settings apply live, also with the app closed: the service reads them itself. */
+    private fun observeSound(settings: SettingsRepository) {
+        scope.launch {
+            settings.settings
+                .map { soundParamsOf(it) to it.skipSilence }
+                .distinctUntilChanged()
+                .collect { (params, skipSilence) ->
+                    soundProcessor.params = params
+                    player.skipSilenceEnabled = skipSilence
+                }
+        }
     }
 
     override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaSession? = session
@@ -491,3 +527,10 @@ class PlaybackService : MediaSessionService() {
         const val FADE_STEP_MS = 100L
     }
 }
+
+/** What the sound chain plays with, from the app settings (the equaliser only when on). */
+internal fun soundParamsOf(settings: AppSettings) = SoundParams(
+    eqGains = if (settings.eqEnabled) settings.eqGains else null,
+    mono = settings.monoAudio,
+    normalize = settings.normalizeVolume,
+)

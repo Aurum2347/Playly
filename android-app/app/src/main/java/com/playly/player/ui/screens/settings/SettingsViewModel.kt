@@ -11,7 +11,9 @@ import com.playly.player.data.db.SourceSummary
 import com.playly.player.data.library.scan.ScanProgress
 import com.playly.player.data.library.AddSourceResult
 import com.playly.player.data.library.LibraryRepository
+import com.playly.player.data.settings.AppSettings
 import com.playly.player.data.settings.SettingsRepository
+import com.playly.player.playback.audio.Equalizer
 import com.playly.player.ui.UiMessage
 import com.playly.player.ui.container
 import com.playly.player.ui.toMessages
@@ -32,7 +34,24 @@ data class SettingsUiState(
     val trackCount: Int,
     val unavailableCount: Int,
     val lastScanAt: Long?,
+    val sound: SoundSettingsUi,
 )
+
+/** Stage 8.3: the "Sound" section and the equaliser sheet. */
+data class SoundSettingsUi(
+    val eqEnabled: Boolean,
+    val eqPreset: String,
+    val eqGains: List<Float>,
+    val mono: Boolean,
+    val normalize: Boolean,
+    val skipSilence: Boolean,
+) {
+    companion object {
+        fun of(app: AppSettings) = SoundSettingsUi(
+            app.eqEnabled, app.eqPreset, app.eqGains, app.monoAudio, app.normalizeVolume, app.skipSilence,
+        )
+    }
+}
 
 class SettingsViewModel(
     private val settings: SettingsRepository,
@@ -48,7 +67,7 @@ class SettingsViewModel(
         library.sourceSummaries,
         library.unavailableCount,
     ) { app, snapshot, sources, unavailable ->
-        SettingsUiState(app.reduceMotion, app.openPlayerOnPlay, app.playerArtworkTint, sources, snapshot.trackCount, unavailable, app.lastScanAt)
+        SettingsUiState(app.reduceMotion, app.openPlayerOnPlay, app.playerArtworkTint, sources, snapshot.trackCount, unavailable, app.lastScanAt, SoundSettingsUi.of(app))
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
     val scanProgress: StateFlow<ScanProgress?> = library.scanProgress
@@ -67,6 +86,31 @@ class SettingsViewModel(
 
     fun setPlayerArtworkTint(enabled: Boolean) {
         viewModelScope.launch { settings.setPlayerArtworkTint(enabled) }
+    }
+
+    fun setEqEnabled(enabled: Boolean) = update { settings.setEqEnabled(enabled) }
+
+    /** Choosing a preset (or a band below) also turns the equaliser on: that is what the user wants to hear. */
+    fun chooseEqPreset(id: String) = update {
+        settings.setEqPreset(id)
+        settings.setEqEnabled(true)
+    }
+
+    fun setEqBand(band: Int, gainDb: Float) = update {
+        settings.setEqBand(band, gainDb)
+        settings.setEqEnabled(true)
+    }
+
+    fun resetEq() = update { settings.setEqPreset(Equalizer.FLAT) }
+
+    fun setMonoAudio(enabled: Boolean) = update { settings.setMonoAudio(enabled) }
+
+    fun setNormalizeVolume(enabled: Boolean) = update { settings.setNormalizeVolume(enabled) }
+
+    fun setSkipSilence(enabled: Boolean) = update { settings.setSkipSilence(enabled) }
+
+    private fun update(block: suspend () -> Unit) {
+        viewModelScope.launch { block() }
     }
 
     fun addSource(uri: Uri) {

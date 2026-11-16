@@ -424,4 +424,32 @@
     <string name="lyrics_seek_line">Играть с этой строки</string>
     <string name="lyrics_line_now">Сейчас звучит</string>
     <string name="lyrics_instrumental">Проигрыш</string>
+    <!-- Stage 8.3: sound -->
+    <string name="settings_section_sound">Звук</string>
+    <string name="settings_eq_title">Эквалайзер</string>
+    <string name="settings_eq_off">Выключен</string>
+    <string name="settings_eq_on">Включён · %1$s</string>
+    <string name="settings_mono_title">Моно</string>
+    <string name="settings_mono_subtitle">Одинаковый звук в обоих ушах</string>
+    <string name="settings_normalize_title">Нормализация громкости</string>
+    <string name="settings_normalize_subtitle">Тихие и громкие треки звучат ровнее</string>
+    <string name="settings_skip_silence_title">Пропуск тишины</string>
+    <string name="settings_skip_silence_subtitle">Паузы без звука внутри треков проматываются</string>
+    <string name="eq_title">Эквалайзер</string>
+    <string name="eq_enabled">Эквалайзер включён</string>
+    <string name="eq_presets">Пресеты</string>
+    <string name="eq_reset">Сбросить</string>
+    <string name="eq_band">Полоса %1$s Гц</string>
+    <string name="eq_gain">%1$s дБ</string>
+    <string name="eq_hint">Звук меняется, когда вы отпускаете ползунок. Выбор пресета или полосы включает эквалайзер. Действует на все треки.</string>
+    <string name="eq_preset_flat">Ровный</string>
+    <string name="eq_preset_bass">Бас</string>
+    <string name="eq_preset_rock">Рок</string>
+    <string name="eq_preset_pop">Поп</string>
+    <string name="eq_preset_electronic">Электроника</string>
+    <string name="eq_preset_vocal">Вокал</string>
+    <string name="eq_preset_jazz">Джаз</string>
+    <string name="eq_preset_classic">Классика</string>
+    <string name="eq_preset_treble">Высокие частоты</string>
+    <string name="eq_preset_custom">Свой</string>
 </resources>

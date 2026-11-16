@@ -55,6 +55,7 @@ fun SettingsScreen(onBack: () -> Unit, viewModel: SettingsViewModel = viewModel(
     val noBrowser = stringResource(R.string.message_no_browser)
     val pickFolder = rememberFolderPicker(viewModel::addSource)
     var pendingRemovalId by rememberSaveable { mutableStateOf<Long?>(null) }
+    var equalizerOpen by rememberSaveable { mutableStateOf(false) }
 
     Column(Modifier.fillMaxSize()) {
         PlaylyTopBar(title = stringResource(R.string.settings_title), onBack = onBack)
@@ -138,6 +139,44 @@ fun SettingsScreen(onBack: () -> Unit, viewModel: SettingsViewModel = viewModel(
                 }
             }
 
+            item(key = "sound-header") { SectionHeader(stringResource(R.string.settings_section_sound)) }
+            item(key = "sound") {
+                val sound = current.sound
+                SettingsGroup {
+                    SettingsRow(
+                        title = stringResource(R.string.settings_eq_title),
+                        subtitle = if (sound.eqEnabled) {
+                            stringResource(R.string.settings_eq_on, stringResource(eqPresetLabel(sound.eqPreset)))
+                        } else {
+                            stringResource(R.string.settings_eq_off)
+                        },
+                        icon = R.drawable.ic_equalizer,
+                        onClick = { equalizerOpen = true },
+                    )
+                    RowDivider()
+                    SettingsSwitchRow(
+                        title = stringResource(R.string.settings_mono_title),
+                        subtitle = stringResource(R.string.settings_mono_subtitle),
+                        checked = sound.mono,
+                        onCheckedChange = viewModel::setMonoAudio,
+                    )
+                    RowDivider()
+                    SettingsSwitchRow(
+                        title = stringResource(R.string.settings_normalize_title),
+                        subtitle = stringResource(R.string.settings_normalize_subtitle),
+                        checked = sound.normalize,
+                        onCheckedChange = viewModel::setNormalizeVolume,
+                    )
+                    RowDivider()
+                    SettingsSwitchRow(
+                        title = stringResource(R.string.settings_skip_silence_title),
+                        subtitle = stringResource(R.string.settings_skip_silence_subtitle),
+                        checked = sound.skipSilence,
+                        onCheckedChange = viewModel::setSkipSilence,
+                    )
+                }
+            }
+
             item(key = "appearance-header") { SectionHeader(stringResource(R.string.settings_section_appearance)) }
             item(key = "appearance") {
                 SettingsGroup {
@@ -193,6 +232,19 @@ fun SettingsScreen(onBack: () -> Unit, viewModel: SettingsViewModel = viewModel(
             }
             // Respects the inset consumed by the scaffold when the mini-player is under the page.
             item(key = "nav-inset") { Spacer(Modifier.navigationBarsPadding()) }
+        }
+
+        if (equalizerOpen && current != null) {
+            EqualizerSheet(
+                sound = current.sound,
+                actions = EqualizerActions(
+                    onEnabled = viewModel::setEqEnabled,
+                    onPreset = viewModel::chooseEqPreset,
+                    onBand = viewModel::setEqBand,
+                    onReset = viewModel::resetEq,
+                ),
+                onDismiss = { equalizerOpen = false },
+            )
         }
 
         val pending = current?.sources?.firstOrNull { it.source.id == pendingRemovalId }?.source

@@ -382,4 +382,32 @@
     <string name="lyrics_seek_line">Play from this line</string>
     <string name="lyrics_line_now">Playing now</string>
     <string name="lyrics_instrumental">Instrumental</string>
+    <!-- Stage 8.3: sound -->
+    <string name="settings_section_sound">Sound</string>
+    <string name="settings_eq_title">Equalizer</string>
+    <string name="settings_eq_off">Off</string>
+    <string name="settings_eq_on">On · %1$s</string>
+    <string name="settings_mono_title">Mono</string>
+    <string name="settings_mono_subtitle">The same sound in both ears</string>
+    <string name="settings_normalize_title">Volume normalisation</string>
+    <string name="settings_normalize_subtitle">Quiet and loud tracks sound more even</string>
+    <string name="settings_skip_silence_title">Skip silence</string>
+    <string name="settings_skip_silence_subtitle">Silent gaps inside tracks are skipped</string>
+    <string name="eq_title">Equalizer</string>
+    <string name="eq_enabled">Equalizer on</string>
+    <string name="eq_presets">Presets</string>
+    <string name="eq_reset">Reset</string>
+    <string name="eq_band">%1$s Hz band</string>
+    <string name="eq_gain">%1$s dB</string>
+    <string name="eq_hint">The sound changes when you let go of a slider. Choosing a preset or a band turns the equalizer on. Applies to every track.</string>
+    <string name="eq_preset_flat">Flat</string>
+    <string name="eq_preset_bass">Bass</string>
+    <string name="eq_preset_rock">Rock</string>
+    <string name="eq_preset_pop">Pop</string>
+    <string name="eq_preset_electronic">Electronic</string>
+    <string name="eq_preset_vocal">Vocal</string>
+    <string name="eq_preset_jazz">Jazz</string>
+    <string name="eq_preset_classic">Classical</string>
+    <string name="eq_preset_treble">Treble</string>
+    <string name="eq_preset_custom">Custom</string>
 </resources>

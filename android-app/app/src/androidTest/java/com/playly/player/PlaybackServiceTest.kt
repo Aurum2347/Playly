@@ -1,5 +1,7 @@
 package com.playly.player
 
+import android.os.SystemClock
+import com.playly.player.playback.audio.Equalizer
 import android.content.ComponentName
 import android.content.Context
 import android.media.AudioAttributes
@@ -349,6 +351,56 @@ class PlaybackServiceTest {
             waitUntil { playback.state.value.isPlaying }
             assertNull(playback.state.value.issue)
         }
+    }
+
+    @Test
+    fun playsThroughTheSoundChainWithEveryEffectOn() = runBlocking<Unit> {
+        val settings = container.settings
+        try {
+            settings.setEqPreset("rock")
+            settings.setEqEnabled(true)
+            settings.setMonoAudio(true)
+            settings.setNormalizeVolume(true)
+            onMain {
+                play(listOf(a, b), startIndex = 0)
+                waitUntil { controller.isPlaying && controller.currentPosition >= 2_000 }
+                assertEquals(a.toString(), controller.currentMediaItem?.mediaId)
+                assertTrue(events.none { it.first == PlaybackCommands.EVENT_ERROR })
+                controller.pause()
+            }
+        } finally {
+            resetSound()
+        }
+    }
+
+    @Test
+    fun skipSilenceRushesThroughASilentTrack() = runBlocking<Unit> {
+        val settings = container.settings
+        try {
+            settings.setSkipSilence(true)
+            // The service picks the setting up from the store; give the flow a moment.
+            delay(SAVE_SETTLE_MS)
+            onMain {
+                play(listOf(a, b), startIndex = 0)
+                waitUntil { controller.isPlaying }
+                val started = SystemClock.elapsedRealtime()
+                waitUntil { controller.currentMediaItem?.mediaId == b.toString() }
+                val took = SystemClock.elapsedRealtime() - started
+                assertTrue("6 s of silence took $took ms", took < 4_500)
+                controller.pause()
+            }
+        } finally {
+            resetSound()
+        }
+    }
+
+    private suspend fun resetSound() {
+        val settings = container.settings
+        settings.setEqEnabled(false)
+        settings.setEqPreset(Equalizer.FLAT)
+        settings.setMonoAudio(false)
+        settings.setNormalizeVolume(false)
+        settings.setSkipSilence(false)
     }
 
     private fun play(ids: List<Long>, startIndex: Int) {
