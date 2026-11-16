@@ -371,4 +371,15 @@
         <item quantity="one">%d minute</item>
         <item quantity="other">%d minutes</item>
     </plurals>
+    <string name="lyrics_title">Lyrics</string>
+    <string name="lyrics_open">Lyrics</string>
+    <string name="lyrics_empty_title">No lyrics</string>
+    <string name="lyrics_empty_message">Put a .lrc file with the same name next to the track, or add lyrics to the file\'s tags.</string>
+    <string name="lyrics_origin_file">From the .lrc file</string>
+    <string name="lyrics_origin_tag">From the file\'s tags</string>
+    <string name="lyrics_unsynced">%1$s · not synced</string>
+    <string name="lyrics_follow">Back to current line</string>
+    <string name="lyrics_seek_line">Play from this line</string>
+    <string name="lyrics_line_now">Playing now</string>
+    <string name="lyrics_instrumental">Instrumental</string>
 </resources>

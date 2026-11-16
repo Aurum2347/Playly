@@ -3,6 +3,7 @@ package com.playly.player
 import android.content.Context
 import com.playly.player.data.db.PlaylyDatabase
 import com.playly.player.data.favorites.FavoritesRepository
+import com.playly.player.data.lyrics.LyricsRepository
 import com.playly.player.data.library.LibraryRepository
 import com.playly.player.data.library.browse.LibraryBrowser
 import com.playly.player.data.library.scan.LibraryScanner
@@ -34,6 +35,7 @@ class AppContainer(context: Context) {
 
     /** Favourite tracks (stage 8.1). */
     val favorites: FavoritesRepository by lazy { FavoritesRepository(database) }
+    val lyrics: LyricsRepository by lazy { LyricsRepository(appContext, library) }
 
     /** Albums, artists, genres and folders, grouped once and shared by every screen. */
     val browser: LibraryBrowser by lazy { LibraryBrowser(database.trackDao(), appScope) }

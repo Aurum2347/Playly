@@ -9,6 +9,8 @@ import com.playly.player.data.artwork.Artwork
 import com.playly.player.data.db.TrackEntity
 import com.playly.player.data.favorites.FavoritesRepository
 import com.playly.player.data.library.LibraryRepository
+import com.playly.player.data.lyrics.FoundLyrics
+import com.playly.player.data.lyrics.LyricsRepository
 import com.playly.player.data.settings.SettingsRepository
 import com.playly.player.playback.PlaybackController
 import com.playly.player.playback.PlaybackState
@@ -18,8 +20,10 @@ import com.playly.player.playback.SleepTimerRules
 import com.playly.player.ui.UiMessage
 import com.playly.player.ui.UiMessageBus
 import com.playly.player.ui.container
+import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.SharingStarted
@@ -48,6 +52,7 @@ class PlayerViewModel(
     settings: SettingsRepository,
     private val bus: UiMessageBus,
     private val favorites: FavoritesRepository,
+    private val lyricsRepository: LyricsRepository,
 ) : ViewModel() {
     val state: StateFlow<PlaybackState> = playback.state
 
@@ -69,6 +74,33 @@ class PlayerViewModel(
         .distinctUntilChanged()
         .flatMapLatest { id -> if (id == null) flowOf(false) else favorites.isFavorite(id) }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
+
+    /**
+     * The current track's text for the lyrics sheet (stage 8.2), loaded again on every track
+     * change and only while the sheet is open. A broken file means "no text", never an error.
+     */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    val lyrics: StateFlow<LyricsUiState> = playback.state
+        .map { it.nowPlaying?.trackId }
+        .distinctUntilChanged()
+        .flatMapLatest { id ->
+            if (id == null) {
+                flowOf(LyricsUiState.Loading)
+            } else {
+                flow<LyricsUiState> {
+                    emit(LyricsUiState.Loading)
+                    val found = try {
+                        lyricsRepository.load(id)
+                    } catch (e: CancellationException) {
+                        throw e
+                    } catch (_: Exception) {
+                        null
+                    }
+                    emit(LyricsUiState.Ready(id, found))
+                }
+            }
+        }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), LyricsUiState.Loading)
 
     fun setFavorite(trackId: Long, favorite: Boolean) {
         viewModelScope.launch { favorites.set(trackId, favorite) }
@@ -108,9 +140,15 @@ class PlayerViewModel(
 
     companion object {
         val Factory = viewModelFactory {
-            initializer { PlayerViewModel(container.playback, container.library, container.settings, container.messages, container.favorites) }
+            initializer { PlayerViewModel(container.playback, container.library, container.settings, container.messages, container.favorites, container.lyrics) }
         }
     }
+}
+
+/** What the lyrics sheet shows: nothing yet, or the result for one track ([found] null = no text). */
+sealed interface LyricsUiState {
+    data object Loading : LyricsUiState
+    data class Ready(val trackId: Long, val found: FoundLyrics?) : LyricsUiState
 }
 
 private fun PlaybackState.toBadge(): NowPlayingBadge? = nowPlaying?.let {

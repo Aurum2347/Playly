@@ -156,7 +156,7 @@ private fun PlayerSheet(state: PlaybackState, viewModel: PlayerViewModel, onColl
     var height by remember { mutableIntStateOf(0) }
     val pane = stringResource(R.string.playback_now_playing)
 
-    // Queue, speed or sleep timer sheet; the track menu lives in the shared TrackActionsHost (one sheet at a time, spec §12).
+    // Queue, lyrics, speed or sleep timer sheet; the track menu lives in the shared TrackActionsHost (one sheet at a time, spec §12).
     var openSheet by rememberSaveable { mutableStateOf<String?>(null) }
     val actions = LocalTrackActions.current
 
@@ -249,6 +249,10 @@ private fun PlayerSheet(state: PlaybackState, viewModel: PlayerViewModel, onColl
     val dismiss = { openSheet = null }
     when (openSheet) {
         SHEET_QUEUE -> PlayerQueue(state.shuffle, viewModel, onDismiss = dismiss)
+        SHEET_LYRICS -> {
+            val lyrics by viewModel.lyrics.collectAsStateWithLifecycle()
+            LyricsSheet(track, lyrics, state.position, onSeek = viewModel::seekTo, onDismiss = dismiss)
+        }
         SHEET_SPEED -> SpeedSheet(state.speed, onSpeed = viewModel::setSpeed, onDismiss = dismiss)
         SHEET_SLEEP -> SleepTimerSheet(
             timer = state.sleepTimer,
@@ -383,6 +387,7 @@ private fun PlayerDetails(
     PlayerExtrasRow(
         speed = state.speed,
         sleepTimer = state.sleepTimer,
+        onLyrics = { onSheet(SHEET_LYRICS) },
         onSpeed = { onSheet(SHEET_SPEED) },
         onSleepTimer = { onSheet(SHEET_SLEEP) },
     )
@@ -626,6 +631,7 @@ private val DETAILS_HEIGHT = 380.dp
 private val MIN_ART = 120.dp
 private const val SHEET_QUEUE = "queue"
 private const val SHEET_SPEED = "speed"
+private const val SHEET_LYRICS = "lyrics"
 private const val SHEET_SLEEP = "sleep"
 private val PLAY_BUTTON = 72.dp
 private const val BUFFERING_SPINNER_DELAY_MS = 400L

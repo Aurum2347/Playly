@@ -413,4 +413,15 @@
         <item quantity="many">%d минут</item>
         <item quantity="other">%d минуты</item>
     </plurals>
+    <string name="lyrics_title">Текст</string>
+    <string name="lyrics_open">Текст песни</string>
+    <string name="lyrics_empty_title">Текста нет</string>
+    <string name="lyrics_empty_message">Положите рядом с треком файл .lrc с тем же именем или добавьте текст в теги файла.</string>
+    <string name="lyrics_origin_file">Из файла .lrc</string>
+    <string name="lyrics_origin_tag">Из тегов файла</string>
+    <string name="lyrics_unsynced">%1$s · без привязки ко времени</string>
+    <string name="lyrics_follow">К текущей строке</string>
+    <string name="lyrics_seek_line">Играть с этой строки</string>
+    <string name="lyrics_line_now">Сейчас звучит</string>
+    <string name="lyrics_instrumental">Проигрыш</string>
 </resources>

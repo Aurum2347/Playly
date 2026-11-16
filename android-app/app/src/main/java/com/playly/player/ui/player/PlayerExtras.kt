@@ -58,10 +58,16 @@ import kotlinx.coroutines.delay
 
 /**
  * The player's bottom panel (spec §10): playback speed and sleep timer, each a labelled pill that
- * shows its current value ("1,25×", "12:34"). Lyrics join it in stage 8.2.
+ * shows its current value ("1,25×", "12:34"), and the track's text (stage 8.2).
  */
 @Composable
-internal fun PlayerExtrasRow(speed: Float, sleepTimer: SleepTimer?, onSpeed: () -> Unit, onSleepTimer: () -> Unit) {
+internal fun PlayerExtrasRow(
+    speed: Float,
+    sleepTimer: SleepTimer?,
+    onLyrics: () -> Unit,
+    onSpeed: () -> Unit,
+    onSleepTimer: () -> Unit,
+) {
     val locale = LocalConfiguration.current.locales[0]
     val speedLabel = PlaybackSpeed.label(speed, locale)
     val remaining = rememberSleepRemaining(sleepTimer)
@@ -80,6 +86,13 @@ internal fun PlayerExtrasRow(speed: Float, sleepTimer: SleepTimer?, onSpeed: () 
         horizontalArrangement = Arrangement.spacedBy(PlaylyTheme.spacing.sm, Alignment.CenterHorizontally),
         verticalAlignment = Alignment.CenterVertically,
     ) {
+        ExtraPill(
+            icon = R.drawable.ic_lyrics,
+            label = stringResource(R.string.lyrics_title),
+            active = false,
+            description = stringResource(R.string.lyrics_open),
+            onClick = onLyrics,
+        )
         ExtraPill(
             icon = R.drawable.ic_speed,
             label = if (PlaybackSpeed.isNormal(speed)) stringResource(R.string.player_speed) else speedLabel,
