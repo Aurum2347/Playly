@@ -128,4 +128,17 @@ class PlaylistRepositoryTest {
         assertTrue(repo.cards.first().isEmpty())
         assertEquals(3, db.trackDao().observeList().first().size + db.trackDao().observeUnavailableCount().first())
     }
+
+    /** Stage 8.1 fix: one track deleted before "Undo" used to roll the whole restore back. */
+    @Test
+    fun undoRestoresTheRestWhenATrackWasDeletedMeanwhile() = runTest {
+        val (a, b, c) = tracks
+        val id = repo.create("Mix")!!
+        repo.add(id, listOf(a, b, c))
+        val rows = repo.tracks(id).first()
+        val removed = repo.remove(id, rows.map { it.entryId })
+        db.trackDao().delete(b)
+        repo.restore(removed)
+        assertEquals(listOf(a, c), order(id))
+    }
 }

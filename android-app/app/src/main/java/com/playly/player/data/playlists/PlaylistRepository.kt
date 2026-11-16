@@ -2,9 +2,7 @@ package com.playly.player.data.playlists
 
 import android.content.ContentResolver
 import android.content.Intent
-import android.database.sqlite.SQLiteConstraintException
 import android.net.Uri
-import android.util.Log
 import androidx.core.net.toUri
 import androidx.room.withTransaction
 import com.playly.player.data.db.PlaylistEntity
@@ -157,15 +155,12 @@ class PlaylistRepository(
         database.withTransaction {
             if (dao.get(removed.playlistId) == null) return@withTransaction
             val order = dao.positions(removed.playlistId).map { it.id }.toMutableList()
-            removed.entries.sortedBy { it.first }.forEach { (index, entry) ->
-                val inserted = try {
-                    dao.insertEntries(listOf(entry)).isNotEmpty()
-                } catch (e: SQLiteConstraintException) {
-                    // The track left the library meanwhile: nothing to put back.
-                    Log.w(TAG, "Cannot restore playlist entry ${entry.id}", e)
-                    false
-                }
-                if (inserted) order.add(index.coerceIn(0, order.size), entry.id)
+            // A track that left the library meanwhile has nothing to put back. Filtered first, not
+            // caught: a foreign-key failure inside Room's insert rolls back this whole transaction.
+            val alive = removed.entries.map { it.second.trackId }.distinct()
+                .chunked(SQLITE_MAX_ARGS).flatMap { dao.existingTrackIds(it) }.toHashSet()
+            removed.entries.filter { it.second.trackId in alive }.sortedBy { it.first }.forEach { (index, entry) ->
+                if (dao.insertEntries(listOf(entry)).isNotEmpty()) order.add(index.coerceIn(0, order.size), entry.id)
             }
             renumber(removed.playlistId, order)
             dao.touch(removed.playlistId, clock())
@@ -200,9 +195,5 @@ class PlaylistRepository(
         } catch (_: SecurityException) {
             // Already gone; nothing to give back.
         }
-    }
-
-    private companion object {
-        const val TAG = "PlaylyPlaylists"
     }
 }

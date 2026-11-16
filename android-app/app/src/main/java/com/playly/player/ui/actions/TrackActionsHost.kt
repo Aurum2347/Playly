@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.produceState
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
@@ -67,6 +68,7 @@ private fun TrackMenu(
     val context = LocalContext.current
     // Tags for "Go to album / artist"; those items appear once the row is read (a few ms).
     val track by produceState<TrackEntity?>(null, target.trackId) { value = viewModel.track(target.trackId) }
+    val isFavorite by remember(target.trackId) { viewModel.isFavorite(target.trackId) }.collectAsStateWithLifecycle(initialValue = null)
     PlaylySheet(onDismiss = viewModel::dismiss) { close ->
         SheetTrackHeader(target.title, target.subtitle, target.artwork)
         Column(Modifier.verticalScroll(rememberScrollState())) {
@@ -90,6 +92,15 @@ private fun TrackMenu(
             SheetAction(R.drawable.ic_playlist_add, stringResource(R.string.track_menu_add_to_playlist), onClick = {
                 close { viewModel.openAddToPlaylist(listOf(target.trackId), single = target) }
             })
+            // Shown once known (a few ms), so the label never flips under the finger.
+            val favorite = isFavorite
+            if (favorite != null) {
+                SheetAction(
+                    if (favorite) R.drawable.ic_favorite else R.drawable.ic_favorite_border,
+                    stringResource(if (favorite) R.string.favorite_remove else R.string.favorite_add),
+                    onClick = { close { viewModel.setFavorite(target.trackId, !favorite) } },
+                )
+            }
             target.playlistEntry?.let { entry ->
                 SheetAction(R.drawable.ic_remove_circle, stringResource(R.string.track_menu_remove_from_playlist), onClick = {
                     close { viewModel.removeFromPlaylist(entry) }
@@ -150,6 +161,9 @@ private fun CollectionMenu(target: CollectionTarget, viewModel: TrackActionsView
             })
             SheetAction(R.drawable.ic_playlist_add, stringResource(R.string.track_menu_add_to_playlist), onClick = {
                 close { viewModel.openAddToPlaylist(target.trackIds) }
+            })
+            SheetAction(R.drawable.ic_favorite_border, stringResource(R.string.favorite_add), onClick = {
+                close { viewModel.addToFavorites(target.trackIds) }
             })
             Spacer(Modifier.navigationBarsPadding().height(PlaylyTheme.spacing.md))
         }

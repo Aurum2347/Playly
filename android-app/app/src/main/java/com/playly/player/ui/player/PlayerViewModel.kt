@@ -7,16 +7,21 @@ import androidx.lifecycle.viewmodel.viewModelFactory
 import com.playly.player.R
 import com.playly.player.data.artwork.Artwork
 import com.playly.player.data.db.TrackEntity
+import com.playly.player.data.favorites.FavoritesRepository
 import com.playly.player.data.library.LibraryRepository
 import com.playly.player.data.settings.SettingsRepository
 import com.playly.player.playback.PlaybackController
 import com.playly.player.playback.PlaybackState
 import com.playly.player.playback.QueueEntry
 import com.playly.player.playback.QueueSnapshot
+import com.playly.player.playback.SleepTimerRules
 import com.playly.player.ui.UiMessage
 import com.playly.player.ui.UiMessageBus
 import com.playly.player.ui.container
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -42,6 +47,7 @@ class PlayerViewModel(
     private val library: LibraryRepository,
     settings: SettingsRepository,
     private val bus: UiMessageBus,
+    private val favorites: FavoritesRepository,
 ) : ViewModel() {
     val state: StateFlow<PlaybackState> = playback.state
 
@@ -55,6 +61,24 @@ class PlayerViewModel(
         .map { it.playerArtworkTint }
         .distinctUntilChanged()
         .stateIn(viewModelScope, SharingStarted.Eagerly, false)
+
+    /** Whether the current track is a favourite (the player's heart). */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    val isFavorite: StateFlow<Boolean> = playback.state
+        .map { it.nowPlaying?.trackId }
+        .distinctUntilChanged()
+        .flatMapLatest { id -> if (id == null) flowOf(false) else favorites.isFavorite(id) }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
+
+    fun setFavorite(trackId: Long, favorite: Boolean) {
+        viewModelScope.launch { favorites.set(trackId, favorite) }
+    }
+
+    fun setSpeed(speed: Float) = playback.setSpeed(speed)
+    fun startSleepTimer(minutes: Int) = playback.startSleepTimer(minutes)
+    fun extendSleepTimer() = playback.extendSleepTimer(SleepTimerRules.EXTEND_MINUTES)
+    fun sleepAtEndOfTrack() = playback.sleepAtEndOfTrack()
+    fun cancelSleepTimer() = playback.cancelSleepTimer()
 
     /** Built only while the queue sheet collects it. */
     val queue: Flow<QueueSnapshot> = playback.queue
@@ -84,7 +108,7 @@ class PlayerViewModel(
 
     companion object {
         val Factory = viewModelFactory {
-            initializer { PlayerViewModel(container.playback, container.library, container.settings, container.messages) }
+            initializer { PlayerViewModel(container.playback, container.library, container.settings, container.messages, container.favorites) }
         }
     }
 }

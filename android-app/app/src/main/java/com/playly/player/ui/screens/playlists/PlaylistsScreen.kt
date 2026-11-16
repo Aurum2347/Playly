@@ -25,6 +25,7 @@ import com.playly.player.designsystem.components.ConfirmDialog
 import com.playly.player.designsystem.components.EmptyState
 import com.playly.player.designsystem.components.ErrorState
 import com.playly.player.designsystem.components.LoadingState
+import com.playly.player.designsystem.components.MediaRow
 import com.playly.player.designsystem.components.PlaylistRow
 import com.playly.player.designsystem.components.PlaylyIconButton
 import com.playly.player.designsystem.components.PlaylyTopBar
@@ -41,9 +42,11 @@ import com.playly.player.ui.tracksSummaryLabel
 @Composable
 fun PlaylistsScreen(
     onOpenPlaylist: (Long) -> Unit,
+    onOpenFavorites: () -> Unit,
     viewModel: PlaylistsViewModel = viewModel(factory = PlaylistsViewModel.Factory),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
+    val favorites by viewModel.favoritesCard.collectAsStateWithLifecycle()
     val motion = PlaylyTheme.motion
     var creating by rememberSaveable { mutableStateOf(false) }
     var menuFor by rememberSaveable { mutableStateOf<Long?>(null) }
@@ -72,8 +75,10 @@ fun PlaylistsScreen(
                     message = stringResource(R.string.state_error_playlists),
                     onRetry = viewModel::retry,
                 )
-                is PlaylistsUiState.Ready -> if (current.playlists.isEmpty()) {
+                is PlaylistsUiState.Ready -> if (current.playlists.isEmpty()) Column(Modifier.fillMaxSize()) {
+                    FavoritesEntry(favorites, onOpenFavorites)
                     EmptyState(
+                        modifier = Modifier.weight(1f),
                         icon = R.drawable.ic_playlists,
                         title = stringResource(R.string.state_no_playlists_title),
                         message = stringResource(R.string.state_no_playlists_message),
@@ -81,6 +86,7 @@ fun PlaylistsScreen(
                     )
                 } else {
                     LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = PlaylyTheme.spacing.md)) {
+                        item(key = "favorites", contentType = "favorites") { FavoritesEntry(favorites, onOpenFavorites) }
                         items(current.playlists, key = { it.id }) { card ->
                             PlaylistRow(
                                 name = card.name,
@@ -163,5 +169,17 @@ internal fun PlaylistDeleteDialog(card: PlaylistCard, onDone: () -> Unit, onConf
             onConfirm()
         },
         onDismiss = onDone,
+    )
+}
+
+/** Favourites always sit first on the tab, even with no playlists yet; heart until something is added. */
+@Composable
+private fun FavoritesEntry(card: FavoritesCard, onOpen: () -> Unit) {
+    MediaRow(
+        title = stringResource(R.string.favorites_title),
+        subtitle = tracksSummaryLabel(card.count, card.totalDurationMs),
+        placeholderIcon = R.drawable.ic_favorite,
+        artwork = card.cover,
+        onClick = onOpen,
     )
 }

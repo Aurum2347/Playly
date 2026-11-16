@@ -337,4 +337,35 @@
     <string name="selection_none">Clear selection</string>
     <string name="selection_close">Done selecting</string>
     <string name="selection_nothing">Select tracks</string>
+    <!-- Stage 8.1: favourites, playback speed, sleep timer -->
+    <string name="favorites_title">Favorites</string>
+    <string name="favorite_add">Add to favorites</string>
+    <string name="favorite_remove">Remove from favorites</string>
+    <string name="favorite_message_added">Added to favorites</string>
+    <string name="favorite_message_removed">Removed from favorites</string>
+    <string name="favorite_message_already">Already in favorites</string>
+    <plurals name="favorite_message_added_many">
+        <item quantity="one">%d track added to favorites</item>
+        <item quantity="other">%d tracks added to favorites</item>
+    </plurals>
+    <string name="favorites_empty_title">No favorites yet</string>
+    <string name="favorites_empty_message">Tap ♡ in the player or “Add to favorites” in a track’s menu.</string>
+    <string name="sort_favorite_added">Recently added</string>
+    <string name="player_speed">Speed</string>
+    <string name="player_speed_value">Speed: %1$s</string>
+    <string name="speed_sheet_title">Playback speed</string>
+    <string name="speed_reset">Normal speed</string>
+    <string name="speed_hint">Pitch is kept. The speed applies to every track.</string>
+    <string name="sleep_timer">Sleep timer</string>
+    <string name="sleep_timer_remaining">Sleep timer: %1$s left</string>
+    <string name="sleep_timer_end_of_track">End of track</string>
+    <string name="sleep_timer_extend">Add %d min</string>
+    <string name="sleep_timer_cancel">Turn off timer</string>
+    <string name="sleep_timer_active">Stops in %1$s</string>
+    <string name="sleep_timer_active_end">Stops after this track</string>
+    <string name="sleep_timer_hint">The music fades out at the end.</string>
+    <plurals name="sleep_timer_minutes">
+        <item quantity="one">%d minute</item>
+        <item quantity="other">%d minutes</item>
+    </plurals>
 </resources>

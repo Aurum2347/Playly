@@ -8,7 +8,7 @@ import android.os.Bundle
  * [label] carries user text (the search query); the kind's name is resolved by the UI.
  */
 data class PlaybackSource(val kind: Kind, val label: String? = null) {
-    enum class Kind { AllTracks, Recent, Search, Playlist, Album, Artist, Genre, Folder }
+    enum class Kind { AllTracks, Recent, Search, Playlist, Album, Artist, Genre, Folder, Favorites }
 
     fun toBundle(): Bundle = Bundle().apply {
         putString(KEY_KIND, kind.name)

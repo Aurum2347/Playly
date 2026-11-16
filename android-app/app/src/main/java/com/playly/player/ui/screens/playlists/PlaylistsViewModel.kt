@@ -5,6 +5,9 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
+import com.playly.player.data.artwork.Artwork
+import com.playly.player.data.artwork.artwork
+import com.playly.player.data.favorites.FavoritesRepository
 import com.playly.player.data.playlists.PlaylistCard
 import com.playly.player.data.playlists.PlaylistRepository
 import com.playly.player.playback.PlaybackController
@@ -20,6 +23,8 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 
+data class FavoritesCard(val count: Int = 0, val totalDurationMs: Long = 0, val cover: Artwork? = null)
+
 sealed interface PlaylistsUiState {
     data object Loading : PlaylistsUiState
     data object Error : PlaylistsUiState
@@ -29,9 +34,21 @@ sealed interface PlaylistsUiState {
 /** The Playlists tab: every playlist with its cover, recently changed first. */
 class PlaylistsViewModel(
     playlists: PlaylistRepository,
+    favorites: FavoritesRepository,
     playback: PlaybackController,
     bus: UiMessageBus,
 ) : ViewModel() {
+    /** The "Favourites" row above the playlists: count, length and the newest favourite's cover. */
+    val favoritesCard: StateFlow<FavoritesCard> = favorites.tracks
+        .map { rows ->
+            FavoritesCard(rows.size, rows.sumOf { it.track.durationMs }, rows.maxByOrNull { it.addedAt }?.track?.artwork())
+        }
+        .catch { error ->
+            Log.e("PlaylyPlaylists", "Favourites summary failed", error)
+            emit(FavoritesCard())
+        }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), FavoritesCard())
+
     private val retryTick = MutableStateFlow(0)
 
     @OptIn(ExperimentalCoroutinesApi::class)
@@ -52,7 +69,7 @@ class PlaylistsViewModel(
 
     companion object {
         val Factory = viewModelFactory {
-            initializer { PlaylistsViewModel(container.playlists, container.playback, container.messages) }
+            initializer { PlaylistsViewModel(container.playlists, container.favorites, container.playback, container.messages) }
         }
     }
 }

@@ -23,6 +23,8 @@ data class SavedPlayback(
     val sourceLabel: String? = null,
     /** Positions in [trackIds] of the user's own queue ("Play next" / "Add to queue"). Since stage 6. */
     val queuedIndices: List<Int> = emptyList(),
+    /** Playback speed (stage 8.1); 1 in older files. */
+    val speed: Float = 1f,
 ) {
     val source: PlaybackSource? get() = PlaybackSource.parse(sourceKind, sourceLabel)
 

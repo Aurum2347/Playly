@@ -9,6 +9,7 @@ import androidx.datastore.preferences.core.emptyPreferences
 import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
+import com.playly.player.data.favorites.FavoriteSort
 import com.playly.player.data.library.TrackSort
 import com.playly.player.data.library.browse.AlbumSort
 import com.playly.player.data.library.browse.GroupSort
@@ -32,6 +33,8 @@ data class AppSettings(
     val artistSort: GroupSort = GroupSort.Name,
     val genreSort: GroupSort = GroupSort.Name,
     val folderSort: GroupSort = GroupSort.Name,
+    /** Stage 8.1: order of the Favourites page (newest first by default). */
+    val favoriteSort: FavoriteSort = FavoriteSort.Added,
     /** Spec §9: starting a track from a list also opens the full-screen player. Off by default. */
     val openPlayerOnPlay: Boolean = false,
     /** Spec §10: a very faint colour from the cover behind the full-screen player. Off by default. */
@@ -49,6 +52,7 @@ class SettingsRepository(private val store: DataStore<Preferences>) {
         val artistSort = stringPreferencesKey("artist_sort")
         val genreSort = stringPreferencesKey("genre_sort")
         val folderSort = stringPreferencesKey("folder_sort")
+        val favoriteSort = stringPreferencesKey("favorite_sort")
         val openPlayerOnPlay = booleanPreferencesKey("open_player_on_play")
         val playerArtworkTint = booleanPreferencesKey("player_artwork_tint")
     }
@@ -65,6 +69,7 @@ class SettingsRepository(private val store: DataStore<Preferences>) {
                 artistSort = GroupSort.fromName(prefs[Keys.artistSort]),
                 genreSort = GroupSort.fromName(prefs[Keys.genreSort]),
                 folderSort = GroupSort.fromName(prefs[Keys.folderSort]),
+                favoriteSort = FavoriteSort.fromName(prefs[Keys.favoriteSort]),
                 openPlayerOnPlay = prefs[Keys.openPlayerOnPlay] ?: false,
                 playerArtworkTint = prefs[Keys.playerArtworkTint] ?: false,
             )
@@ -83,6 +88,8 @@ class SettingsRepository(private val store: DataStore<Preferences>) {
     suspend fun setGenreSort(sort: GroupSort) = store.edit { it[Keys.genreSort] = sort.name }
 
     suspend fun setFolderSort(sort: GroupSort) = store.edit { it[Keys.folderSort] = sort.name }
+
+    suspend fun setFavoriteSort(sort: FavoriteSort) = store.edit { it[Keys.favoriteSort] = sort.name }
 
     suspend fun setOpenPlayerOnPlay(enabled: Boolean) = store.edit { it[Keys.openPlayerOnPlay] = enabled }
 

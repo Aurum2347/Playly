@@ -165,6 +165,34 @@ data class PlayHistoryEntity(
     @ColumnInfo(name = "played_at") val playedAt: Long,
 )
 
+/**
+ * A favourite track (stage 8.1; the PC version's "liked"). Its own table, so library scans that
+ * rewrite track rows never touch it. A favourite whose file is gone stays here (the track row is
+ * kept, flagged unavailable) and comes back with the file.
+ */
+@Entity(
+    tableName = "favorites",
+    foreignKeys = [
+        ForeignKey(
+            entity = TrackEntity::class,
+            parentColumns = ["id"],
+            childColumns = ["track_id"],
+            onDelete = ForeignKey.CASCADE,
+        ),
+    ],
+    indices = [Index(value = ["added_at"])],
+)
+data class FavoriteEntity(
+    @PrimaryKey @ColumnInfo(name = "track_id") val trackId: Long,
+    @ColumnInfo(name = "added_at") val addedAt: Long,
+)
+
+/** A favourite with its track, for the Favourites page. */
+data class FavoriteTrackRow(
+    @ColumnInfo(name = "favorite_added_at") val addedAt: Long,
+    @Embedded val track: TrackListItem,
+)
+
 /** Identity facts used to spot the same file reached through MediaStore and a folder. */
 data class TrackLocation(
     val id: Long,

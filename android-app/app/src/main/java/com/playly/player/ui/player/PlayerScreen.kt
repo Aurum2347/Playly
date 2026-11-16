@@ -33,6 +33,8 @@ import androidx.compose.animation.scaleOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.draggable
@@ -154,8 +156,8 @@ private fun PlayerSheet(state: PlaybackState, viewModel: PlayerViewModel, onColl
     var height by remember { mutableIntStateOf(0) }
     val pane = stringResource(R.string.playback_now_playing)
 
-    // The queue sheet; the track menu lives in the shared TrackActionsHost (one sheet at a time, spec §12).
-    var queueOpen by rememberSaveable { mutableStateOf(false) }
+    // Queue, speed or sleep timer sheet; the track menu lives in the shared TrackActionsHost (one sheet at a time, spec §12).
+    var openSheet by rememberSaveable { mutableStateOf<String?>(null) }
     val actions = LocalTrackActions.current
 
     // Optional cover tint (spec §10): a faint wash at the top, fading into the plain background.
@@ -209,7 +211,7 @@ private fun PlayerSheet(state: PlaybackState, viewModel: PlayerViewModel, onColl
                 Unit
             }
             Column(Modifier.fillMaxSize()) {
-                PlayerTopBar(state, onCollapse, onQueue = { queueOpen = true })
+                PlayerTopBar(state, onCollapse, onQueue = { openSheet = SHEET_QUEUE })
                 if (landscape) {
                     val art = minOf(boxHeight - TOP_BAR - 32.dp, boxWidth * 0.42f)
                     Row(
@@ -218,10 +220,17 @@ private fun PlayerSheet(state: PlaybackState, viewModel: PlayerViewModel, onColl
                         horizontalArrangement = Arrangement.spacedBy(PlaylyTheme.spacing.xxl),
                     ) {
                         PlayerArtwork(track, art, onTint)
-                        Column(Modifier.weight(1f)) { PlayerDetails(track, state, viewModel, openMenu) }
+                        Column(Modifier.weight(1f).verticalScroll(rememberScrollState())) {
+                            PlayerDetails(track, state, viewModel, openMenu, onSheet = { openSheet = it })
+                        }
                     }
                 } else {
-                    val art = minOf(boxWidth - PlaylyTheme.spacing.xl * 2, (boxHeight - TOP_BAR) * 0.46f)
+                    // The cover gives way on short screens, so the controls below always fit.
+                    val art = minOf(
+                        boxWidth - PlaylyTheme.spacing.xl * 2,
+                        (boxHeight - TOP_BAR) * 0.46f,
+                        (boxHeight - TOP_BAR - DETAILS_HEIGHT).coerceAtLeast(MIN_ART),
+                    )
                     Column(
                         Modifier.fillMaxSize().padding(horizontal = PlaylyTheme.spacing.xl),
                         horizontalAlignment = Alignment.CenterHorizontally,
@@ -229,7 +238,7 @@ private fun PlayerSheet(state: PlaybackState, viewModel: PlayerViewModel, onColl
                         Spacer(Modifier.weight(1f))
                         PlayerArtwork(track, art, onTint)
                         Spacer(Modifier.height(PlaylyTheme.spacing.xxl))
-                        PlayerDetails(track, state, viewModel, openMenu)
+                        PlayerDetails(track, state, viewModel, openMenu, onSheet = { openSheet = it })
                         Spacer(Modifier.weight(1.2f))
                     }
                 }
@@ -237,7 +246,23 @@ private fun PlayerSheet(state: PlaybackState, viewModel: PlayerViewModel, onColl
         }
     }
 
-    if (queueOpen) PlayerQueue(state.shuffle, viewModel, onDismiss = { queueOpen = false })
+    val dismiss = { openSheet = null }
+    when (openSheet) {
+        SHEET_QUEUE -> PlayerQueue(state.shuffle, viewModel, onDismiss = dismiss)
+        SHEET_SPEED -> SpeedSheet(state.speed, onSpeed = viewModel::setSpeed, onDismiss = dismiss)
+        SHEET_SLEEP -> SleepTimerSheet(
+            timer = state.sleepTimer,
+            actions = remember(viewModel) {
+                SleepTimerActions(
+                    onStart = viewModel::startSleepTimer,
+                    onExtend = viewModel::extendSleepTimer,
+                    onEndOfTrack = viewModel::sleepAtEndOfTrack,
+                    onCancel = viewModel::cancelSleepTimer,
+                )
+            },
+            onDismiss = dismiss,
+        )
+    }
 }
 
 @Composable
@@ -288,6 +313,7 @@ private fun PlayerTopBar(state: PlaybackState, onCollapse: () -> Unit, onQueue: 
 private fun sourceLabel(source: PlaybackSource?): String = when (source?.kind) {
     PlaybackSource.Kind.AllTracks -> stringResource(R.string.all_tracks)
     PlaybackSource.Kind.Recent -> stringResource(R.string.home_recent)
+    PlaybackSource.Kind.Favorites -> stringResource(R.string.favorites_title)
     PlaybackSource.Kind.Search -> source.label?.let { stringResource(R.string.player_source_search, it) }
         ?: stringResource(R.string.playback_now_playing)
     PlaybackSource.Kind.Playlist -> source.label?.let { stringResource(R.string.player_source_playlist, it) }
@@ -304,8 +330,15 @@ private fun sourceLabel(source: PlaybackSource?): String = when (source?.kind) {
 }
 
 @Composable
-private fun PlayerDetails(track: NowPlaying, state: PlaybackState, viewModel: PlayerViewModel, onMenu: () -> Unit) {
+private fun PlayerDetails(
+    track: NowPlaying,
+    state: PlaybackState,
+    viewModel: PlayerViewModel,
+    onMenu: () -> Unit,
+    onSheet: (String) -> Unit,
+) {
     val motion = PlaylyTheme.motion
+    val favorite by viewModel.isFavorite.collectAsStateWithLifecycle()
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
         AnimatedContent(
             targetState = track,
@@ -333,6 +366,12 @@ private fun PlayerDetails(track: NowPlaying, state: PlaybackState, viewModel: Pl
                 )
             }
         }
+        PlaylyIconButton(
+            if (favorite) R.drawable.ic_favorite else R.drawable.ic_favorite_border,
+            stringResource(if (favorite) R.string.favorite_remove else R.string.favorite_add),
+            { viewModel.setFavorite(track.trackId, !favorite) },
+            tint = if (favorite) PlaylyTheme.colors.textPrimary else PlaylyTheme.colors.textSecondary,
+        )
         PlaylyIconButton(R.drawable.ic_more_vert, stringResource(R.string.player_track_menu), onMenu)
     }
     PlayerIssue(state.issue, track.title, onRetry = viewModel::retry)
@@ -340,6 +379,13 @@ private fun PlayerDetails(track: NowPlaying, state: PlaybackState, viewModel: Pl
     PlayerProgress(state.position, onSeek = viewModel::seekTo)
     Spacer(Modifier.height(PlaylyTheme.spacing.sm))
     PlayerControls(state, viewModel)
+    Spacer(Modifier.height(PlaylyTheme.spacing.md))
+    PlayerExtrasRow(
+        speed = state.speed,
+        sleepTimer = state.sleepTimer,
+        onSpeed = { onSheet(SHEET_SPEED) },
+        onSleepTimer = { onSheet(SHEET_SLEEP) },
+    )
 }
 
 /**
@@ -575,6 +621,12 @@ private fun PlayPauseButton(showPlay: Boolean, buffering: Boolean, onClick: () -
 }
 
 private val TOP_BAR = 64.dp
+/** Rough height of title, progress, controls and the speed / timer row under the cover (portrait). */
+private val DETAILS_HEIGHT = 380.dp
+private val MIN_ART = 120.dp
+private const val SHEET_QUEUE = "queue"
+private const val SHEET_SPEED = "speed"
+private const val SHEET_SLEEP = "sleep"
 private val PLAY_BUTTON = 72.dp
 private const val BUFFERING_SPINNER_DELAY_MS = 400L
 /** How much of the cover tint reaches the top of the player (0 = none). */

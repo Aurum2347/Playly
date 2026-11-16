@@ -13,6 +13,7 @@ import kotlinx.serialization.Serializable
 @Serializable data object PlaylistsRoute
 @Serializable data object SearchRoute
 @Serializable data object SettingsRoute
+@Serializable data object FavoritesRoute
 /** A playlist's page; outside the tab graphs, like Settings, so it opens from Search as well. */
 @Serializable data class PlaylistRoute(val id: Long)
 /** "Add tracks" picker of a playlist. */

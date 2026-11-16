@@ -3,6 +3,7 @@ package com.playly.player.playback
 import android.app.PendingIntent
 import android.content.Intent
 import android.os.Bundle
+import android.os.SystemClock
 import android.util.Log
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
@@ -62,6 +63,9 @@ class PlaybackService : MediaSessionService() {
     private lateinit var history: PlayHistoryDao
     /** Track that became current and is not in the play history yet; written once it actually plays. */
     private var unrecordedTrackId: Long? = null
+    /** Stage 8.1: the running sleep timer, null when off. Not saved: a new process starts without one. */
+    private var sleepTimer: SleepTimer? = null
+    private var sleepJob: Job? = null
 
     override fun onCreate() {
         super.onCreate()
@@ -144,17 +148,19 @@ class PlaybackService : MediaSessionService() {
         publishExtras()
     }
 
-    /** Source and the user's queue for every controller (session extras). */
+    /** Source, the user's queue and the sleep timer for every controller (session extras). */
     private fun publishExtras() {
         val extras = source?.toBundle() ?: Bundle()
         extras.putLongArray(PlaybackCommands.EXTRA_QUEUED_UIDS, queue.queuedUids().toLongArray())
+        sleepTimer?.let { extras.putAll(it.toBundle()) }
         session?.setSessionExtras(extras)
     }
 
-    internal fun applyModes(shuffle: Boolean, repeatMode: Int) {
+    internal fun applyModes(shuffle: Boolean, repeatMode: Int, speed: Float = player.playbackParameters.speed) {
         val keep = queue.queuedIndicesInPlayOrder()
         player.shuffleModeEnabled = shuffle
         player.repeatMode = repeatMode
+        player.setPlaybackSpeed(PlaybackSpeed.snap(speed))
         shuffleFromCurrent(keep)
     }
 
@@ -195,6 +201,49 @@ class PlaybackService : MediaSessionService() {
                 Log.w(TAG, "Cannot record play history", e)
             }
         }
+    }
+
+    /** Sleep timer command: [mode] is one of PlaybackCommands.SLEEP_*; "extend" with no timer starts one. */
+    internal fun setSleepTimer(mode: String?, minutes: Int) {
+        val now = SystemClock.elapsedRealtime()
+        val running = sleepTimer as? SleepTimer.At
+        val next: SleepTimer? = when (mode) {
+            PlaybackCommands.SLEEP_MINUTES -> SleepTimerRules.start(now, minutes)
+            PlaybackCommands.SLEEP_EXTEND ->
+                if (running != null) SleepTimerRules.extend(running, now, minutes) else SleepTimerRules.start(now, minutes)
+            PlaybackCommands.SLEEP_END_OF_TRACK -> SleepTimer.EndOfTrack
+            else -> null
+        }
+        applySleepTimer(next)
+    }
+
+    private fun applySleepTimer(timer: SleepTimer?) {
+        sleepJob?.cancel()
+        sleepJob = null
+        sleepTimer = timer
+        // A cancelled or changed timer never leaves the audio faded.
+        player.volume = 1f
+        player.pauseAtEndOfMediaItems = timer == SleepTimer.EndOfTrack
+        if (timer is SleepTimer.At) sleepJob = scope.launch { runSleepTimer(timer) }
+        publishExtras()
+    }
+
+    /**
+     * Waits for the deadline on the elapsed-time clock, fades the volume out over the last
+     * seconds, then pauses. While audio plays the player's wake lock keeps this on time.
+     */
+    private suspend fun runSleepTimer(timer: SleepTimer.At) {
+        val fade = SleepTimerRules.fadeMs(timer.totalMs)
+        delay((timer.remainingMs(SystemClock.elapsedRealtime()) - fade).coerceAtLeast(0))
+        while (true) {
+            val remaining = timer.remainingMs(SystemClock.elapsedRealtime())
+            if (remaining <= 0) break
+            player.volume = SleepTimerRules.volumeAt(remaining, fade)
+            delay(minOf(FADE_STEP_MS, remaining))
+        }
+        sleepJob = null
+        player.pause()
+        applySleepTimer(null)
     }
 
     internal fun cycleRepeat() {
@@ -281,7 +330,7 @@ class PlaybackService : MediaSessionService() {
                 player.setMediaItems(restored.mediaItems, restored.startIndex, restored.startPositionMs)
                 val restoredIds = restored.mediaItems.map { TrackMediaItems.trackId(it) ?: -1L }
                 queue.restore(PlaybackPolicy.survivingIndices(saved.trackIds, restoredIds, saved.queuedIndices))
-                applyModes(saved.shuffle, saved.repeatMode)
+                applyModes(saved.shuffle, saved.repeatMode, saved.speed)
                 setSource(saved.source)
             } finally {
                 restoreSettled = true
@@ -317,6 +366,7 @@ class PlaybackService : MediaSessionService() {
             sourceKind = source?.kind?.name,
             sourceLabel = source?.label,
             queuedIndices = queuedOut,
+            speed = player.playbackParameters.speed,
         )
     }
 
@@ -376,6 +426,7 @@ class PlaybackService : MediaSessionService() {
                     Player.EVENT_IS_PLAYING_CHANGED,
                     Player.EVENT_SHUFFLE_MODE_ENABLED_CHANGED,
                     Player.EVENT_REPEAT_MODE_CHANGED,
+                    Player.EVENT_PLAYBACK_PARAMETERS_CHANGED,
                 )
             ) {
                 scheduleSave()
@@ -398,9 +449,24 @@ class PlaybackService : MediaSessionService() {
 
         override fun onPlaybackStateChanged(playbackState: Int) {
             if (playbackState == Player.STATE_READY) consecutiveErrors = 0
+            // The queue ran out before the track-end timer fired: nothing left to wait for.
+            if (playbackState == Player.STATE_ENDED && sleepTimer == SleepTimer.EndOfTrack) applySleepTimer(null)
+        }
+
+        override fun onPlayWhenReadyChanged(playWhenReady: Boolean, reason: Int) {
+            // "End of track" did its job: the player paused itself at the end of the item.
+            if (reason == Player.PLAY_WHEN_READY_CHANGE_REASON_END_OF_MEDIA_ITEM && sleepTimer == SleepTimer.EndOfTrack) {
+                applySleepTimer(null)
+            }
         }
 
         override fun onIsPlayingChanged(isPlaying: Boolean) {
+            // Audio resumed: re-arm the timer on the real clock (the wait may have slept with the
+            // CPU while paused). One that ran out meanwhile is just dropped, not applied now.
+            val timer = sleepTimer
+            if (isPlaying && timer is SleepTimer.At && sleepJob != null) {
+                applySleepTimer(timer.takeIf { it.remainingMs(SystemClock.elapsedRealtime()) > 0 })
+            }
             periodicSaveJob?.cancel()
             // While audio plays, refresh the saved position now and then, so even a process the
             // system kills resumes close to where it was. Stops the moment playback stops.
@@ -421,5 +487,7 @@ class PlaybackService : MediaSessionService() {
         const val TAG = "PlaylyPlayback"
         const val SAVE_DEBOUNCE_MS = 400L
         const val PERIODIC_SAVE_MS = 20_000L
+        /** Volume steps of the sleep-timer fade: smooth to the ear, ~100 updates over 10 s. */
+        const val FADE_STEP_MS = 100L
     }
 }

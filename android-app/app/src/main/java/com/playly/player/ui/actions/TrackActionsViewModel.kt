@@ -7,6 +7,8 @@ import androidx.lifecycle.viewmodel.viewModelFactory
 import com.playly.player.R
 import com.playly.player.data.artwork.Artwork
 import com.playly.player.data.db.TrackEntity
+import com.playly.player.data.favorites.FavoriteChange
+import com.playly.player.data.favorites.FavoritesRepository
 import com.playly.player.data.library.LibraryRepository
 import com.playly.player.data.playlists.PlaylistCard
 import com.playly.player.data.playlists.PlaylistRepository
@@ -73,6 +75,7 @@ class TrackActionsViewModel(
     private val playback: PlaybackController,
     private val library: LibraryRepository,
     private val playlists: PlaylistRepository,
+    private val favorites: FavoritesRepository,
 ) : ViewModel() {
     private val _sheet = MutableStateFlow<TrackSheet?>(null)
     val sheet: StateFlow<TrackSheet?> = _sheet.asStateFlow()
@@ -202,9 +205,37 @@ class TrackActionsViewModel(
         _messages.trySend(message)
     }
 
+    fun isFavorite(trackId: Long): Flow<Boolean> = favorites.isFavorite(trackId)
+
+    /** "Add to / Remove from favorites" of one track, with "Undo". */
+    fun setFavorite(trackId: Long, favorite: Boolean) {
+        viewModelScope.launch {
+            val change = favorites.set(trackId, favorite)
+            if (change.isEmpty) return@launch
+            val text = if (favorite) R.string.favorite_message_added else R.string.favorite_message_removed
+            _messages.send(UiMessage(text, action = undoFavorite(change)))
+        }
+    }
+
+    /** A collection or a selection into favorites; ones already there are left as they are. */
+    fun addToFavorites(trackIds: List<Long>) {
+        viewModelScope.launch {
+            val change = favorites.add(trackIds)
+            val added = change.added.size
+            val message = when (added) {
+                0 -> UiMessage(R.string.favorite_message_already)
+                else -> UiMessage(R.plurals.favorite_message_added_many, listOf(added), quantity = added, action = undoFavorite(change))
+            }
+            _messages.send(message)
+        }
+    }
+
+    private fun undoFavorite(change: FavoriteChange) =
+        UiAction(R.string.action_undo) { viewModelScope.launch { favorites.undo(change) } }
+
     companion object {
         val Factory = viewModelFactory {
-            initializer { TrackActionsViewModel(container.playback, container.library, container.playlists) }
+            initializer { TrackActionsViewModel(container.playback, container.library, container.playlists, container.favorites) }
         }
     }
 }

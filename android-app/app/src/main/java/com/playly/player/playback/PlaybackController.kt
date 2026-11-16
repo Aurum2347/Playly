@@ -91,6 +91,10 @@ data class PlaybackState(
      * stopped). Cleared as soon as the player tries again or moves to another track.
      */
     val issue: PlaybackErrorKind? = null,
+    /** Stage 8.1: playback speed (pitch kept). */
+    val speed: Float = 1f,
+    /** Stage 8.1: the running sleep timer, null when off. */
+    val sleepTimer: SleepTimer? = null,
 )
 
 /**
@@ -304,6 +308,27 @@ class PlaybackController(context: Context) {
     /** Removes everything after the current track. */
     fun clearUpcoming() = withController { it.sendCustomCommand(PlaybackCommands.QUEUE_CLEAR_UPCOMING, Bundle.EMPTY) }
 
+    /** Playback speed for every track, kept with the queue; snapped to [PlaybackSpeed.STEP]. */
+    fun setSpeed(speed: Float) = withController { it.setPlaybackSpeed(PlaybackSpeed.snap(speed)) }
+
+    /** Sleep timer: pause after [minutes]. */
+    fun startSleepTimer(minutes: Int) = sleepTimer(PlaybackCommands.SLEEP_MINUTES, minutes)
+
+    /** Adds [minutes] to the running timer. */
+    fun extendSleepTimer(minutes: Int) = sleepTimer(PlaybackCommands.SLEEP_EXTEND, minutes)
+
+    /** Sleep timer: pause when the playing track ends. */
+    fun sleepAtEndOfTrack() = sleepTimer(PlaybackCommands.SLEEP_END_OF_TRACK, 0)
+
+    fun cancelSleepTimer() = sleepTimer(PlaybackCommands.SLEEP_OFF, 0)
+
+    private fun sleepTimer(mode: String, minutes: Int) = withController { c ->
+        val args = Bundle()
+        args.putString(PlaybackCommands.ARG_SLEEP_MODE, mode)
+        args.putInt(PlaybackCommands.ARG_MINUTES, minutes)
+        c.sendCustomCommand(PlaybackCommands.SLEEP_TIMER, args)
+    }
+
     private suspend fun connected(): MediaController? {
         controller?.takeIf { it.isConnected }?.let { return it }
         return try {
@@ -445,6 +470,8 @@ class PlaybackController(context: Context) {
             ),
             source = PlaybackSource.from(c.sessionExtras),
             issue = issue,
+            speed = c.playbackParameters.speed,
+            sleepTimer = SleepTimer.from(c.sessionExtras),
         )
     }
 

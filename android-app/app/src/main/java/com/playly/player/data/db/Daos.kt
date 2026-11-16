@@ -75,7 +75,8 @@ interface TrackDao {
     suspend fun markMissing(ids: List<Long>, now: Long)
 
     /** Rows from the old "all music on the device" mode (MediaStore); the library is one chosen folder now. */
-    @Query("DELETE FROM tracks WHERE media_store_id IS NOT NULL AND id NOT IN (SELECT track_id FROM playlist_entries)")
+    @Query("DELETE FROM tracks WHERE media_store_id IS NOT NULL AND id NOT IN (SELECT track_id FROM playlist_entries) " +
+            "AND id NOT IN (SELECT track_id FROM favorites)")
     suspend fun deleteUnreferencedMediaStore(): Int
 
     @Query("UPDATE tracks SET is_available = 0, missing_since = :now WHERE media_store_id IS NOT NULL AND is_available = 1")
@@ -84,8 +85,9 @@ interface TrackDao {
     @Query("UPDATE tracks SET is_available = 0, missing_since = :now WHERE source_id = :sourceId AND is_available = 1")
     suspend fun markSourceMissing(sourceId: Long, now: Long)
 
-    /** Forgets a source's tracks that no playlist needs; the rest stay, flagged unavailable. */
-    @Query("DELETE FROM tracks WHERE source_id = :sourceId AND id NOT IN (SELECT track_id FROM playlist_entries)")
+    /** Forgets a source's tracks that no playlist or favourite needs; the rest stay, flagged unavailable. */
+    @Query("DELETE FROM tracks WHERE source_id = :sourceId AND id NOT IN (SELECT track_id FROM playlist_entries) " +
+            "AND id NOT IN (SELECT track_id FROM favorites)")
     suspend fun deleteUnreferencedFromSource(sourceId: Long)
 
     /** Pass at most [SQLITE_MAX_ARGS] ids per call. */
@@ -130,6 +132,10 @@ interface LibrarySourceDao {
 
 @Dao
 interface PlaylistDao {
+    /** Which of [trackIds] are still in the library. Pass at most [SQLITE_MAX_ARGS] ids per call. */
+    @Query("SELECT id FROM tracks WHERE id IN (:trackIds)")
+    suspend fun existingTrackIds(trackIds: List<Long>): List<Long>
+
     @Query(
         "SELECT p.*, COUNT(e.id) AS track_count, COALESCE(SUM(t.duration_ms), 0) AS total_duration_ms " +
             "FROM playlists p " +
@@ -254,4 +260,47 @@ interface PlayHistoryDao {
     companion object {
         const val KEEP = 1000
     }
+}
+
+@Dao
+interface FavoriteDao {
+    /** Ids of every favourite, available or not: the heart buttons read this. */
+    @Query("SELECT track_id FROM favorites")
+    fun observeIds(): Flow<List<Long>>
+
+    @Query("SELECT EXISTS(SELECT 1 FROM favorites WHERE track_id = :trackId)")
+    fun observeIsFavorite(trackId: Long): Flow<Boolean>
+
+    /** Available favourites by title order (the base every sort starts from), with when they were added. */
+    @Query(
+        "SELECT f.added_at AS favorite_added_at, " +
+            "t.id, t.uri, t.media_store_id, t.album_id, t.title, t.artist, t.album, t.duration_ms, t.size_bytes, " +
+            "t.date_modified, t.date_added, t.track_number, t.disc_number " +
+            "FROM favorites f JOIN tracks t ON t.id = f.track_id " +
+            "WHERE t.is_available = 1 ORDER BY t.search_key, t.id",
+    )
+    fun observeTracks(): Flow<List<FavoriteTrackRow>>
+
+    /**
+     * Which of [trackIds] are still in the table. Filter before inserting: a foreign-key failure
+     * inside Room's insert would silently roll back the caller's whole transaction.
+     * Pass at most [SQLITE_MAX_ARGS] ids per call.
+     */
+    @Query("SELECT id FROM tracks WHERE id IN (:trackIds)")
+    suspend fun existingTrackIds(trackIds: List<Long>): List<Long>
+
+    /** Already-favourite tracks keep their original date. */
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    suspend fun insertAll(favorites: List<FavoriteEntity>): List<Long>
+
+    /** Pass at most [SQLITE_MAX_ARGS] ids per call. */
+    @Query("SELECT * FROM favorites WHERE track_id IN (:trackIds)")
+    suspend fun byTrackIds(trackIds: List<Long>): List<FavoriteEntity>
+
+    /** Pass at most [SQLITE_MAX_ARGS] ids per call. */
+    @Query("DELETE FROM favorites WHERE track_id IN (:trackIds)")
+    suspend fun deleteAll(trackIds: List<Long>)
+
+    @Query("SELECT COUNT(*) FROM favorites")
+    suspend fun count(): Int
 }

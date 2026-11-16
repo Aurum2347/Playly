@@ -49,6 +49,7 @@ internal class PlaybackSessionCallback(
             .add(PlaybackCommands.QUEUE_MOVE)
             .add(PlaybackCommands.QUEUE_REMOVE)
             .add(PlaybackCommands.QUEUE_CLEAR_UPCOMING)
+            .add(PlaybackCommands.SLEEP_TIMER)
             .build()
         return Futures.immediateFuture(
             ConnectionResult.AcceptedResultBuilder(session, controller)
@@ -76,6 +77,10 @@ internal class PlaybackSessionCallback(
             PlaybackCommands.QUEUE_REMOVE.customAction ->
                 service.removeFromQueue(args.getLongArray(PlaybackCommands.ARG_UIDS)?.toHashSet().orEmpty())
             PlaybackCommands.QUEUE_CLEAR_UPCOMING.customAction -> service.clearUpcoming()
+            PlaybackCommands.SLEEP_TIMER.customAction -> service.setSleepTimer(
+                mode = args.getString(PlaybackCommands.ARG_SLEEP_MODE),
+                minutes = args.getInt(PlaybackCommands.ARG_MINUTES),
+            )
             else -> return Futures.immediateFuture(SessionResult(SessionError.ERROR_NOT_SUPPORTED))
         }
         return Futures.immediateFuture(SessionResult(SessionResult.RESULT_SUCCESS))
@@ -158,7 +163,7 @@ internal class PlaybackSessionCallback(
         val saved = withContext(Dispatchers.IO) { store.read() } ?: throw IOException("Nothing to resume")
         val restored = resolveSaved(service.items, saved) ?: throw IOException("Saved tracks are gone")
         if (isForPlayback) {
-            service.applyModes(saved.shuffle, saved.repeatMode)
+            service.applyModes(saved.shuffle, saved.repeatMode, saved.speed)
             service.setSource(saved.source)
             return@future restored
         }

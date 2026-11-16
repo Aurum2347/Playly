@@ -50,6 +50,19 @@ object PlaybackCommands {
     /** Session extras key: uids of the user's queue (LongArray), next to the [PlaybackSource]. */
     const val EXTRA_QUEUED_UIDS = "playly.queued"
 
+    /**
+     * Controller → session: the sleep timer (stage 8.1). [ARG_SLEEP_MODE] is one of the SLEEP_*
+     * values, [ARG_MINUTES] the length for [SLEEP_MINUTES] / [SLEEP_EXTEND]. The running timer
+     * is published in the session extras ([SleepTimer.from]).
+     */
+    val SLEEP_TIMER = SessionCommand("com.playly.player.SLEEP_TIMER", Bundle.EMPTY)
+    const val ARG_SLEEP_MODE = "sleep_mode"
+    const val ARG_MINUTES = "minutes"
+    const val SLEEP_OFF = "off"
+    const val SLEEP_MINUTES = "minutes"
+    const val SLEEP_EXTEND = "extend"
+    const val SLEEP_END_OF_TRACK = "end_of_track"
+
     /** Session → controllers: a track could not be played. Args: [ARG_KIND], [ARG_TITLE], [ARG_TRACK_ID], [ARG_SKIPPED]. */
     const val EVENT_ERROR = "com.playly.player.EVENT_ERROR"
 

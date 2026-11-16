@@ -375,4 +375,39 @@
     <string name="selection_none">Снять выбор</string>
     <string name="selection_close">Закончить выбор</string>
     <string name="selection_nothing">Отметьте треки</string>
+    <!-- Stage 8.1: favourites, playback speed, sleep timer -->
+    <string name="favorites_title">Избранное</string>
+    <string name="favorite_add">Добавить в избранное</string>
+    <string name="favorite_remove">Убрать из избранного</string>
+    <string name="favorite_message_added">Добавлено в избранное</string>
+    <string name="favorite_message_removed">Убрано из избранного</string>
+    <string name="favorite_message_already">Уже в избранном</string>
+    <plurals name="favorite_message_added_many">
+        <item quantity="one">В избранное добавлен %d трек</item>
+        <item quantity="few">В избранное добавлено %d трека</item>
+        <item quantity="many">В избранное добавлено %d треков</item>
+        <item quantity="other">В избранное добавлено %d трека</item>
+    </plurals>
+    <string name="favorites_empty_title">В избранном пока пусто</string>
+    <string name="favorites_empty_message">Нажмите ♡ в плеере или «Добавить в избранное» в меню трека.</string>
+    <string name="sort_favorite_added">Недавно добавленные</string>
+    <string name="player_speed">Скорость</string>
+    <string name="player_speed_value">Скорость: %1$s</string>
+    <string name="speed_sheet_title">Скорость воспроизведения</string>
+    <string name="speed_reset">Обычная скорость</string>
+    <string name="speed_hint">Высота тона сохраняется. Скорость действует на все треки.</string>
+    <string name="sleep_timer">Таймер сна</string>
+    <string name="sleep_timer_remaining">Таймер сна: осталось %1$s</string>
+    <string name="sleep_timer_end_of_track">До конца трека</string>
+    <string name="sleep_timer_extend">Добавить %d мин</string>
+    <string name="sleep_timer_cancel">Выключить таймер</string>
+    <string name="sleep_timer_active">Остановится через %1$s</string>
+    <string name="sleep_timer_active_end">Остановится после этого трека</string>
+    <string name="sleep_timer_hint">В конце музыка плавно стихнет.</string>
+    <plurals name="sleep_timer_minutes">
+        <item quantity="one">%d минута</item>
+        <item quantity="few">%d минуты</item>
+        <item quantity="many">%d минут</item>
+        <item quantity="other">%d минуты</item>
+    </plurals>
 </resources>

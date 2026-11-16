@@ -65,8 +65,10 @@ import com.playly.player.ui.navigation.HomeRoute
 import com.playly.player.ui.navigation.RecentRoute
 import com.playly.player.ui.navigation.LibraryRoute
 import com.playly.player.ui.navigation.AddTracksRoute
+import com.playly.player.ui.navigation.FavoritesRoute
 import com.playly.player.ui.navigation.CollectionRoute
 import com.playly.player.ui.screens.collections.CollectionScreen
+import com.playly.player.ui.screens.favorites.FavoritesScreen
 import com.playly.player.data.library.browse.CollectionKind
 import androidx.navigation.toRoute
 import com.playly.player.ui.navigation.PlaylistRoute
@@ -137,6 +139,7 @@ fun MainScaffold(
     val openSettings = dropUnlessResumed { nav.navigate(SettingsRoute) { launchSingleTop = true } }
     val openSearch = dropUnlessResumed { nav.navigateToTopLevel(TopLevelDestination.Search) }
     val openRecent = dropUnlessResumed { nav.navigate(RecentRoute) { launchSingleTop = true } }
+    val openFavorites = dropUnlessResumed { nav.navigate(FavoritesRoute) { launchSingleTop = true } }
     val goBack = dropUnlessResumed { nav.popBackStack() }
     val openPlaylist: (Long) -> Unit = { id ->
         // Same guard as dropUnlessResumed: a second tap during the transition does nothing.
@@ -190,7 +193,11 @@ fun MainScaffold(
                         ) { RecentScreen(onBack = goBack) }
                     }
                     composable<LibraryRoute> { LibraryScreen(onOpenSettings = openSettings, onOpenCollection = openCollection) }
-                    composable<PlaylistsRoute> { PlaylistsScreen(onOpenPlaylist = openPlaylist) }
+                    composable<PlaylistsRoute> { PlaylistsScreen(onOpenPlaylist = openPlaylist, onOpenFavorites = openFavorites) }
+                    composable<FavoritesRoute>(
+                        enterTransition = { slideInHorizontally(motion.enter()) { it / 4 } + fadeIn(motion.enter()) },
+                        popExitTransition = { slideOutHorizontally(motion.exit()) { it / 4 } + fadeOut(motion.exit()) },
+                    ) { FavoritesScreen(onBack = goBack) }
                     composable<PlaylistRoute>(
                         enterTransition = { slideInHorizontally(motion.enter()) { it / 4 } + fadeIn(motion.enter()) },
                         popExitTransition = { slideOutHorizontally(motion.exit()) { it / 4 } + fadeOut(motion.exit()) },
