@@ -29,7 +29,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
-/** What the top-bar "Now playing" button shows. Changes only with the track or play/pause. */
+/** Whether there is a current track (shows the mini-player). Changes only with the track or play/pause. */
 data class NowPlayingBadge(
     val trackId: Long,
     val title: String,
@@ -39,7 +39,7 @@ data class NowPlayingBadge(
 )
 
 /**
- * The full-screen player and the "Now playing" button read the same [PlaybackController]
+ * The full-screen player and the mini-player read the same [PlaybackController]
  * state as the notification (spec §17): no second engine, no copy of the queue.
  */
 class PlayerViewModel(

@@ -117,7 +117,7 @@
     <string name="settings_pick_folder_subtitle">The library is built only from this folder and its subfolders</string>
     <string name="settings_change_folder_subtitle">The current folder will be replaced</string>
 
-    <!-- Stage 4: Home, Now playing button, player -->
+    <!-- Stage 4: Home, player; stage 8.5: mini-player -->
     <string name="home_recent">Recently played</string>
     <string name="action_see_all">See all</string>
     <string name="action_see_all_description">All recently played</string>
@@ -133,8 +133,11 @@
     <string name="recent_empty_message">Tracks you play will appear here.</string>
     <string name="now_playing_open">Now playing: %1$s — %2$s, open player</string>
     <string name="now_playing_open_no_artist">Now playing: %1$s, open player</string>
-    <string name="now_playing_state_playing">Playing</string>
-    <string name="now_playing_state_paused">Paused</string>
+    <string name="mini_issue_missing">File not found</string>
+    <string name="mini_issue_no_access">No access to the file</string>
+    <string name="mini_issue_unsupported">Format not supported</string>
+    <string name="mini_issue_damaged">File is damaged</string>
+    <string name="mini_issue_other">Could not play</string>
     <string name="player_collapse">Collapse player</string>
     <string name="player_queue_position">%1$d of %2$d</string>
     <string name="player_play">Play</string>
@@ -144,7 +147,7 @@
     <string name="player_seek">Track position</string>
     <string name="player_position_of">%1$s of %2$s</string>
     <string name="settings_open_player_title">Open the player when a track starts</string>
-    <string name="settings_open_player_subtitle">When off, the track just starts and the player opens from the Now playing button at the top</string>
+    <string name="settings_open_player_subtitle">When off, the track just starts and the player opens from the mini-player at the bottom</string>
 
     <!-- Stage 5: full-screen player -->
     <string name="settings_player_tint_title">Artwork tint in the player</string>

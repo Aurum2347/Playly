@@ -27,7 +27,6 @@ import com.playly.player.playback.PlaybackController
 import com.playly.player.playback.PlaybackSource
 import com.playly.player.ui.container
 import com.playly.player.ui.player.LocalPlayerLauncher
-import com.playly.player.ui.player.NowPlayingAction
 import com.playly.player.ui.player.rememberListOrigin
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -70,7 +69,6 @@ fun RecentScreen(onBack: () -> Unit, viewModel: RecentViewModel = viewModel(fact
         PlaylyTopBar(
             title = stringResource(R.string.home_recent),
             onBack = onBack,
-            actions = { NowPlayingAction() },
         )
         val list = tracks
         when {

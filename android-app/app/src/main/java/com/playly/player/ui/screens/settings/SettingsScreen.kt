@@ -5,10 +5,9 @@ import android.content.Intent
 import android.text.format.DateUtils
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -64,7 +63,7 @@ fun SettingsScreen(onBack: () -> Unit, viewModel: SettingsViewModel = viewModel(
             LoadingState(stringResource(R.string.state_loading_settings))
         } else LazyColumn(
             modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + PlaylyTheme.spacing.xl),
+            contentPadding = PaddingValues(bottom = PlaylyTheme.spacing.xl),
         ) {
             item(key = "library-header") { SectionHeader(stringResource(R.string.settings_section_library)) }
             item(key = "library") {
@@ -192,6 +191,8 @@ fun SettingsScreen(onBack: () -> Unit, viewModel: SettingsViewModel = viewModel(
                     )
                 }
             }
+            // Respects the inset consumed by the scaffold when the mini-player is under the page.
+            item(key = "nav-inset") { Spacer(Modifier.navigationBarsPadding()) }
         }
 
         val pending = current?.sources?.firstOrNull { it.source.id == pendingRemovalId }?.source

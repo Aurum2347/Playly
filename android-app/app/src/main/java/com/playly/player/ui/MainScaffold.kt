@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -77,7 +78,8 @@ import com.playly.player.ui.navigation.SearchRoute
 import com.playly.player.ui.navigation.SettingsRoute
 import com.playly.player.ui.navigation.TopLevelDestination
 import com.playly.player.ui.screens.library.HomeScreen
-import com.playly.player.ui.player.LocalNowPlayingBadge
+import com.playly.player.ui.player.MiniPlayer
+import com.playly.player.ui.player.MiniPlayerRules
 import com.playly.player.ui.player.LocalPlayerLauncher
 import com.playly.player.ui.player.PlayerLauncher
 import com.playly.player.ui.player.PlayerOverlay
@@ -93,9 +95,9 @@ import com.playly.player.ui.screens.search.SearchScreen
 import com.playly.player.ui.screens.settings.SettingsScreen
 
 /**
- * Bottom navigation shell with the full-screen player layered on top. There is no mini-player
- * (spec §9): the player opens from the "Now playing" button in each tab's top bar, from the
- * notification ([openPlayerRequest]) or, if the user wants, whenever a track starts.
+ * Bottom navigation shell with the full-screen player layered on top. While a track is current
+ * the mini-player sits above the bottom navigation on every page (spec §9); the player opens
+ * from it, from the notification ([openPlayerRequest]) or, if the user wants, whenever a track starts.
  */
 @Composable
 fun MainScaffold(
@@ -119,6 +121,7 @@ fun MainScaffold(
     val launcher = rememberSaveable(saver = PlayerLauncher.Saver) { PlayerLauncher() }
     SideEffect { launcher.openOnPlay = openPlayerOnPlay }
     val playerVisible = launcher.isOpen && badge != null
+    val miniVisible = badge != null
 
     LaunchedEffect(openPlayerRequest) {
         if (!openPlayerRequest) return@LaunchedEffect
@@ -164,7 +167,6 @@ fun MainScaffold(
 
     CompositionLocalProvider(
         LocalPlayerLauncher provides launcher,
-        LocalNowPlayingBadge provides badge,
         LocalTrackActions provides trackActions,
     ) {
         Box(Modifier.fillMaxSize()) {
@@ -177,7 +179,11 @@ fun MainScaffold(
                 NavHost(
                     navController = nav,
                     startDestination = HomeGraph,
-                    modifier = Modifier.weight(1f),
+                    // Pages end above the mini-player; on pages without the bottom bar the
+                    // mini-player takes the navigation-bar inset instead of the page.
+                    modifier = Modifier
+                        .weight(1f)
+                        .then(if (miniVisible) Modifier.consumeWindowInsets(WindowInsets.navigationBars) else Modifier),
                     enterTransition = { fadeIn(motion.enter()) },
                     exitTransition = { fadeOut(motion.exit()) },
                     popEnterTransition = { fadeIn(motion.enter()) },
@@ -219,6 +225,17 @@ fun MainScaffold(
                     ) { SettingsScreen(onBack = goBack) }
                 }
                 AnimatedVisibility(
+                    visible = miniVisible,
+                    enter = expandVertically(motion.standard()) + fadeIn(motion.enter()),
+                    exit = shrinkVertically(motion.standard()) + fadeOut(motion.exit()),
+                ) {
+                    MiniPlayer(
+                        playerViewModel,
+                        launcher,
+                        Modifier.then(if (onTopLevel) Modifier else Modifier.windowInsetsPadding(WindowInsets.navigationBars)),
+                    )
+                }
+                AnimatedVisibility(
                     visible = onTopLevel,
                     enter = expandVertically(motion.standard()),
                     exit = shrinkVertically(motion.standard()),
@@ -233,13 +250,19 @@ fun MainScaffold(
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
                     .windowInsetsPadding(WindowInsets.navigationBars)
-                    .padding(bottom = if (onTopLevel && !playerVisible) PlaylyTheme.spacing.bottomBarHeight else 0.dp),
+                    .padding(bottom = if (playerVisible) 0.dp else snackbarLift(onTopLevel, miniVisible)),
             ) { data -> PlaylySnackbar(data.visuals.message, data.visuals.actionLabel, data::performAction) }
         }
     }
 }
 
 private const val PLAYER_REQUEST_TIMEOUT_MS = 5_000L
+
+/** Snackbars show above the bottom bar and the mini-player (spec §9). */
+@Composable
+private fun snackbarLift(onTopLevel: Boolean, miniVisible: Boolean) =
+    (if (onTopLevel) PlaylyTheme.spacing.bottomBarHeight else 0.dp) +
+        (if (miniVisible) MiniPlayerRules.HEIGHT + MiniPlayerRules.PROGRESS else 0.dp)
 
 @Composable
 fun PlaylySnackbar(message: String, actionLabel: String? = null, onAction: () -> Unit = {}) {

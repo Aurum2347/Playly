@@ -131,7 +131,7 @@
     <string name="settings_pick_folder_subtitle">Медиатека строится только из этой папки и её подпапок</string>
     <string name="settings_change_folder_subtitle">Текущая папка будет заменена новой</string>
 
-    <!-- Stage 4: Home, Now playing button, player -->
+    <!-- Stage 4: Home, player; stage 8.5: mini-player -->
     <string name="home_recent">Недавно слушали</string>
     <string name="action_see_all">Все</string>
     <string name="action_see_all_description">Все недавно прослушанные</string>
@@ -147,8 +147,11 @@
     <string name="recent_empty_message">Здесь появятся треки, которые вы включали.</string>
     <string name="now_playing_open">Сейчас играет: %1$s — %2$s, открыть плеер</string>
     <string name="now_playing_open_no_artist">Сейчас играет: %1$s, открыть плеер</string>
-    <string name="now_playing_state_playing">Воспроизводится</string>
-    <string name="now_playing_state_paused">На паузе</string>
+    <string name="mini_issue_missing">Файл не найден</string>
+    <string name="mini_issue_no_access">Нет доступа к файлу</string>
+    <string name="mini_issue_unsupported">Формат не поддерживается</string>
+    <string name="mini_issue_damaged">Файл повреждён</string>
+    <string name="mini_issue_other">Не удалось воспроизвести</string>
     <string name="player_collapse">Свернуть плеер</string>
     <string name="player_queue_position">%1$d из %2$d</string>
     <string name="player_play">Воспроизвести</string>
@@ -158,7 +161,7 @@
     <string name="player_seek">Позиция в треке</string>
     <string name="player_position_of">%1$s из %2$s</string>
     <string name="settings_open_player_title">Открывать плеер при запуске трека</string>
-    <string name="settings_open_player_subtitle">Если выключено, трек просто начинает играть, а плеер открывается кнопкой «Сейчас играет» в шапке</string>
+    <string name="settings_open_player_subtitle">Если выключено, трек просто начинает играть, а плеер открывается из мини-плеера внизу</string>
 
     <!-- Stage 5: full-screen player -->
     <string name="settings_player_tint_title">Оттенок обложки в плеере</string>

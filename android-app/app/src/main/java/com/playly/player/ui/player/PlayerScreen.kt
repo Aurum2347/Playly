@@ -106,7 +106,7 @@ import kotlinx.coroutines.delay
 /**
  * The full-screen player as a layer above the tabs: the list underneath keeps its scroll
  * position and state, and closing it (arrow, swipe down, Back) never touches playback.
- * It grows out of [PlayerLauncher.origin] and shrinks back into the "Now playing" button.
+ * It grows out of [PlayerLauncher.origin] and shrinks back into the mini-player.
  */
 @Composable
 fun PlayerOverlay(launcher: PlayerLauncher, viewModel: PlayerViewModel, modifier: Modifier = Modifier) {
@@ -474,7 +474,7 @@ private fun PlayerProgress(position: PlaybackPosition, onSeek: (Long) -> Unit) {
  * and the app is visible: a stopped screen or a paused track runs no timer.
  */
 @Composable
-private fun rememberLivePosition(position: PlaybackPosition): Long {
+internal fun rememberLivePosition(position: PlaybackPosition): Long {
     var now by remember { mutableLongStateOf(SystemClock.elapsedRealtime()) }
     val lifecycle = LocalLifecycleOwner.current.lifecycle
     LaunchedEffect(position, lifecycle) {

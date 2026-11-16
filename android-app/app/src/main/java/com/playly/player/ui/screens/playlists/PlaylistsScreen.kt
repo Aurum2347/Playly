@@ -32,7 +32,6 @@ import com.playly.player.designsystem.components.PlaylyTopBar
 import com.playly.player.designsystem.components.StateAction
 import com.playly.player.ui.actions.PlaylistDialog
 import com.playly.player.ui.player.LocalPlayerLauncher
-import com.playly.player.ui.player.NowPlayingAction
 import com.playly.player.ui.tracksSummaryLabel
 
 /**
@@ -58,7 +57,6 @@ fun PlaylistsScreen(
         PlaylyTopBar(
             title = stringResource(R.string.nav_playlists),
             actions = {
-                NowPlayingAction()
                 PlaylyIconButton(R.drawable.ic_add, stringResource(R.string.action_create_playlist), { creating = true })
             },
         )

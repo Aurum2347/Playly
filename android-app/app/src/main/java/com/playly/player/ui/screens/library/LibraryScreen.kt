@@ -34,7 +34,6 @@ import com.playly.player.ui.actions.SelectionTopBar
 import com.playly.player.ui.actions.TrackSelection
 import com.playly.player.ui.actions.rememberTrackSelection
 import com.playly.player.ui.player.LocalPlayerLauncher
-import com.playly.player.ui.player.NowPlayingAction
 import com.playly.player.ui.player.rememberListOrigin
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
@@ -69,7 +68,6 @@ fun LibraryScreen(
             PlaylyTopBar(
                 title = stringResource(R.string.nav_library),
                 actions = {
-                    NowPlayingAction()
                     PlaylyIconButton(R.drawable.ic_refresh, stringResource(R.string.action_rescan), viewModel::rescan)
                     PlaylyIconButton(R.drawable.ic_settings, stringResource(R.string.action_settings), onOpenSettings)
                 },

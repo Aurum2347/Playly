@@ -52,7 +52,6 @@ import com.playly.player.designsystem.components.PlaylyIcon
 import com.playly.player.designsystem.components.PlaylyIconButton
 import com.playly.player.designsystem.components.SectionHeader
 import com.playly.player.ui.player.LocalPlayerLauncher
-import com.playly.player.ui.player.NowPlayingAction
 import com.playly.player.ui.player.rememberListOrigin
 import com.playly.player.ui.actions.LocalTrackActions
 import com.playly.player.ui.actions.TrackTarget
@@ -152,7 +151,6 @@ private fun SearchField(query: String, onQueryChange: (String) -> Unit, onBack: 
                 PlaylyIconButton(R.drawable.ic_close, stringResource(R.string.action_clear), { onQueryChange("") }, tint = colors.textSecondary)
             }
         }
-        NowPlayingAction(Modifier.padding(start = PlaylyTheme.spacing.xxs))
     }
 }
 

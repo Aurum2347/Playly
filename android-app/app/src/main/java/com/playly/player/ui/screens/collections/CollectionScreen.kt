@@ -30,7 +30,6 @@ import com.playly.player.ui.actions.LocalTrackActions
 import com.playly.player.ui.actions.SelectionTopBar
 import com.playly.player.ui.actions.rememberTrackSelection
 import com.playly.player.ui.player.LocalPlayerLauncher
-import com.playly.player.ui.player.NowPlayingAction
 import com.playly.player.ui.player.rememberListOrigin
 import com.playly.player.ui.screens.library.trackItems
 
@@ -73,7 +72,6 @@ fun CollectionScreen(
                 title = title,
                 onBack = onBack,
                 actions = {
-                    NowPlayingAction()
                     if (target != null && actions != null) {
                         PlaylyIconButton(R.drawable.ic_more_vert, stringResource(R.string.collection_menu), { actions.openCollection(target) })
                     }

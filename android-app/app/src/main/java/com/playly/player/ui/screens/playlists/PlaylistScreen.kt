@@ -22,7 +22,6 @@ import com.playly.player.designsystem.components.PlaylyTopBar
 import com.playly.player.ui.UiMessage
 import com.playly.player.ui.actions.LocalTrackActions
 import com.playly.player.ui.player.LocalPlayerLauncher
-import com.playly.player.ui.player.NowPlayingAction
 
 /**
  * A playlist's page (spec §7): cover, name, description, play / shuffle, sort, drag to reorder,
@@ -68,7 +67,6 @@ fun PlaylistScreen(
             title = page?.card?.name.orEmpty(),
             onBack = onBack,
             actions = {
-                NowPlayingAction()
                 if (page != null) PlaylyIconButton(R.drawable.ic_more_vert, stringResource(R.string.playlist_menu), { menuOpen = true })
             },
         )

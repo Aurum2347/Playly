@@ -30,7 +30,6 @@ import com.playly.player.designsystem.components.PlaylyTopBar
 import com.playly.player.ui.actions.SelectionTopBar
 import com.playly.player.ui.actions.rememberTrackSelection
 import com.playly.player.ui.player.LocalPlayerLauncher
-import com.playly.player.ui.player.NowPlayingAction
 import com.playly.player.ui.player.rememberListOrigin
 import com.playly.player.ui.screens.library.SortButton
 import com.playly.player.ui.screens.library.trackItems
@@ -54,7 +53,7 @@ fun FavoritesScreen(onBack: () -> Unit, viewModel: FavoritesViewModel = viewMode
         if (current != null && selection.isActive) {
             SelectionTopBar(selection, current.tracks)
         } else {
-            PlaylyTopBar(title = stringResource(R.string.favorites_title), onBack = onBack, actions = { NowPlayingAction() })
+            PlaylyTopBar(title = stringResource(R.string.favorites_title), onBack = onBack)
         }
         when {
             current == null -> LoadingState(stringResource(R.string.state_loading_library))

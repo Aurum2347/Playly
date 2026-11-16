@@ -47,7 +47,6 @@ import com.playly.player.ui.CollectMessages
 import com.playly.player.ui.actions.LocalTrackActions
 import com.playly.player.ui.actions.TrackTarget
 import com.playly.player.ui.player.LocalPlayerLauncher
-import com.playly.player.ui.player.NowPlayingAction
 import com.playly.player.ui.player.rememberListOrigin
 
 /**
@@ -73,7 +72,6 @@ fun HomeScreen(
             title = stringResource(R.string.app_name),
             leading = { PlaylyLogo() },
             actions = {
-                NowPlayingAction()
                 PlaylyIconButton(R.drawable.ic_search, stringResource(R.string.action_search), onOpenSearch)
                 PlaylyIconButton(R.drawable.ic_settings, stringResource(R.string.action_settings), onOpenSettings)
             },

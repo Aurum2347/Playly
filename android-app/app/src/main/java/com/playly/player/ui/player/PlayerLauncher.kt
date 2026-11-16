@@ -1,15 +1,9 @@
 package com.playly.player.ui.player
 
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.expandHorizontally
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.shrinkHorizontally
 import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Stable
-import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -21,14 +15,10 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.onGloballyPositioned
-import androidx.compose.ui.res.stringResource
-import com.playly.player.R
-import com.playly.player.designsystem.PlaylyTheme
-import com.playly.player.designsystem.components.NowPlayingButton
 
 /**
  * Whether the full-screen player is open, and where its open / close animation is anchored
- * (spec §3: the player grows out of the "Now playing" button or the row that started the track).
+ * (spec §3, §9: the player grows out of the mini-player or the row that started the track).
  * Open-ness survives rotation and process death through [Saver]; anchors are layout facts and
  * are simply measured again.
  */
@@ -44,7 +34,7 @@ class PlayerLauncher(initiallyOpen: Boolean = false) {
     /** Start a track from a list also opens the player (user setting, spec §9). */
     var openOnPlay = false
 
-    /** Centre of the visible "Now playing" button: the natural place to collapse into. */
+    /** Centre of the mini-player: the natural place to collapse into. */
     private var buttonCentre: Offset? = null
 
     fun open(from: Offset? = null) {
@@ -72,50 +62,6 @@ class PlayerLauncher(initiallyOpen: Boolean = false) {
 }
 
 val LocalPlayerLauncher = staticCompositionLocalOf { PlayerLauncher() }
-
-/** Dynamic on purpose: only the buttons that read it recompose when the track or play state changes. */
-val LocalNowPlayingBadge = compositionLocalOf<NowPlayingBadge?> { null }
-
-/**
- * The "Now playing" for a top bar. Takes no space without a current track (spec §9);
- * appears and disappears with a short expand / fade.
- */
-@Composable
-fun NowPlayingAction(modifier: Modifier = Modifier) {
-    val badge = LocalNowPlayingBadge.current
-    val launcher = LocalPlayerLauncher.current
-    val motion = PlaylyTheme.motion
-    // Keep the last track while the button animates away.
-    val shown = remember { ShownBadge() }
-    if (badge != null) shown.value = badge
-    AnimatedVisibility(
-        visible = badge != null,
-        modifier = modifier,
-        enter = fadeIn(motion.enter()) + expandHorizontally(motion.enter()),
-        exit = fadeOut(motion.exit()) + shrinkHorizontally(motion.exit()),
-    ) {
-        val current = shown.value ?: return@AnimatedVisibility
-        val description = if (current.artist.isNullOrBlank()) {
-            stringResource(R.string.now_playing_open_no_artist, current.title)
-        } else {
-            stringResource(R.string.now_playing_open, current.title, current.artist)
-        }
-        NowPlayingButton(
-            artwork = current.artwork,
-            isPlaying = current.isPlaying,
-            contentDescription = description,
-            stateDescription = stringResource(
-                if (current.isPlaying) R.string.now_playing_state_playing else R.string.now_playing_state_paused,
-            ),
-            onClick = { launcher.open() },
-            modifier = Modifier.onGloballyPositioned { launcher.reportButton(it.boundsInRoot().center) },
-        )
-    }
-}
-
-private class ShownBadge {
-    var value: NowPlayingBadge? = null
-}
 
 /**
  * Finds where a visible list item sits on screen, so the player can grow out of the row (or
