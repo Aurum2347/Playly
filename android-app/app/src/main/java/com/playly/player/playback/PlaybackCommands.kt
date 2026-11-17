@@ -44,6 +44,18 @@ object PlaybackCommands {
     val QUEUE_REMOVE = SessionCommand("com.playly.player.QUEUE_REMOVE", Bundle.EMPTY)
     const val ARG_UIDS = "uids"
 
+    /**
+     * Controller → session: the files of [ARG_TRACK_IDS] were deleted (stage 8.4): every row of
+     * them goes, the current one too (playback moves on to the next row).
+     */
+    val QUEUE_FORGET_TRACKS = SessionCommand("com.playly.player.QUEUE_FORGET_TRACKS", Bundle.EMPTY)
+
+    /**
+     * Controller → session: the tags of [ARG_TRACK_IDS] changed (stage 8.4): their rows are
+     * rebuilt from the library in place, without interrupting playback.
+     */
+    val QUEUE_REFRESH_TRACKS = SessionCommand("com.playly.player.QUEUE_REFRESH_TRACKS", Bundle.EMPTY)
+
     /** Controller → session: remove everything after the current track. */
     val QUEUE_CLEAR_UPCOMING = SessionCommand("com.playly.player.QUEUE_CLEAR_UPCOMING", Bundle.EMPTY)
 

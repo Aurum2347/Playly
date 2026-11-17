@@ -24,7 +24,16 @@ class TrackMediaItems(private val tracks: TrackDao) {
         ids.distinct().chunked(SQLITE_MAX_ARGS).forEach { chunk ->
             tracks.byIds(chunk).forEach { if (it.isAvailable) byId[it.id] = it }
         }
-        return ids.mapNotNull { id -> byId[id]?.let(::toMediaItem) }
+        return ids.mapNotNull { id -> byId[id]?.let { toMediaItem(it) } }
+    }
+
+    /** Available rows of [ids] by id (for refreshing queue rows in place). */
+    suspend fun resolveById(ids: Collection<Long>): Map<Long, TrackEntity> {
+        val byId = HashMap<Long, TrackEntity>(ids.size * 2)
+        ids.distinct().chunked(SQLITE_MAX_ARGS).forEach { chunk ->
+            tracks.byIds(chunk).forEach { if (it.isAvailable) byId[it.id] = it }
+        }
+        return byId
     }
 
     companion object {
@@ -42,7 +51,8 @@ class TrackMediaItems(private val tracks: TrackDao) {
          */
         fun uid(item: MediaItem): Long = item.mediaMetadata.extras?.getLong(KEY_UID, 0L) ?: 0L
 
-        fun toMediaItem(track: TrackEntity): MediaItem {
+        /** [uid]: a new row by default; an existing row's uid when rebuilding that row. */
+        fun toMediaItem(track: TrackEntity, uid: Long = nextUid.getAndIncrement()): MediaItem {
             val metadata = MediaMetadata.Builder()
                 .setTitle(track.title)
                 .setArtist(track.artist)
@@ -57,7 +67,7 @@ class TrackMediaItems(private val tracks: TrackDao) {
                 .setMediaType(MediaMetadata.MEDIA_TYPE_MUSIC)
                 .setIsPlayable(true)
                 .setIsBrowsable(false)
-                .setExtras(Bundle().apply { putLong(KEY_UID, nextUid.getAndIncrement()) })
+                .setExtras(Bundle().apply { putLong(KEY_UID, uid) })
                 .build()
             return MediaItem.Builder()
                 .setMediaId(track.id.toString())

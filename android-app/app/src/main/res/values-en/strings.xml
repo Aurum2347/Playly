@@ -410,4 +410,48 @@
     <string name="eq_preset_classic">Classical</string>
     <string name="eq_preset_treble">Treble</string>
     <string name="eq_preset_custom">Custom</string>
+
+    <!-- Tags, deleting files, duplicates (stage 8.4) -->
+    <string name="track_menu_edit_tags">Edit tags</string>
+    <string name="track_menu_delete_file">Delete file</string>
+    <string name="tags_title">Tags</string>
+    <string name="tags_hint">Changes are written to the file itself. An empty field removes the tag.</string>
+    <string name="tags_title_required">Title can’t be empty</string>
+    <string name="tags_saving">Saving…</string>
+    <string name="tags_saved">Tags saved</string>
+    <string name="tags_error_unsupported">Playly doesn’t change tags of this file format. The file is unchanged.</string>
+    <string name="tags_error_damaged">The file looks damaged, so Playly left it unchanged.</string>
+    <string name="tags_error_no_access">No permission to write to the folder. Pick it again: Library → Change folder.</string>
+    <string name="tags_error_missing">File not found: it was deleted or its folder is unavailable.</string>
+    <string name="tags_error_failed">Couldn’t write the file. The original was restored.</string>
+    <string name="delete_confirm_title">Delete the file?</string>
+    <string name="delete_confirm_message">“%1$s” will be permanently deleted from the device. The track will also disappear from playlists and favorites.</string>
+    <string name="delete_message_done">File deleted</string>
+    <plurals name="delete_message_done_many">
+        <item quantity="one">%d file deleted</item>
+        <item quantity="other">%d files deleted</item>
+    </plurals>
+    <string name="delete_message_no_access">No permission to delete. Pick the folder again: Library → Change folder.</string>
+    <plurals name="delete_message_failed">
+        <item quantity="one">Couldn’t delete %d file</item>
+        <item quantity="other">Couldn’t delete %d files</item>
+    </plurals>
+    <string name="action_find_duplicates">Find duplicates</string>
+    <string name="duplicates_title">Duplicates</string>
+    <string name="duplicates_scanning">Comparing files…</string>
+    <string name="duplicates_scanning_progress">Comparing files: %1$d of %2$d</string>
+    <string name="duplicates_none_title">No duplicates</string>
+    <string name="duplicates_none_message">No identical files and no tracks with the same title, artist and length.</string>
+    <string name="duplicates_summary">Groups: %1$d (exact copies: %2$d, probable matches: %3$d). Nothing is deleted until you choose.</string>
+    <string name="duplicates_select_extras">Select extras</string>
+    <string name="duplicates_select_extras_hint">Selects all but the earliest added track in each group</string>
+    <string name="duplicates_exact">Exact copies: same file contents</string>
+    <string name="duplicates_similar">Probable match: same title, artist and length</string>
+    <string name="duplicates_delete">Delete from disk (%d)</string>
+    <plurals name="duplicates_confirm_title">
+        <item quantity="one">Delete %d file from disk?</item>
+        <item quantity="other">Delete %d files from disk?</item>
+    </plurals>
+    <string name="duplicates_confirm_message">This can’t be undone. The tracks will also disappear from playlists and favorites.</string>
+    <string name="duplicates_failed">Couldn’t search for duplicates</string>
 </resources>

@@ -5,11 +5,14 @@ import com.playly.player.data.db.PlaylyDatabase
 import com.playly.player.data.favorites.FavoritesRepository
 import com.playly.player.data.lyrics.LyricsRepository
 import com.playly.player.data.library.LibraryRepository
+import com.playly.player.data.library.TrackFiles
+import com.playly.player.data.library.duplicates.DuplicateFinder
 import com.playly.player.data.library.browse.LibraryBrowser
 import com.playly.player.data.library.scan.LibraryScanner
 import com.playly.player.data.playlists.PlaylistRepository
 import com.playly.player.data.settings.SettingsRepository
 import com.playly.player.data.settings.settingsDataStore
+import com.playly.player.data.tags.TagRepository
 import com.playly.player.playback.PlaybackController
 import com.playly.player.ui.UiMessageBus
 import com.playly.player.playback.PlaybackStateStore
@@ -36,6 +39,11 @@ class AppContainer(context: Context) {
     /** Favourite tracks (stage 8.1). */
     val favorites: FavoritesRepository by lazy { FavoritesRepository(database) }
     val lyrics: LyricsRepository by lazy { LyricsRepository(appContext, library) }
+
+    /** Tag editing, file deletion and duplicate search (stage 8.4). */
+    val tags: TagRepository by lazy { TagRepository(appContext, library) }
+    val trackFiles: TrackFiles by lazy { TrackFiles(appContext.contentResolver, library) }
+    val duplicates: DuplicateFinder by lazy { DuplicateFinder(library, trackFiles) }
 
     /** Albums, artists, genres and folders, grouped once and shared by every screen. */
     val browser: LibraryBrowser by lazy { LibraryBrowser(database.trackDao(), appScope) }

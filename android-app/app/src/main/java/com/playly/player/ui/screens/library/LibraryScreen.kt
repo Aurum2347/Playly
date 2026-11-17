@@ -47,6 +47,7 @@ import kotlinx.coroutines.launch
 fun LibraryScreen(
     onOpenSettings: () -> Unit,
     onOpenCollection: (CollectionKind, String) -> Unit,
+    onOpenDuplicates: () -> Unit,
     viewModel: LibraryViewModel = viewModel(factory = LibraryViewModel.Factory),
     browse: BrowseViewModel = viewModel(factory = BrowseViewModel.Factory),
 ) {
@@ -68,6 +69,9 @@ fun LibraryScreen(
             PlaylyTopBar(
                 title = stringResource(R.string.nav_library),
                 actions = {
+                    if ((state as? LibraryUiState.Ready)?.content is LibraryContent.Tracks) {
+                        PlaylyIconButton(R.drawable.ic_duplicates, stringResource(R.string.action_find_duplicates), onOpenDuplicates)
+                    }
                     PlaylyIconButton(R.drawable.ic_refresh, stringResource(R.string.action_rescan), viewModel::rescan)
                     PlaylyIconButton(R.drawable.ic_settings, stringResource(R.string.action_settings), onOpenSettings)
                 },

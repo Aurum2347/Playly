@@ -308,6 +308,21 @@ class PlaybackController(context: Context) {
     /** Removes everything after the current track. */
     fun clearUpcoming() = withController { it.sendCustomCommand(PlaybackCommands.QUEUE_CLEAR_UPCOMING, Bundle.EMPTY) }
 
+    /** The files of [trackIds] were deleted: their rows leave the queue, the current one too. */
+    fun forgetTracks(trackIds: Collection<Long>) = trackCommand(PlaybackCommands.QUEUE_FORGET_TRACKS, trackIds)
+
+    /** The tags of [trackIds] changed: the player shows the new ones without a restart. */
+    fun refreshTracks(trackIds: Collection<Long>) = trackCommand(PlaybackCommands.QUEUE_REFRESH_TRACKS, trackIds)
+
+    private fun trackCommand(command: SessionCommand, trackIds: Collection<Long>) {
+        // Only when connected: with no session there is no queue to fix, the next one is built from the library.
+        val c = controller?.takeIf { it.isConnected } ?: return
+        if (trackIds.isEmpty()) return
+        val args = Bundle()
+        args.putLongArray(PlaybackCommands.ARG_TRACK_IDS, trackIds.toLongArray())
+        c.sendCustomCommand(command, args)
+    }
+
     /** Playback speed for every track, kept with the queue; snapped to [PlaybackSpeed.STEP]. */
     fun setSpeed(speed: Float) = withController { it.setPlaybackSpeed(PlaybackSpeed.snap(speed)) }
 

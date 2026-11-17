@@ -68,6 +68,9 @@ android {
     sourceSets {
         // Exported Room schemas feed MigrationTestHelper.
         getByName("androidTest").assets.directories.add("$projectDir/schemas")
+        // Small audio samples for the tag tests: JVM resources and device assets alike.
+        getByName("test").resources.directories.add("$projectDir/src/sharedTest/audio")
+        getByName("androidTest").assets.directories.add("$projectDir/src/sharedTest/audio")
     }
 
     lint {

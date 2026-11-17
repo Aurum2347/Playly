@@ -14,6 +14,8 @@ import kotlinx.serialization.Serializable
 @Serializable data object SearchRoute
 @Serializable data object SettingsRoute
 @Serializable data object FavoritesRoute
+/** Duplicate search (stage 8.4), opened from the Library. */
+@Serializable data object DuplicatesRoute
 /** A playlist's page; outside the tab graphs, like Settings, so it opens from Search as well. */
 @Serializable data class PlaylistRoute(val id: Long)
 /** "Add tracks" picker of a playlist. */

@@ -22,6 +22,7 @@ import com.playly.player.data.library.browse.CollectionKeys
 import com.playly.player.data.library.browse.CollectionKind
 import com.playly.player.ui.player.LocalPlayerLauncher
 import com.playly.player.designsystem.PlaylyTheme
+import com.playly.player.designsystem.components.ConfirmDialog
 import com.playly.player.designsystem.components.PlaylySheet
 import com.playly.player.designsystem.components.SheetAction
 import com.playly.player.designsystem.components.SheetTrackHeader
@@ -51,6 +52,18 @@ fun TrackActionsHost(viewModel: TrackActionsViewModel, onOpenCollection: (Collec
         is TrackSheet.Details -> TrackDetailsSheet(current.trackId, viewModel::track, viewModel::dismiss)
         is TrackSheet.AddToPlaylist -> AddToPlaylistSheet(current, viewModel)
         is TrackSheet.Collection -> CollectionMenu(current.target, viewModel)
+        is TrackSheet.EditTags -> EditTagsSheet(current, viewModel)
+        is TrackSheet.ConfirmDelete -> ConfirmDialog(
+            title = stringResource(R.string.delete_confirm_title),
+            message = stringResource(R.string.delete_confirm_message, current.title),
+            confirmLabel = stringResource(R.string.action_delete),
+            onConfirm = {
+                viewModel.dismiss()
+                viewModel.deleteFiles(listOf(current.trackId))
+            },
+            onDismiss = viewModel::dismiss,
+            dangerous = true,
+        )
     }
 }
 
@@ -128,6 +141,18 @@ private fun TrackMenu(
                     }
                 }
             })
+            // File actions (stage 8.4), once the row is read: only for files of the music folder.
+            val file = track
+            if (file != null && viewModel.canEditTags(file)) {
+                SheetAction(R.drawable.ic_edit, stringResource(R.string.track_menu_edit_tags), onClick = {
+                    close { viewModel.openEditTags(target.trackId) }
+                })
+            }
+            if (file != null && viewModel.canDelete(file)) {
+                SheetAction(R.drawable.ic_delete, stringResource(R.string.track_menu_delete_file), onClick = {
+                    close { viewModel.openDelete(target.trackId, file.title) }
+                })
+            }
             Spacer(Modifier.navigationBarsPadding().height(PlaylyTheme.spacing.md))
         }
     }

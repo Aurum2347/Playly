@@ -452,4 +452,54 @@
     <string name="eq_preset_classic">Классика</string>
     <string name="eq_preset_treble">Высокие частоты</string>
     <string name="eq_preset_custom">Свой</string>
+
+    <!-- Tags, deleting files, duplicates (stage 8.4) -->
+    <string name="track_menu_edit_tags">Изменить теги</string>
+    <string name="track_menu_delete_file">Удалить файл</string>
+    <string name="tags_title">Теги</string>
+    <string name="tags_hint">Изменения записываются в сам файл. Пустое поле убирает тег.</string>
+    <string name="tags_title_required">Название не может быть пустым</string>
+    <string name="tags_saving">Сохраняю…</string>
+    <string name="tags_saved">Теги сохранены</string>
+    <string name="tags_error_unsupported">Теги файлов этого формата Playly не меняет. Файл не изменён.</string>
+    <string name="tags_error_damaged">Файл похож на повреждённый, поэтому Playly его не изменил.</string>
+    <string name="tags_error_no_access">Нет доступа на запись в папку. Выберите её снова: «Медиатека» → «Сменить папку».</string>
+    <string name="tags_error_missing">Файл не найден: он удалён или его папка отключена.</string>
+    <string name="tags_error_failed">Не удалось записать файл. Исходный файл восстановлен.</string>
+    <string name="delete_confirm_title">Удалить файл?</string>
+    <string name="delete_confirm_message">«%1$s» будет удалён с устройства навсегда. Трек пропадёт и из плейлистов, и из избранного.</string>
+    <string name="delete_message_done">Файл удалён</string>
+    <plurals name="delete_message_done_many">
+        <item quantity="one">Удалён %d файл</item>
+        <item quantity="few">Удалено %d файла</item>
+        <item quantity="many">Удалено %d файлов</item>
+        <item quantity="other">Удалено %d файла</item>
+    </plurals>
+    <string name="delete_message_no_access">Нет доступа на удаление. Выберите папку снова: «Медиатека» → «Сменить папку».</string>
+    <plurals name="delete_message_failed">
+        <item quantity="one">Не удалось удалить %d файл</item>
+        <item quantity="few">Не удалось удалить %d файла</item>
+        <item quantity="many">Не удалось удалить %d файлов</item>
+        <item quantity="other">Не удалось удалить %d файла</item>
+    </plurals>
+    <string name="action_find_duplicates">Найти дубликаты</string>
+    <string name="duplicates_title">Дубликаты</string>
+    <string name="duplicates_scanning">Сравниваю файлы…</string>
+    <string name="duplicates_scanning_progress">Сравниваю файлы: %1$d из %2$d</string>
+    <string name="duplicates_none_title">Дубликатов нет</string>
+    <string name="duplicates_none_message">Нет ни одинаковых файлов, ни треков с тем же названием, исполнителем и длительностью.</string>
+    <string name="duplicates_summary">Групп: %1$d (точных копий: %2$d, вероятных совпадений: %3$d). Ничего не удаляется без вашего выбора.</string>
+    <string name="duplicates_select_extras">Отметить лишние</string>
+    <string name="duplicates_select_extras_hint">В каждой группе отмечаются все, кроме добавленного первым</string>
+    <string name="duplicates_exact">Точные копии: одинаковое содержимое файлов</string>
+    <string name="duplicates_similar">Вероятное совпадение: название, исполнитель и длительность</string>
+    <string name="duplicates_delete">Удалить с диска (%d)</string>
+    <plurals name="duplicates_confirm_title">
+        <item quantity="one">Удалить %d файл с диска?</item>
+        <item quantity="few">Удалить %d файла с диска?</item>
+        <item quantity="many">Удалить %d файлов с диска?</item>
+        <item quantity="other">Удалить %d файла с диска?</item>
+    </plurals>
+    <string name="duplicates_confirm_message">Это нельзя отменить. Треки пропадут и из плейлистов, и из избранного.</string>
+    <string name="duplicates_failed">Не удалось найти дубликаты</string>
 </resources>

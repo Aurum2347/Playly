@@ -317,6 +317,27 @@ class PlaybackService : MediaSessionService() {
         publishExtras()
     }
 
+    /** Rows of deleted files go, the current one included. */
+    internal fun forgetTracks(trackIds: Set<Long>) {
+        if (trackIds.isEmpty()) return
+        queue.removeTracks(trackIds)
+        publishExtras()
+    }
+
+    /** Rows of re-tagged tracks get the new tags; each keeps its queue uid, so nothing else moves. */
+    internal fun refreshTracks(trackIds: Set<Long>) {
+        if (trackIds.isEmpty()) return
+        scope.launch {
+            val fresh = items.resolveById(trackIds)
+            for (index in 0 until player.mediaItemCount) {
+                val old = player.getMediaItemAt(index)
+                val track = TrackMediaItems.trackId(old)?.let(fresh::get) ?: continue
+                // Same URI: ExoPlayer swaps the item without re-preparing what plays.
+                player.replaceMediaItem(index, TrackMediaItems.toMediaItem(track, TrackMediaItems.uid(old)))
+            }
+        }
+    }
+
     internal fun clearUpcoming() {
         queue.clearUpcoming()
         publishExtras()

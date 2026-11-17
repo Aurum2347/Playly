@@ -119,6 +119,18 @@ internal class QueueEditor(private val player: ExoPlayer) {
         return indices.size
     }
 
+    /**
+     * Every row of [trackIds], the current one too: the player then moves on to the next row
+     * (or ends when none is left). Returns how many went.
+     */
+    fun removeTracks(trackIds: Set<Long>): Int {
+        val indices = (0 until player.mediaItemCount).filter { TrackMediaItems.trackId(player.getMediaItemAt(it)) in trackIds }
+        val uids = indices.map(::uidAt)
+        removeIndices(indices)
+        queued.removeAll(uids.toSet())
+        return indices.size
+    }
+
     /** Everything after the current track in play order. Returns how many went. */
     fun clearUpcoming(): Int {
         val order = playOrder()

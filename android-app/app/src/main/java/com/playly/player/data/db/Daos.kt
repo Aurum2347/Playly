@@ -63,6 +63,10 @@ interface TrackDao {
     @Query("SELECT id, media_store_id, source_id, folder_path, file_name, size_bytes FROM tracks WHERE is_available = 1")
     suspend fun availableLocations(): List<TrackLocation>
 
+    /** Playable tracks of the music folder: what duplicate search compares (stage 8.4). */
+    @Query("SELECT * FROM tracks WHERE is_available = 1 AND source_id IS NOT NULL")
+    suspend fun availableFolderTracks(): List<TrackEntity>
+
     /** Returns -1 for rows skipped because their URI is already indexed. */
     @Insert(onConflict = OnConflictStrategy.IGNORE)
     suspend fun insertAll(tracks: List<TrackEntity>): List<Long>

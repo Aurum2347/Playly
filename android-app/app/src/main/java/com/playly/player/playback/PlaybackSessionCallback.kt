@@ -48,6 +48,8 @@ internal class PlaybackSessionCallback(
             .add(PlaybackCommands.QUEUE_ADD)
             .add(PlaybackCommands.QUEUE_MOVE)
             .add(PlaybackCommands.QUEUE_REMOVE)
+            .add(PlaybackCommands.QUEUE_FORGET_TRACKS)
+            .add(PlaybackCommands.QUEUE_REFRESH_TRACKS)
             .add(PlaybackCommands.QUEUE_CLEAR_UPCOMING)
             .add(PlaybackCommands.SLEEP_TIMER)
             .build()
@@ -76,6 +78,10 @@ internal class PlaybackSessionCallback(
             )
             PlaybackCommands.QUEUE_REMOVE.customAction ->
                 service.removeFromQueue(args.getLongArray(PlaybackCommands.ARG_UIDS)?.toHashSet().orEmpty())
+            PlaybackCommands.QUEUE_FORGET_TRACKS.customAction ->
+                service.forgetTracks(args.getLongArray(PlaybackCommands.ARG_TRACK_IDS)?.toHashSet().orEmpty())
+            PlaybackCommands.QUEUE_REFRESH_TRACKS.customAction ->
+                service.refreshTracks(args.getLongArray(PlaybackCommands.ARG_TRACK_IDS)?.toHashSet().orEmpty())
             PlaybackCommands.QUEUE_CLEAR_UPCOMING.customAction -> service.clearUpcoming()
             PlaybackCommands.SLEEP_TIMER.customAction -> service.setSleepTimer(
                 mode = args.getString(PlaybackCommands.ARG_SLEEP_MODE),

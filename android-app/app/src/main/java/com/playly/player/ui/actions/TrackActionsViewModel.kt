@@ -17,6 +17,14 @@ import com.playly.player.playback.PlaybackController
 import com.playly.player.playback.PlaybackSource
 import kotlin.random.Random
 import androidx.annotation.DrawableRes
+import androidx.annotation.StringRes
+import android.util.Log
+import com.playly.player.data.library.DeleteResult
+import com.playly.player.data.library.TrackFiles
+import com.playly.player.data.tags.TagEdit
+import com.playly.player.data.tags.TagRepository
+import com.playly.player.data.tags.TagSaveResult
+import kotlinx.coroutines.CancellationException
 import com.playly.player.playback.QueueAddResult
 import com.playly.player.ui.UiAction
 import com.playly.player.ui.UiMessage
@@ -64,6 +72,10 @@ sealed interface TrackSheet {
     /** [single]: the one track being added, to mark playlists that already hold it. */
     data class AddToPlaylist(val trackIds: List<Long>, val single: TrackTarget?) : TrackSheet
     data class Collection(val target: CollectionTarget) : TrackSheet
+    /** Tag editor (stage 8.4). [error]: why the last save failed; the sheet stays open. */
+    data class EditTags(val trackId: Long, val saving: Boolean = false, @StringRes val error: Int? = null) : TrackSheet
+    /** "Delete file?" (stage 8.4). */
+    data class ConfirmDelete(val trackId: Long, val title: String) : TrackSheet
 }
 
 /**
@@ -76,6 +88,8 @@ class TrackActionsViewModel(
     private val library: LibraryRepository,
     private val playlists: PlaylistRepository,
     private val favorites: FavoritesRepository,
+    private val tags: TagRepository,
+    private val files: TrackFiles,
 ) : ViewModel() {
     private val _sheet = MutableStateFlow<TrackSheet?>(null)
     val sheet: StateFlow<TrackSheet?> = _sheet.asStateFlow()
@@ -230,12 +244,90 @@ class TrackActionsViewModel(
         }
     }
 
+    fun canEditTags(track: TrackEntity): Boolean = tags.canEdit(track)
+
+    fun canDelete(track: TrackEntity): Boolean = files.canDelete(track)
+
+    fun openEditTags(trackId: Long) {
+        _sheet.value = TrackSheet.EditTags(trackId)
+    }
+
+    fun openDelete(trackId: Long, title: String) {
+        _sheet.value = TrackSheet.ConfirmDelete(trackId, title)
+    }
+
+    /**
+     * Writes [edit] into the file. On success the sheet closes and the player shows the new
+     * tags; on failure it stays open with the reason (the file is unchanged).
+     */
+    fun saveTags(trackId: Long, edit: TagEdit) {
+        val open = _sheet.value as? TrackSheet.EditTags ?: return
+        if (open.trackId != trackId || open.saving) return
+        if (!edit.isValid) {
+            _sheet.value = open.copy(error = R.string.tags_title_required)
+            return
+        }
+        _sheet.value = open.copy(saving = true, error = null)
+        viewModelScope.launch {
+            val result = try {
+                tags.save(trackId, edit)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Log.e(TAG, "Saving tags failed", e)
+                TagSaveResult.Failed
+            }
+            val error = when (result) {
+                is TagSaveResult.Saved -> null
+                TagSaveResult.Unsupported -> R.string.tags_error_unsupported
+                TagSaveResult.Damaged -> R.string.tags_error_damaged
+                TagSaveResult.NoWriteAccess -> R.string.tags_error_no_access
+                TagSaveResult.Missing -> R.string.tags_error_missing
+                TagSaveResult.Failed -> R.string.tags_error_failed
+            }
+            val stillOpen = (_sheet.value as? TrackSheet.EditTags)?.takeIf { it.trackId == trackId }
+            if (error == null) {
+                playback.refreshTracks(listOf(trackId))
+                if (stillOpen != null) _sheet.value = null
+                _messages.send(UiMessage(R.string.tags_saved))
+            } else if (stillOpen != null) {
+                _sheet.value = stillOpen.copy(saving = false, error = error)
+            } else {
+                _messages.send(UiMessage(error))
+            }
+        }
+    }
+
+    /** Deletes the files for good and tells how it went. */
+    fun deleteFiles(trackIds: List<Long>) {
+        if (trackIds.isEmpty()) return
+        viewModelScope.launch { _messages.send(deleteMessage(deleteAndForget(trackIds))) }
+    }
+
+    private suspend fun deleteAndForget(trackIds: List<Long>): DeleteResult {
+        val result = files.delete(trackIds)
+        playback.forgetTracks(result.deleted)
+        return result
+    }
+
     private fun undoFavorite(change: FavoriteChange) =
         UiAction(R.string.action_undo) { viewModelScope.launch { favorites.undo(change) } }
 
     companion object {
+        private const val TAG = "PlaylyActions"
+
+        /** The snackbar text for a [DeleteResult] (shared with the Duplicates page). */
+        fun deleteMessage(result: DeleteResult): UiMessage = when {
+            result.failed > 0 -> UiMessage(R.plurals.delete_message_failed, listOf(result.failed), quantity = result.failed)
+            result.noAccess > 0 -> UiMessage(R.string.delete_message_no_access)
+            result.deleted.size == 1 && result.requested == 1 -> UiMessage(R.string.delete_message_done)
+            else -> UiMessage(R.plurals.delete_message_done_many, listOf(result.deleted.size), quantity = result.deleted.size)
+        }
+
         val Factory = viewModelFactory {
-            initializer { TrackActionsViewModel(container.playback, container.library, container.playlists, container.favorites) }
+            initializer {
+                TrackActionsViewModel(container.playback, container.library, container.playlists, container.favorites, container.tags, container.trackFiles)
+            }
         }
     }
 }

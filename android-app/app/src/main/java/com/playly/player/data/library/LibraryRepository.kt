@@ -10,6 +10,7 @@ import com.playly.player.core.SearchText
 import com.playly.player.data.db.LibrarySourceEntity
 import com.playly.player.data.db.PlaylistSummary
 import com.playly.player.data.db.PlaylyDatabase
+import com.playly.player.data.db.SQLITE_MAX_ARGS
 import com.playly.player.data.db.SourceSummary
 import com.playly.player.data.db.TrackEntity
 import com.playly.player.data.db.TrackListItem
@@ -101,11 +102,10 @@ class LibraryRepository(
      * persisted and the previous folder is forgotten (one folder, like the desktop app).
      */
     suspend fun addSource(treeUri: Uri): AddSourceResult = withContext(io) {
-        try {
-            resolver.takePersistableUriPermission(treeUri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
-        } catch (_: SecurityException) {
-            return@withContext AddSourceResult.AccessRefused
-        }
+        // Read and write (tag editing, stage 8.4); a provider that refuses writing still gives a
+        // read-only library.
+        val granted = takeGrant(treeUri, READ_WRITE) || takeGrant(treeUri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        if (!granted) return@withContext AddSourceResult.AccessRefused
         val uriString = treeUri.toString()
         sourcesDao.findByUri(uriString)?.let { existing ->
             // Picking a known folder again renews its grant: rescan so lost access recovers.
@@ -134,11 +134,45 @@ class LibraryRepository(
             tracks.markSourceMissing(id, clock())
             sourcesDao.delete(id)
         }
-        try {
-            resolver.releasePersistableUriPermission(source.treeUri.toUri(), Intent.FLAG_GRANT_READ_URI_PERMISSION)
-        } catch (_: SecurityException) {
-            // Already revoked by the system; the row is gone either way.
-        }
+        val uri = source.treeUri.toUri()
+        // Already revoked by the system: the row is gone either way.
+        val held = resolver.persistedUriPermissions.firstOrNull { it.uri == uri }
+        val flags = (if (held?.isReadPermission == true) Intent.FLAG_GRANT_READ_URI_PERMISSION else 0) or
+            (if (held?.isWritePermission == true) Intent.FLAG_GRANT_WRITE_URI_PERMISSION else 0)
+        if (flags != 0) runCatching { resolver.releasePersistableUriPermission(uri, flags) }
+    }
+
+    private fun takeGrant(uri: Uri, flags: Int): Boolean = try {
+        resolver.takePersistableUriPermission(uri, flags)
+        true
+    } catch (_: SecurityException) {
+        false
+    }
+
+    /**
+     * Whether files of [sourceId]'s folder may be changed. Folders picked before stage 8.4 were
+     * granted for reading only: picking the folder again adds writing.
+     */
+    fun canWrite(source: LibrarySourceEntity): Boolean {
+        val uri = source.treeUri.toUri()
+        return resolver.persistedUriPermissions.any { it.uri == uri && it.isWritePermission }
+    }
+
+    suspend fun source(id: Long): LibrarySourceEntity? = withContext(io) { sourcesDao.get(id) }
+
+    /** Playable tracks of the music folder (duplicate search). */
+    suspend fun availableFolderTracks(): List<TrackEntity> = withContext(io) { tracks.availableFolderTracks() }
+
+    /** Rows of tracks whose files were deleted: playlists, favourites and history lose them too. */
+    suspend fun forgetTracks(ids: Collection<Long>) = withContext(io) {
+        ids.chunked(SQLITE_MAX_ARGS).forEach { tracks.deleteAll(it) }
+    }
+
+    /** Saves tags written to the file, with the file's new size and time (so a rescan keeps the row). */
+    suspend fun updateTrack(track: TrackEntity) = withContext(io) { tracks.updateAll(listOf(track)) }
+
+    private companion object {
+        const val READ_WRITE = Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
     }
 
     private fun displayName(treeUri: Uri): String {
