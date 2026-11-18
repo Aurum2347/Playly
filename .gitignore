@@ -38,3 +38,6 @@ release-notes-*.md
 
 # Сборка под Linux из Docker (npm run build:linux)
 release-linux/
+
+# Инструкции для Claude — локальные
+CLAUDE.md
