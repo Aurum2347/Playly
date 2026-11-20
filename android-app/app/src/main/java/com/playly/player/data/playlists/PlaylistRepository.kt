@@ -28,6 +28,9 @@ data class RemovedEntries(val playlistId: Long, val entries: List<Pair<Int, Play
     val count: Int get() = entries.size
 }
 
+/** Stage 9.2: what restoring one playlist did. */
+data class RestoredPlaylist(val id: Long, val created: Boolean, val added: Int)
+
 /**
  * Playlists: create, edit, delete, add and remove tracks, manual order. Removing a track from a
  * playlist never touches the file. Positions are kept dense (0..n-1) inside transactions, so
@@ -63,6 +66,49 @@ class PlaylistRepository(
         PlaylistRules.sorted(dao.observeTracks(id).first(), PlaylistSort.fromCode(playlist.sortOrder))
             .filter { it.isAvailable }
             .map { it.track.id }
+    }
+
+    /** Stage 9.2: every playlist (oldest first) with its tracks in the user's order, unavailable ones too. */
+    suspend fun allWithTracks(): List<Pair<PlaylistEntity, List<Long>>> = withContext(io) {
+        dao.observeSummaries().first().map { it.playlist }.sortedBy { it.createdAt }
+            .map { it to entryTrackIds(it.id) }
+    }
+
+    /** Stage 9.2: the playlist's tracks in the user's order (M3U export), unavailable ones too. */
+    suspend fun entryTrackIds(id: Long): List<Long> = withContext(io) { dao.observeTracks(id).first().map { it.track.id } }
+
+    /**
+     * Stage 9.2: a playlist from a backup or a playlist file. With [merge], a playlist of the same
+     * name (any case) gets the tracks it lacks; otherwise a new one is made, a taken name getting
+     * " (2)", " (3)"… Null when the name is blank.
+     */
+    suspend fun restore(
+        name: String,
+        description: String?,
+        sort: PlaylistSort,
+        trackIds: List<Long>,
+        merge: Boolean,
+    ): RestoredPlaylist? = withContext(io) {
+        val clean = PlaylistRules.cleanName(name) ?: return@withContext null
+        val existing = dao.observeSummaries().first().map { it.playlist }
+        val same = existing.firstOrNull { it.name.equals(clean, ignoreCase = true) }
+        if (merge && same != null) {
+            return@withContext RestoredPlaylist(same.id, created = false, added = add(same.id, trackIds).addedEntryIds.size)
+        }
+        val taken = existing.mapTo(HashSet()) { it.name.lowercase() }
+        val unique = PlaylistRules.uniqueName(clean, taken)
+        val now = clock()
+        val id = dao.insert(
+            PlaylistEntity(
+                name = unique,
+                description = PlaylistRules.cleanDescription(description),
+                createdAt = now,
+                updatedAt = now,
+                sortOrder = sort.code,
+            ),
+        )
+        // The file's own order and repeats are kept.
+        RestoredPlaylist(id, created = true, added = add(id, trackIds, allowDuplicates = true).addedEntryIds.size)
     }
 
     /** Returns the new id, or null when the name is blank. */

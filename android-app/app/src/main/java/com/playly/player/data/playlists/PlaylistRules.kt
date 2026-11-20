@@ -42,6 +42,18 @@ object PlaylistRules {
 
     fun cleanDescription(input: String?): String? = input?.trim()?.take(MAX_DESCRIPTION_LENGTH)?.trim()?.takeIf { it.isNotEmpty() }
 
+    /** Stage 9.2: [name], or "name (2)", "name (3)"… when [taken] (lower-cased) has it; fits the length limit. */
+    fun uniqueName(name: String, taken: Set<String>): String {
+        if (name.lowercase() !in taken) return name
+        var n = 2
+        while (true) {
+            val suffix = " ($n)"
+            val candidate = name.take(MAX_NAME_LENGTH - suffix.length).trimEnd() + suffix
+            if (candidate.lowercase() !in taken) return candidate
+            n++
+        }
+    }
+
     /**
      * The automatic cover: four different covers as a 2×2 grid when the playlist has at least
      * four albums, otherwise the first track's cover. Tracks without an album count by themselves.

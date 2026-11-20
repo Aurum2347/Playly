@@ -1,6 +1,8 @@
 package com.playly.player
 
 import android.content.Context
+import com.playly.player.data.artwork.CoverCache
+import com.playly.player.data.backup.BackupRepository
 import com.playly.player.data.db.PlaylyDatabase
 import com.playly.player.data.favorites.FavoritesRepository
 import com.playly.player.data.lyrics.LyricsRepository
@@ -44,6 +46,14 @@ class AppContainer(context: Context) {
     val tags: TagRepository by lazy { TagRepository(appContext, library) }
     val trackFiles: TrackFiles by lazy { TrackFiles(appContext.contentResolver, library) }
     val duplicates: DuplicateFinder by lazy { DuplicateFinder(library, trackFiles) }
+
+    /** Size and clearing of the cover cache (stage 9.2). */
+    val coverCache: CoverCache by lazy { CoverCache(appContext) }
+
+    /** Backups and M3U playlist files (stage 9.2). */
+    val backup: BackupRepository by lazy {
+        BackupRepository(appContext.contentResolver, database, settings, playlists, favorites, BuildConfig.VERSION_NAME)
+    }
 
     /** Albums, artists, genres and folders, grouped once and shared by every screen. */
     val browser: LibraryBrowser by lazy { LibraryBrowser(database.trackDao(), appScope) }

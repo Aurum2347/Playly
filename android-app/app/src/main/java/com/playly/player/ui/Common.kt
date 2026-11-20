@@ -108,6 +108,48 @@ fun rememberFolderPicker(onPicked: (Uri) -> Unit): () -> Unit {
     }
 }
 
+/**
+ * Stage 9.2: the system "save as" dialog for one [mimeType]; call the result with the suggested
+ * file name. [onPicked] gets the new document.
+ */
+@Composable
+fun rememberCreateDocument(mimeType: String, onPicked: (Uri) -> Unit): (String) -> Unit {
+    val latestOnPicked by rememberUpdatedState(onPicked)
+    val launcher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument(mimeType)) { uri ->
+        if (uri != null) latestOnPicked(uri)
+    }
+    val guard = rememberPickerGuard()
+    return remember(launcher, guard) { { name: String -> guard { launcher.launch(name) } } }
+}
+
+/** Stage 9.2: the system "open" dialog limited to [mimeTypes]. */
+@Composable
+fun rememberOpenDocument(mimeTypes: Array<String>, onPicked: (Uri) -> Unit): () -> Unit {
+    val latestOnPicked by rememberUpdatedState(onPicked)
+    val launcher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) latestOnPicked(uri)
+    }
+    val guard = rememberPickerGuard()
+    return remember(launcher, guard) { { guard { launcher.launch(mimeTypes) } } }
+}
+
+/** Runs a picker launch; a phone without the system file dialog gets a snackbar instead of a crash. */
+@Composable
+private fun rememberPickerGuard(): (() -> Unit) -> Unit {
+    val snackbar = LocalSnackbarHostState.current
+    val scope = rememberCoroutineScope()
+    val unavailable = stringResource(R.string.message_picker_unavailable)
+    return remember(snackbar, scope, unavailable) {
+        { launch ->
+            try {
+                launch()
+            } catch (_: ActivityNotFoundException) {
+                scope.launch { snackbar.showSnackbar(unavailable) }
+            }
+        }
+    }
+}
+
 /** True when the system "remove animations" option is on. Re-read on every resume. */
 @Composable
 fun rememberSystemAnimationsDisabled(): Boolean {

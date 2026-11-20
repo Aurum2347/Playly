@@ -20,7 +20,15 @@ import com.playly.player.playback.audio.Equalizer
 import java.io.IOException
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.booleanOrNull
+import kotlinx.serialization.json.intOrNull
+
+private fun JsonElement.primitiveOrNull(): JsonPrimitive? = this as? JsonPrimitive
 
 val Context.settingsDataStore: DataStore<Preferences> by preferencesDataStore(name = "settings")
 
@@ -94,6 +102,48 @@ class SettingsRepository(private val store: DataStore<Preferences>) {
         val resumePosition = booleanPreferencesKey("resume_position")
         val pauseOnNoisy = booleanPreferencesKey("pause_on_noisy")
         val queueEnd = stringPreferencesKey("queue_end")
+
+        /** Stage 9.2: what a backup carries. Not the scan time or onboarding: those belong to the device. */
+        val backupBooleans = listOf(
+            reduceMotion, openPlayerOnPlay, playerArtworkTint, eqEnabled, monoAudio, normalizeVolume,
+            skipSilence, resumePosition, pauseOnNoisy,
+        )
+        val backupStrings = listOf(trackSort, albumSort, artistSort, genreSort, folderSort, favoriteSort, eqPreset, eqCustomGains, queueEnd)
+        val backupInts = listOf(minTrackSeconds)
+        val backupStringSets = listOf(excludedFolders)
+    }
+
+    /** Stage 9.2: the user's settings for a backup file, by key name. Unset ones are left out. */
+    suspend fun exportBackup(): Map<String, JsonElement> {
+        val prefs = store.data.catch { emit(emptyPreferences()) }.first()
+        val out = LinkedHashMap<String, JsonElement>()
+        Keys.backupBooleans.forEach { key -> prefs[key]?.let { out[key.name] = JsonPrimitive(it) } }
+        Keys.backupStrings.forEach { key -> prefs[key]?.let { out[key.name] = JsonPrimitive(it) } }
+        Keys.backupInts.forEach { key -> prefs[key]?.let { out[key.name] = JsonPrimitive(it) } }
+        Keys.backupStringSets.forEach { key -> prefs[key]?.let { set -> out[key.name] = JsonArray(set.map(::JsonPrimitive)) } }
+        return out
+    }
+
+    /**
+     * Puts back settings from a backup in one atomic write. Unknown keys and values of the wrong
+     * type are skipped; wrong values of the right type fall back to defaults when read.
+     */
+    suspend fun importBackup(values: Map<String, JsonElement>): Int {
+        var applied = 0
+        store.edit { prefs ->
+            Keys.backupBooleans.forEach { key -> values[key.name]?.primitiveOrNull()?.booleanOrNull?.let { prefs[key] = it; applied++ } }
+            Keys.backupStrings.forEach { key ->
+                values[key.name]?.primitiveOrNull()?.takeIf { it.isString }?.content?.let { prefs[key] = it; applied++ }
+            }
+            Keys.backupInts.forEach { key -> values[key.name]?.primitiveOrNull()?.intOrNull?.let { prefs[key] = it; applied++ } }
+            Keys.backupStringSets.forEach { key ->
+                (values[key.name] as? JsonArray)?.let { array ->
+                    prefs[key] = array.mapNotNull { it.primitiveOrNull()?.takeIf { p -> p.isString }?.content }.toSet()
+                    applied++
+                }
+            }
+        }
+        return applied
     }
 
     val settings: Flow<AppSettings> = store.data

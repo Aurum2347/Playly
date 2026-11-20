@@ -3,6 +3,14 @@ package com.playly.player.ui.screens.settings
 import android.content.ActivityNotFoundException
 import android.content.Intent
 import android.text.format.DateUtils
+import android.text.format.Formatter
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
+import androidx.lifecycle.compose.LifecycleResumeEffect
+import com.playly.player.data.artwork.CoverCache
+import com.playly.player.ui.rememberCreateDocument
+import com.playly.player.ui.rememberOpenDocument
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
@@ -45,6 +53,12 @@ import com.playly.player.ui.rememberFolderPicker
 import kotlinx.coroutines.launch
 
 private const val SOURCE_URL = "https://github.com/Aurum2347/Playly"
+private const val BACKUP_MIME = "application/json"
+private val BACKUP_OPEN_MIMES = arrayOf("application/json", "text/plain", "application/octet-stream")
+
+/** "playly-backup-2026-11-19.json" */
+private fun backupFileName(): String =
+    "playly-backup-" + SimpleDateFormat("yyyy-MM-dd", Locale.ROOT).format(Date()) + ".json"
 
 /** Only settings that actually work today; each later stage adds its own section. */
 @Composable
@@ -60,6 +74,17 @@ fun SettingsScreen(onBack: () -> Unit, viewModel: SettingsViewModel = viewModel(
     var pendingRemovalId by rememberSaveable { mutableStateOf<Long?>(null) }
     var equalizerOpen by rememberSaveable { mutableStateOf(false) }
     var confirmForget by rememberSaveable { mutableStateOf(false) }
+    var confirmClearCovers by rememberSaveable { mutableStateOf(false) }
+    var confirmRestore by rememberSaveable { mutableStateOf<String?>(null) }
+    val busy by viewModel.busy.collectAsStateWithLifecycle()
+    val coverCacheBytes by viewModel.coverCacheBytes.collectAsStateWithLifecycle()
+    LifecycleResumeEffect(Unit) {
+        viewModel.refreshCoverCache()
+        onPauseOrDispose { }
+    }
+    val createBackup = rememberCreateDocument(BACKUP_MIME, viewModel::exportBackup)
+    // Some file managers label .json as text or binary: accept those, the content is checked.
+    val openBackup = rememberOpenDocument(BACKUP_OPEN_MIMES) { confirmRestore = it.toString() }
 
     Column(Modifier.fillMaxSize()) {
         PlaylyTopBar(title = stringResource(R.string.settings_title), onBack = onBack)
@@ -260,6 +285,45 @@ fun SettingsScreen(onBack: () -> Unit, viewModel: SettingsViewModel = viewModel(
                 }
             }
 
+            item(key = "data-header") { SectionHeader(stringResource(R.string.settings_section_data)) }
+            item(key = "data") {
+                SettingsGroup {
+                    SettingsRow(
+                        title = stringResource(R.string.settings_backup_title),
+                        subtitle = stringResource(if (busy) R.string.settings_backup_busy else R.string.settings_backup_subtitle),
+                        icon = R.drawable.ic_save,
+                        onClick = if (busy) null else { { createBackup(backupFileName()) } },
+                    )
+                    RowDivider()
+                    SettingsRow(
+                        title = stringResource(R.string.settings_restore_title),
+                        subtitle = stringResource(R.string.settings_restore_subtitle),
+                        icon = R.drawable.ic_restore,
+                        onClick = if (busy) null else openBackup,
+                    )
+                    RowDivider()
+                    SettingsRow(
+                        title = stringResource(R.string.settings_cover_cache_title),
+                        subtitle = coverCacheBytes?.let {
+                            stringResource(
+                                R.string.settings_cover_cache_value,
+                                Formatter.formatShortFileSize(context, it),
+                                Formatter.formatShortFileSize(context, CoverCache.MAX_BYTES),
+                            )
+                        } ?: stringResource(R.string.state_loading_short),
+                        icon = R.drawable.ic_image,
+                        trailing = {
+                            PlaylyButton(
+                                text = stringResource(R.string.action_clear),
+                                onClick = { confirmClearCovers = true },
+                                style = PlaylyButtonStyle.Text,
+                                enabled = (coverCacheBytes ?: 0) > 0,
+                            )
+                        },
+                    )
+                }
+            }
+
             item(key = "about-header") { SectionHeader(stringResource(R.string.settings_section_about)) }
             item(key = "about") {
                 SettingsGroup {
@@ -305,6 +369,30 @@ fun SettingsScreen(onBack: () -> Unit, viewModel: SettingsViewModel = viewModel(
         }
 
         val pending = current?.sources?.firstOrNull { it.source.id == pendingRemovalId }?.source
+        if (confirmClearCovers) {
+            ConfirmDialog(
+                title = stringResource(R.string.dialog_clear_covers_title),
+                message = stringResource(R.string.dialog_clear_covers_message),
+                confirmLabel = stringResource(R.string.action_clear),
+                onConfirm = {
+                    confirmClearCovers = false
+                    viewModel.clearCoverCache()
+                },
+                onDismiss = { confirmClearCovers = false },
+            )
+        }
+        confirmRestore?.let { uri ->
+            ConfirmDialog(
+                title = stringResource(R.string.dialog_restore_title),
+                message = stringResource(R.string.dialog_restore_message),
+                confirmLabel = stringResource(R.string.action_restore),
+                onConfirm = {
+                    confirmRestore = null
+                    viewModel.restoreBackup(uri.toUri())
+                },
+                onDismiss = { confirmRestore = null },
+            )
+        }
         if (confirmForget && current != null) {
             ConfirmDialog(
                 title = stringResource(R.string.dialog_forget_unavailable_title),

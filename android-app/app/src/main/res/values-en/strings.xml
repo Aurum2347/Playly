@@ -487,4 +487,42 @@
     <string name="settings_queue_end_title">When the queue ends</string>
     <string name="settings_queue_end_stop">Stop on the last track</string>
     <string name="settings_queue_end_rewind">Go back to the start of the queue</string>
+
+    <!-- Stage 9.2: data and storage -->
+    <string name="settings_section_data">Data and storage</string>
+    <string name="settings_backup_title">Save a backup</string>
+    <string name="settings_backup_subtitle">Playlists, favorites and settings in one file. Music is not included</string>
+    <string name="settings_backup_busy">Please wait, working on a backup…</string>
+    <string name="settings_restore_title">Restore from a backup</string>
+    <string name="settings_restore_subtitle">Adds playlists and favorites, brings settings back. Deletes nothing</string>
+    <string name="settings_cover_cache_title">Cover cache</string>
+    <string name="settings_cover_cache_value">%1$s of %2$s</string>
+    <string name="state_loading_short">Counting…</string>
+    <string name="dialog_clear_covers_title">Clear the cover cache?</string>
+    <string name="dialog_clear_covers_message">Only resized copies of covers are removed. Music and the covers inside files stay; lists load them again as you scroll.</string>
+    <string name="message_cover_cache_cleared">Cover cache cleared</string>
+    <string name="dialog_restore_title">Restore from a backup?</string>
+    <string name="dialog_restore_message">Playlists from the backup are added (ones with the same name get their missing tracks), favorites are added to, settings are replaced by the saved ones. Tracks are found in the current library by path and tags.</string>
+    <string name="action_restore">Restore</string>
+    <plurals name="message_backup_saved">
+        <item quantity="one">Backup saved: %d playlist, favorites and settings</item>
+        <item quantity="other">Backup saved: %d playlists, favorites and settings</item>
+    </plurals>
+    <string name="message_backup_failed">Couldn’t save the backup. Try another folder</string>
+    <string name="message_restore_not_backup">This is not a Playly backup (or it is from a newer version of Playly)</string>
+    <string name="message_restore_failed">Couldn’t read the backup file</string>
+    <string name="message_restore_done">Restored. New playlists: %1$d, completed: %2$d · tracks found: %3$d, not found: %4$d · added to favorites: %5$d</string>
+    <string name="playlist_menu_export">Save as M3U</string>
+    <string name="action_import_playlist">Import M3U playlist</string>
+    <plurals name="playlist_message_exported">
+        <item quantity="one">%1$d track saved from “%2$s”</item>
+        <item quantity="other">%1$d tracks saved from “%2$s”</item>
+    </plurals>
+    <string name="playlist_message_export_failed">Couldn’t save the playlist</string>
+    <plurals name="playlist_message_imported">
+        <item quantity="one">Playlist “%2$s”: %1$d track</item>
+        <item quantity="other">Playlist “%2$s”: %1$d tracks</item>
+    </plurals>
+    <string name="playlist_message_imported_partly">Playlist “%1$s”: found: %2$d, not in the library: %3$d</string>
+    <string name="playlist_message_import_failed">Couldn’t read the playlist file</string>
 </resources>

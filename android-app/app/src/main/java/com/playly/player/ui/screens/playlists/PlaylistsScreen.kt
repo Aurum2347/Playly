@@ -12,6 +12,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
@@ -32,6 +33,8 @@ import com.playly.player.designsystem.components.PlaylyTopBar
 import com.playly.player.designsystem.components.StateAction
 import com.playly.player.ui.actions.PlaylistDialog
 import com.playly.player.ui.player.LocalPlayerLauncher
+import com.playly.player.ui.rememberCreateDocument
+import com.playly.player.ui.rememberOpenDocument
 import com.playly.player.ui.tracksSummaryLabel
 
 /**
@@ -52,11 +55,22 @@ fun PlaylistsScreen(
     var editing by rememberSaveable { mutableStateOf<Long?>(null) }
     var deleting by rememberSaveable { mutableStateOf<Long?>(null) }
     val menuLabel = stringResource(R.string.playlist_menu)
+    // Stage 9.2: which playlist the "save as" is for; survives the trip to the picker.
+    var exporting by rememberSaveable { mutableStateOf<Long?>(null) }
+    val latestCards by rememberUpdatedState((state as? PlaylistsUiState.Ready)?.playlists.orEmpty())
+    val exportTo = rememberCreateDocument(PlaylistCommands.M3U_MIME) { uri ->
+        latestCards.firstOrNull { it.id == exporting }?.let { viewModel.commands.export(it.id, it.name, uri) }
+        exporting = null
+    }
+    val importFrom = rememberOpenDocument(PlaylistCommands.M3U_OPEN_MIMES) { uri ->
+        viewModel.commands.import(uri, onImported = onOpenPlaylist)
+    }
 
     Column(Modifier.fillMaxSize()) {
         PlaylyTopBar(
             title = stringResource(R.string.nav_playlists),
             actions = {
+                PlaylyIconButton(R.drawable.ic_file_download, stringResource(R.string.action_import_playlist), importFrom)
                 PlaylyIconButton(R.drawable.ic_add, stringResource(R.string.action_create_playlist), { creating = true })
             },
         )
@@ -114,6 +128,10 @@ fun PlaylistsScreen(
                 onAddToQueue = { viewModel.commands.addToQueue(card.id) },
                 onEdit = { editing = card.id },
                 onDelete = { deleting = card.id },
+                onExport = {
+                    exporting = card.id
+                    exportTo(PlaylistCommands.exportFileName(card.name))
+                },
             ),
             onDismiss = { menuFor = null },
         )

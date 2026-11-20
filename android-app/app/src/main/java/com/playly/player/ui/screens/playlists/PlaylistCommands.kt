@@ -2,6 +2,7 @@ package com.playly.player.ui.screens.playlists
 
 import android.net.Uri
 import com.playly.player.R
+import com.playly.player.data.backup.BackupRepository
 import com.playly.player.data.playlists.PlaylistRepository
 import com.playly.player.playback.PlaybackController
 import com.playly.player.playback.PlaybackSource
@@ -18,6 +19,7 @@ import kotlin.random.Random
 class PlaylistCommands(
     private val playlists: PlaylistRepository,
     private val playback: PlaybackController,
+    private val backup: BackupRepository,
     private val scope: CoroutineScope,
     private val send: suspend (UiMessage) -> Unit,
 ) {
@@ -83,7 +85,53 @@ class PlaylistCommands(
         }
     }
 
+    /** Stage 9.2: writes the playlist to [uri] (picked in "save as") as M3U8. */
+    fun export(id: Long, name: String, uri: Uri) {
+        scope.launch {
+            val count = backup.exportPlaylist(id, name, uri)
+            send(
+                if (count == null) {
+                    UiMessage(R.string.playlist_message_export_failed)
+                } else {
+                    UiMessage(R.plurals.playlist_message_exported, listOf(count, name), quantity = count)
+                },
+            )
+        }
+    }
+
+    /** Stage 9.2: a new playlist from an M3U / M3U8 file, then [onImported] opens it. */
+    fun import(uri: Uri, onImported: (Long) -> Unit = {}) {
+        scope.launch {
+            val result = backup.importPlaylist(uri)
+            if (result == null) {
+                send(UiMessage(R.string.playlist_message_import_failed))
+                return@launch
+            }
+            send(
+                if (result.missing == 0) {
+                    UiMessage(R.plurals.playlist_message_imported, listOf(result.found, result.name), quantity = result.found)
+                } else {
+                    UiMessage(R.string.playlist_message_imported_partly, listOf(result.name, result.found, result.missing))
+                },
+            )
+            onImported(result.playlistId)
+        }
+    }
+
     companion object {
         fun source(name: String) = PlaybackSource(PlaybackSource.Kind.Playlist, name)
+
+        /** "Rock.m3u8"; characters that file systems refuse become "_". */
+        fun exportFileName(name: String): String =
+            name.map { if (it in FORBIDDEN || it.isISOControl()) '_' else it }.joinToString("").trim().ifEmpty { "playlist" } + ".m3u8"
+
+        private const val FORBIDDEN = "\\/:*?\"<>|"
+        const val M3U_MIME = "audio/x-mpegurl"
+
+        /** File managers give .m3u / .m3u8 many types; the content is what counts. */
+        val M3U_OPEN_MIMES = arrayOf(
+            "audio/x-mpegurl", "audio/mpegurl", "application/vnd.apple.mpegurl", "application/x-mpegurl",
+            "text/plain", "application/octet-stream",
+        )
     }
 }

@@ -9,6 +9,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
@@ -20,6 +21,7 @@ import com.playly.player.designsystem.components.LoadingState
 import com.playly.player.designsystem.components.PlaylyIconButton
 import com.playly.player.designsystem.components.PlaylyTopBar
 import com.playly.player.ui.UiMessage
+import com.playly.player.ui.rememberCreateDocument
 import com.playly.player.ui.actions.LocalTrackActions
 import com.playly.player.ui.player.LocalPlayerLauncher
 
@@ -62,6 +64,8 @@ fun PlaylistScreen(
     }
 
     val page = (state as? PlaylistPageState.Ready)?.page
+    val latestName by rememberUpdatedState(page?.card?.name.orEmpty())
+    val exportTo = rememberCreateDocument(PlaylistCommands.M3U_MIME) { uri -> viewModel.commands.export(id, latestName, uri) }
     Column(Modifier.fillMaxSize()) {
         PlaylyTopBar(
             title = page?.card?.name.orEmpty(),
@@ -89,6 +93,7 @@ fun PlaylistScreen(
                 onDelete = { deleting = true },
                 onPickCover = pickCover,
                 onResetCover = { viewModel.commands.setCover(id, null) },
+                onExport = { exportTo(PlaylistCommands.exportFileName(card.name)) },
             ),
             onDismiss = { menuOpen = false },
         )

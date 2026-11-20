@@ -541,4 +541,48 @@
     <string name="settings_queue_end_title">Когда очередь закончилась</string>
     <string name="settings_queue_end_stop">Остановиться на последнем треке</string>
     <string name="settings_queue_end_rewind">Вернуться к началу очереди</string>
+
+    <!-- Stage 9.2: data and storage -->
+    <string name="settings_section_data">Данные и память</string>
+    <string name="settings_backup_title">Сохранить резервную копию</string>
+    <string name="settings_backup_subtitle">Плейлисты, избранное и настройки в один файл. Музыка в него не входит</string>
+    <string name="settings_backup_busy">Подождите, идёт работа с копией…</string>
+    <string name="settings_restore_title">Восстановить из копии</string>
+    <string name="settings_restore_subtitle">Добавит плейлисты и избранное, вернёт настройки. Ничего не удаляет</string>
+    <string name="settings_cover_cache_title">Кэш обложек</string>
+    <string name="settings_cover_cache_value">%1$s из %2$s</string>
+    <string name="state_loading_short">Считаем…</string>
+    <string name="dialog_clear_covers_title">Очистить кэш обложек?</string>
+    <string name="dialog_clear_covers_message">Удалятся только уменьшенные копии обложек. Музыка и обложки внутри файлов останутся, списки снова загрузят их при прокрутке.</string>
+    <string name="message_cover_cache_cleared">Кэш обложек очищен</string>
+    <string name="dialog_restore_title">Восстановить из копии?</string>
+    <string name="dialog_restore_message">Плейлисты из копии добавятся (одноимённые дополнятся недостающими треками), избранное пополнится, настройки заменятся сохранёнными. Треки ищутся в текущей медиатеке по пути и тегам.</string>
+    <string name="action_restore">Восстановить</string>
+    <plurals name="message_backup_saved">
+        <item quantity="one">Копия сохранена: %d плейлист, избранное и настройки</item>
+        <item quantity="few">Копия сохранена: %d плейлиста, избранное и настройки</item>
+        <item quantity="many">Копия сохранена: %d плейлистов, избранное и настройки</item>
+        <item quantity="other">Копия сохранена: %d плейлиста, избранное и настройки</item>
+    </plurals>
+    <string name="message_backup_failed">Не удалось сохранить копию. Попробуйте другую папку</string>
+    <string name="message_restore_not_backup">Это не резервная копия Playly (или она из более новой версии)</string>
+    <string name="message_restore_failed">Не удалось прочитать файл копии</string>
+    <string name="message_restore_done">Восстановлено. Плейлисты: новых %1$d, дополнено %2$d · треков найдено %3$d, не найдено %4$d · в избранное добавлено %5$d</string>
+    <string name="playlist_menu_export">Сохранить как M3U</string>
+    <string name="action_import_playlist">Импорт плейлиста M3U</string>
+    <plurals name="playlist_message_exported">
+        <item quantity="one">Из «%2$s» сохранён %1$d трек</item>
+        <item quantity="few">Из «%2$s» сохранено %1$d трека</item>
+        <item quantity="many">Из «%2$s» сохранено %1$d треков</item>
+        <item quantity="other">Из «%2$s» сохранено %1$d трека</item>
+    </plurals>
+    <string name="playlist_message_export_failed">Не удалось сохранить плейлист</string>
+    <plurals name="playlist_message_imported">
+        <item quantity="one">Плейлист «%2$s»: %1$d трек</item>
+        <item quantity="few">Плейлист «%2$s»: %1$d трека</item>
+        <item quantity="many">Плейлист «%2$s»: %1$d треков</item>
+        <item quantity="other">Плейлист «%2$s»: %1$d трека</item>
+    </plurals>
+    <string name="playlist_message_imported_partly">Плейлист «%1$s»: найдено %2$d, нет в медиатеке %3$d</string>
+    <string name="playlist_message_import_failed">Не удалось прочитать файл плейлиста</string>
 </resources>

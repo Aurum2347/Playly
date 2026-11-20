@@ -36,6 +36,8 @@ class PlaylistMenuActions(
     val onDelete: () -> Unit,
     val onPickCover: (() -> Unit)? = null,
     val onResetCover: (() -> Unit)? = null,
+    /** Stage 9.2: save the playlist as an M3U8 file. */
+    val onExport: (() -> Unit)? = null,
 )
 
 /** "⋮" of a playlist (spec §12): the same actions on the Playlists tab and on its page. */
@@ -74,6 +76,11 @@ internal fun PlaylistMenuSheet(card: PlaylistCard, actions: PlaylistMenuActions,
             if (card.coverUri != null) {
                 actions.onResetCover?.let { reset ->
                     SheetAction(R.drawable.ic_refresh, stringResource(R.string.playlist_menu_cover_reset), onClick = { close(reset) })
+                }
+            }
+            if (card.summary.trackCount > 0) {
+                actions.onExport?.let { export ->
+                    SheetAction(R.drawable.ic_file_upload, stringResource(R.string.playlist_menu_export), onClick = { close(export) })
                 }
             }
             SheetAction(R.drawable.ic_delete, stringResource(R.string.playlist_menu_delete), onClick = { close(actions.onDelete) })

@@ -6,6 +6,10 @@ import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.playly.player.R
+import com.playly.player.data.artwork.CoverCache
+import com.playly.player.data.backup.BackupRepository
+import com.playly.player.data.backup.RestoreReport
+import com.playly.player.data.backup.RestoreResult
 import com.playly.player.data.db.LibrarySourceEntity
 import com.playly.player.data.db.SourceSummary
 import com.playly.player.data.library.scan.ScanProgress
@@ -21,8 +25,10 @@ import com.playly.player.ui.container
 import com.playly.player.ui.toMessages
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
@@ -70,6 +76,8 @@ class SettingsViewModel(
     private val settings: SettingsRepository,
     private val library: LibraryRepository,
     private val playback: PlaybackController,
+    private val backup: BackupRepository,
+    private val covers: CoverCache,
 ) : ViewModel() {
     private val _messages = Channel<UiMessage>(Channel.BUFFERED)
     val messages: Flow<UiMessage> = _messages.receiveAsFlow()
@@ -156,6 +164,53 @@ class SettingsViewModel(
         _messages.send(UiMessage(R.plurals.message_forgot_unavailable, listOf(ids.size), quantity = ids.size))
     }
 
+    // --- Stage 9.2: data and storage ------------------------------------------------------
+
+    private val _busy = MutableStateFlow(false)
+    /** True while a backup is written or read: the rows wait instead of starting a second one. */
+    val busy: StateFlow<Boolean> = _busy.asStateFlow()
+
+    private val _coverCacheBytes = MutableStateFlow<Long?>(null)
+    val coverCacheBytes: StateFlow<Long?> = _coverCacheBytes.asStateFlow()
+
+    fun refreshCoverCache() = update { _coverCacheBytes.value = covers.sizeBytes() }
+
+    /** Only resized copies of covers go; music files and the covers inside them stay. */
+    fun clearCoverCache() = update {
+        covers.clear()
+        _coverCacheBytes.value = covers.sizeBytes()
+        _messages.send(UiMessage(R.string.message_cover_cache_cleared))
+    }
+
+    fun exportBackup(uri: Uri) = busyWork {
+        val playlists = backup.exportBackup(uri)
+        _messages.send(
+            if (playlists == null) UiMessage(R.string.message_backup_failed)
+            else UiMessage(R.plurals.message_backup_saved, listOf(playlists), quantity = playlists),
+        )
+    }
+
+    fun restoreBackup(uri: Uri) = busyWork {
+        _messages.send(
+            when (val result = backup.restoreBackup(uri)) {
+                RestoreResult.NotABackup -> UiMessage(R.string.message_restore_not_backup)
+                RestoreResult.Failed -> UiMessage(R.string.message_restore_failed)
+                is RestoreResult.Restored -> restoredMessage(result.report)
+            },
+        )
+    }
+
+    private fun busyWork(block: suspend () -> Unit) {
+        if (!_busy.compareAndSet(expect = false, update = true)) return
+        viewModelScope.launch {
+            try {
+                block()
+            } finally {
+                _busy.value = false
+            }
+        }
+    }
+
     private fun update(block: suspend () -> Unit) {
         viewModelScope.launch { block() }
     }
@@ -180,6 +235,16 @@ class SettingsViewModel(
     }
 
     companion object {
-        val Factory = viewModelFactory { initializer { SettingsViewModel(container.settings, container.library, container.playback) } }
+        /** "Playlists: 2 new, 1 merged · tracks found: 40, not found: 3 · favourites: 12". */
+        fun restoredMessage(report: RestoreReport): UiMessage = UiMessage(
+            R.string.message_restore_done,
+            listOf(report.playlistsCreated, report.playlistsMerged, report.tracksFound, report.tracksMissing, report.favoritesAdded),
+        )
+
+        val Factory = viewModelFactory {
+            initializer {
+                SettingsViewModel(container.settings, container.library, container.playback, container.backup, container.coverCache)
+            }
+        }
     }
 }

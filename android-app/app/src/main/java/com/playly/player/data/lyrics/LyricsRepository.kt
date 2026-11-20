@@ -6,6 +6,7 @@ import android.provider.DocumentsContract
 import android.util.Log
 import android.util.LruCache
 import androidx.core.net.toUri
+import com.playly.player.core.readNBytesCompat
 import com.playly.player.data.library.LibraryRepository
 import java.io.FileInputStream
 import java.io.FileNotFoundException
@@ -76,18 +77,4 @@ class LyricsRepository(context: Context, private val library: LibraryRepository)
         const val EXTERNAL_STORAGE = "com.android.externalstorage.documents"
         const val CACHE_SIZE = 16
     }
-}
-
-/** InputStream.readNBytes needs API 33; this reads at most [limit] bytes on any version. */
-private fun java.io.InputStream.readNBytesCompat(limit: Int): ByteArray {
-    val out = java.io.ByteArrayOutputStream()
-    val buffer = ByteArray(8 * 1024)
-    var total = 0
-    while (total < limit) {
-        val n = read(buffer, 0, minOf(buffer.size, limit - total))
-        if (n < 0) break
-        out.write(buffer, 0, n)
-        total += n
-    }
-    return out.toByteArray()
 }

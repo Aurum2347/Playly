@@ -13,6 +13,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
+import kotlinx.serialization.json.JsonPrimitive
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -99,6 +100,25 @@ class SettingsStageTest {
         repo.setMinTrackSeconds(17)
         assertEquals(0, repo.settings.first().minTrackSeconds)
         assertEquals(QueueEndAction.Stop, QueueEndAction.fromName("Shuffle"))
+    }
+
+    @Test
+    fun settingsBackupRoundTripSkipsWrongTypes() = withRepo { repo ->
+        repo.setMinTrackSeconds(30)
+        repo.setQueueEnd(QueueEndAction.Rewind)
+        repo.excludeFolder("Music/Voice")
+        repo.setLastScanAt(42)
+        val saved = repo.exportBackup()
+        assertFalse("last_scan_at" in saved)
+        withRepo { other ->
+            val values = saved + ("pause_on_noisy" to JsonPrimitive("yes")) + ("unknown_key" to JsonPrimitive(1))
+            assertEquals(3, other.importBackup(values))
+            val s = other.settings.first()
+            assertEquals(30, s.minTrackSeconds)
+            assertEquals(QueueEndAction.Rewind, s.queueEnd)
+            assertEquals(setOf("Music/Voice"), s.excludedFolders)
+            assertTrue(s.pauseOnNoisy)
+        }
     }
 
     @Test

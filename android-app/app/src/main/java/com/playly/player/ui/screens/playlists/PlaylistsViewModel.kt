@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.playly.player.data.artwork.Artwork
+import com.playly.player.data.backup.BackupRepository
 import com.playly.player.data.artwork.artwork
 import com.playly.player.data.favorites.FavoritesRepository
 import com.playly.player.data.playlists.PlaylistCard
@@ -37,6 +38,7 @@ class PlaylistsViewModel(
     favorites: FavoritesRepository,
     playback: PlaybackController,
     bus: UiMessageBus,
+    backup: BackupRepository,
 ) : ViewModel() {
     /** The "Favourites" row above the playlists: count, length and the newest favourite's cover. */
     val favoritesCard: StateFlow<FavoritesCard> = favorites.tracks
@@ -63,13 +65,13 @@ class PlaylistsViewModel(
         }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), PlaylistsUiState.Loading)
 
-    val commands = PlaylistCommands(playlists, playback, viewModelScope, bus::send)
+    val commands = PlaylistCommands(playlists, playback, backup, viewModelScope, bus::send)
 
     fun retry() = retryTick.update { it + 1 }
 
     companion object {
         val Factory = viewModelFactory {
-            initializer { PlaylistsViewModel(container.playlists, container.favorites, container.playback, container.messages) }
+            initializer { PlaylistsViewModel(container.playlists, container.favorites, container.playback, container.messages, container.backup) }
         }
     }
 }

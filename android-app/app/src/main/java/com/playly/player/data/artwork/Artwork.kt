@@ -10,6 +10,7 @@ import android.util.Size
 import androidx.core.graphics.scale
 import androidx.core.net.toUri
 import coil3.ImageLoader
+import coil3.SingletonImageLoader
 import coil3.asImage
 import coil3.decode.DataSource
 import coil3.decode.ImageSource
@@ -23,8 +24,10 @@ import coil3.memory.MemoryCache
 import coil3.request.Options
 import coil3.size.pxOrElse
 import com.playly.player.data.db.TrackListItem
+import java.io.File
 import java.io.IOException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import okio.Path.Companion.toOkioPath
 import okio.buffer
 
@@ -165,10 +168,13 @@ private class ArtworkFetcher(
 }
 
 object ArtworkImageLoader {
-    private const val DISK_CACHE_BYTES = 96L * 1024 * 1024
+    /** Decimal, as Android shows sizes: Settings reads "of 100 MB". */
+    const val DISK_CACHE_BYTES = 100L * 1000 * 1000
     private const val MEMORY_CACHE_FRACTION = 0.15
     /** Cover extraction opens files; a few at a time keeps scrolling smooth without thrashing I/O. */
     private const val PARALLEL_EXTRACTIONS = 4
+
+    fun directory(context: Context): File = context.cacheDir.resolve("artwork")
 
     fun create(context: Context): ImageLoader = ImageLoader.Builder(context)
         .components {
@@ -178,10 +184,38 @@ object ArtworkImageLoader {
         .memoryCache { MemoryCache.Builder().maxSizePercent(context, MEMORY_CACHE_FRACTION).build() }
         .diskCache {
             DiskCache.Builder()
-                .directory(context.cacheDir.resolve("artwork").toOkioPath())
+                .directory(directory(context).toOkioPath())
                 .maxSizeBytes(DISK_CACHE_BYTES)
                 .build()
         }
         .fetcherCoroutineContext(Dispatchers.IO.limitedParallelism(PARALLEL_EXTRACTIONS))
         .build()
+}
+
+/**
+ * Stage 9.2: "Cover cache" in Settings. Holds only resized copies of covers (the folder Coil
+ * writes to); clearing it never touches music files, they are read again when needed.
+ */
+class CoverCache(private val context: Context) {
+    private val loader get() = SingletonImageLoader.get(context)
+
+    /**
+     * Counted from the files, as the system storage screen does, without Coil's small journal
+     * (an emptied cache reads 0).
+     */
+    suspend fun sizeBytes(): Long = withContext(Dispatchers.IO) {
+        ArtworkImageLoader.directory(context).walkBottomUp().filter { it.isFile && !it.name.startsWith(JOURNAL) }.sumOf { it.length() }
+    }
+
+    suspend fun clear() = withContext(Dispatchers.IO) {
+        loader.memoryCache?.clear()
+        loader.diskCache?.clear()
+        // Leftovers Coil does not track (an interrupted write, an older cache version) go too.
+        ArtworkImageLoader.directory(context).listFiles()?.filter { it.isFile && !it.name.startsWith(JOURNAL) }?.forEach { it.delete() }
+    }
+
+    companion object {
+        const val MAX_BYTES = ArtworkImageLoader.DISK_CACHE_BYTES
+        private const val JOURNAL = "journal"
+    }
 }

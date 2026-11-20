@@ -100,6 +100,16 @@ class FavoritesRepository(private val database: PlaylyDatabase) {
         }
     }
 
+    /** Stage 9.2: favourites from a backup, with their own dates; ones already there keep theirs. */
+    suspend fun restore(entries: List<FavoriteEntity>): Int {
+        if (entries.isEmpty()) return 0
+        return database.withTransaction {
+            val alive = existing(entries.map { it.trackId }).toHashSet()
+            entries.filter { it.trackId in alive }.distinctBy { it.trackId }.chunked(SQLITE_MAX_ARGS)
+                .sumOf { chunk -> dao.insertAll(chunk).count { it != -1L } }
+        }
+    }
+
     /** Ids still in the library, in the given order; a track deleted meanwhile is dropped. */
     private suspend fun existing(ids: List<Long>): List<Long> {
         val alive = ids.chunked(SQLITE_MAX_ARGS).flatMap { dao.existingTrackIds(it) }.toHashSet()

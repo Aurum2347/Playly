@@ -67,6 +67,10 @@ interface TrackDao {
     @Query("SELECT * FROM tracks WHERE is_available = 1 AND source_id IS NOT NULL")
     suspend fun availableFolderTracks(): List<TrackEntity>
 
+    /** Stage 9.2: every playable track, for matching backups and playlist files. */
+    @Query("SELECT * FROM tracks WHERE is_available = 1")
+    suspend fun availableTracks(): List<TrackEntity>
+
     /** Returns -1 for rows skipped because their URI is already indexed. */
     @Insert(onConflict = OnConflictStrategy.IGNORE)
     suspend fun insertAll(tracks: List<TrackEntity>): List<Long>
@@ -316,4 +320,8 @@ interface FavoriteDao {
 
     @Query("SELECT COUNT(*) FROM favorites")
     suspend fun count(): Int
+
+    /** Stage 9.2: every favourite, available or not (backups). */
+    @Query("SELECT * FROM favorites ORDER BY added_at, track_id")
+    suspend fun all(): List<FavoriteEntity>
 }

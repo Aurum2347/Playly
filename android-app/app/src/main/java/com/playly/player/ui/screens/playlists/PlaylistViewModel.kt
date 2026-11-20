@@ -7,6 +7,7 @@ import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import androidx.navigation.toRoute
 import com.playly.player.R
+import com.playly.player.data.backup.BackupRepository
 import com.playly.player.data.db.PLAYLIST_COVER_CANDIDATES
 import com.playly.player.data.db.PlaylistSummary
 import com.playly.player.data.db.PlaylistTrackRow
@@ -48,6 +49,7 @@ class PlaylistViewModel(
     private val playlists: PlaylistRepository,
     private val playback: PlaybackController,
     private val bus: UiMessageBus,
+    backup: BackupRepository,
 ) : ViewModel() {
     val state: StateFlow<PlaylistPageState> = combine(playlists.playlist(playlistId), playlists.tracks(playlistId)) { playlist, rows ->
         if (playlist == null) return@combine PlaylistPageState.Missing
@@ -60,7 +62,7 @@ class PlaylistViewModel(
         .flowOn(Dispatchers.Default)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), PlaylistPageState.Loading)
 
-    val commands = PlaylistCommands(playlists, playback, viewModelScope, bus::send)
+    val commands = PlaylistCommands(playlists, playback, backup, viewModelScope, bus::send)
 
     val nowPlayingId: StateFlow<Long?> = playback.state
         .map { it.nowPlaying?.trackId }
@@ -104,7 +106,7 @@ class PlaylistViewModel(
         val Factory = viewModelFactory {
             initializer {
                 val route = createSavedStateHandle().toRoute<PlaylistRoute>()
-                PlaylistViewModel(route.id, container.playlists, container.playback, container.messages)
+                PlaylistViewModel(route.id, container.playlists, container.playback, container.messages, container.backup)
             }
         }
     }
