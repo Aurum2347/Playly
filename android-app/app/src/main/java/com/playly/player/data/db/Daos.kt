@@ -98,6 +98,15 @@ interface TrackDao {
     @Query("DELETE FROM tracks WHERE id IN (:ids)")
     suspend fun deleteAll(ids: List<Long>)
 
+    /** Stage 9.1: of [ids], forgets those no playlist or favourite needs. At most [SQLITE_MAX_ARGS] ids. */
+    @Query("DELETE FROM tracks WHERE id IN (:ids) AND id NOT IN (SELECT track_id FROM playlist_entries) " +
+            "AND id NOT IN (SELECT track_id FROM favorites)")
+    suspend fun deleteUnreferenced(ids: List<Long>): Int
+
+    /** Stage 9.1: "Forget unavailable files". */
+    @Query("SELECT id FROM tracks WHERE is_available = 0")
+    suspend fun unavailableIds(): List<Long>
+
     @Query("DELETE FROM tracks WHERE id = :id")
     suspend fun delete(id: Long)
 }

@@ -30,6 +30,7 @@ import com.playly.player.R
 import com.playly.player.data.db.PlayHistoryDao
 import com.playly.player.data.library.scan.ScanPlan
 import com.playly.player.data.settings.AppSettings
+import com.playly.player.data.settings.QueueEndAction
 import com.playly.player.data.settings.SettingsRepository
 import com.playly.player.playback.audio.PlaylyAudioProcessor
 import com.playly.player.playback.audio.SoundParams
@@ -78,6 +79,8 @@ class PlaybackService : MediaSessionService() {
     private var sleepJob: Job? = null
     /** Stage 8.3: equaliser, mono and normalisation inside the audio sink. */
     private val soundProcessor = PlaylyAudioProcessor()
+    /** Stage 9.1: read on the main thread (the scope is Main), so a plain field is enough. */
+    private var playbackPrefs = PlaybackPrefs()
 
     override fun onCreate() {
         super.onCreate()
@@ -137,6 +140,16 @@ class PlaybackService : MediaSessionService() {
                 .collect { (params, skipSilence) ->
                     soundProcessor.params = params
                     player.skipSilenceEnabled = skipSilence
+                }
+        }
+        // Stage 9.1: playback behaviour from the "Playback" settings.
+        scope.launch {
+            settings.settings
+                .map { PlaybackPrefs(it.pauseOnNoisy, it.resumePosition, it.queueEnd) }
+                .distinctUntilChanged()
+                .collect { prefs ->
+                    playbackPrefs = prefs
+                    player.setHandleAudioBecomingNoisy(prefs.pauseOnNoisy)
                 }
         }
     }
@@ -287,6 +300,17 @@ class PlaybackService : MediaSessionService() {
     }
 
     /**
+     * Stage 9.1 "When the queue ends: back to the start": the first track in play order (the
+     * shuffled one with shuffle on), paused at 0, so play runs the whole queue again.
+     */
+    private fun rewindFinishedQueue() {
+        val timeline = player.currentTimeline
+        if (timeline.isEmpty) return
+        player.pause()
+        player.seekTo(timeline.getFirstWindowIndex(player.shuffleModeEnabled), 0)
+    }
+
+    /**
      * "Play next" / "Add to queue". With nothing queued, [items] become the queue and start;
      * after a finished queue, playback continues with them. True when playback started.
      */
@@ -416,8 +440,9 @@ class PlaybackService : MediaSessionService() {
         return SavedPlayback(
             trackIds = ids,
             index = index.coerceIn(0, ids.lastIndex),
-            // A finished queue resumes from the start of its last track, not its very end.
-            positionMs = if (ended) 0 else player.currentPosition.coerceAtLeast(0),
+            // A finished queue resumes from the start of its last track, not its very end;
+            // with "Continue where I stopped" off (stage 9.1) every track starts from 0.
+            positionMs = if (ended || !playbackPrefs.resumePosition) 0 else player.currentPosition.coerceAtLeast(0),
             shuffle = player.shuffleModeEnabled,
             repeatMode = player.repeatMode,
             sourceKind = source?.kind?.name,
@@ -508,6 +533,7 @@ class PlaybackService : MediaSessionService() {
             if (playbackState == Player.STATE_READY) consecutiveErrors = 0
             // The queue ran out before the track-end timer fired: nothing left to wait for.
             if (playbackState == Player.STATE_ENDED && sleepTimer == SleepTimer.EndOfTrack) applySleepTimer(null)
+            if (playbackState == Player.STATE_ENDED && playbackPrefs.queueEnd == QueueEndAction.Rewind) rewindFinishedQueue()
         }
 
         override fun onPlayWhenReadyChanged(playWhenReady: Boolean, reason: Int) {
@@ -554,4 +580,11 @@ internal fun soundParamsOf(settings: AppSettings) = SoundParams(
     eqGains = if (settings.eqEnabled) settings.eqGains else null,
     mono = settings.monoAudio,
     normalize = settings.normalizeVolume,
+)
+
+/** Stage 9.1: the "Playback" settings the service acts on. */
+internal data class PlaybackPrefs(
+    val pauseOnNoisy: Boolean = true,
+    val resumePosition: Boolean = true,
+    val queueEnd: QueueEndAction = QueueEndAction.Stop,
 )

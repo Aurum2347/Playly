@@ -20,6 +20,10 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.drop
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 
 /** What to scan. Requests that arrive while a scan runs are merged and run once afterwards. */
@@ -130,12 +134,14 @@ class LibraryScanner(
             val now = clock()
             var report = ScanReport()
             var foundBefore = 0
+            // Read once: a filter changed during the scan queues another one (see start()).
+            val filter = settings.settings.first().libraryFilter
             if (plan.allFolders) report += retireMediaStoreTracks(now)
             if (plan.allFolders || plan.folderIds.isNotEmpty()) {
                 val all = sources.all()
                 val chosen = if (plan.allFolders) all else all.filter { it.id in plan.folderIds }
                 for (source in chosen) {
-                    val (result, found) = scanFolder(source, now, foundBefore)
+                    val (result, found) = scanFolder(source, filter, now, foundBefore)
                     report += result
                     foundBefore += found
                 }
@@ -168,7 +174,12 @@ class LibraryScanner(
         return ScanReport(missing = gone)
     }
 
-    private suspend fun scanFolder(source: LibrarySourceEntity, now: Long, foundBefore: Int): Pair<ScanReport, Int> {
+    private suspend fun scanFolder(
+        source: LibrarySourceEntity,
+        filter: LibraryFilter,
+        now: Long,
+        foundBefore: Int,
+    ): Pair<ScanReport, Int> {
         val existing = tracks.folderTracks(source.id)
         val known = existing.associateBy { it.uri }
         val scan = folderScanner.scan(source, known, now) { _progress.value = ScanProgress(foundBefore + it) }
@@ -191,17 +202,23 @@ class LibraryScanner(
                     .mapNotNull { it.key() }
                     .toHashSet()
                 val kept = scan.tracks.filter { it.key() == null || it.key() !in elsewhere }
-                val result = TrackReconciler.reconcile(existing, kept) { it.uri }
+                // Stage 9.1: hidden files count as absent from the folder.
+                val visible = if (filter.isEmpty) kept else kept.filterNot(filter::hides)
+                val result = TrackReconciler.reconcile(existing, visible) { it.uri }
+                val hiddenIds = if (visible.size == kept.size) emptyList() else hiddenRowIds(existing, kept, visible, result)
                 var applied = false
                 database.withTransaction {
                     // The user may have removed the folder while it was being read.
                     if (sources.get(source.id) == null) return@withTransaction
                     apply(result, now)
+                    // Hidden rows nothing needs are forgotten; the rest stay flagged unavailable.
+                    hiddenIds.chunked(SQLITE_MAX_ARGS).forEach { tracks.deleteUnreferenced(it) }
                     sources.updateScanState(source.id, accessible = true, scannedAt = now)
                     applied = true
                 }
                 if (!applied) return ScanReport() to 0
-                ScanReport(result.inserts.size, result.updates.size, result.missingIds.size, scan.unreadable) to scan.tracks.size
+                val missing = result.missingIds.size - hiddenIds.size
+                ScanReport(result.inserts.size, result.updates.size, missing, scan.unreadable) to visible.size
             }
         }
     }
@@ -224,6 +241,10 @@ class LibraryScanner(
                 if (clock() - lastFolderScanAt >= FOLDER_RESCAN_INTERVAL_MS) request(ScanPlan.FULL)
             }
         })
+        // Stage 9.1: a changed filter (short tracks, hidden folders) applies at once.
+        scope.launch {
+            settings.settings.map { it.libraryFilter }.distinctUntilChanged().drop(1).collect { request(ScanPlan.FULL) }
+        }
     }
 
     private data class LocationKey(val folder: String, val fileName: String, val size: Long)

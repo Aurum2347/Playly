@@ -76,4 +76,5 @@ fun folderTarget(node: FolderNode): CollectionTarget = CollectionTarget(
     artwork = null,
     trackIds = node.allTracks.map { it.id },
     placeholderIcon = R.drawable.ic_folder,
+    folderPath = node.path.takeIf { it.isNotEmpty() },
 )

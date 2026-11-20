@@ -190,6 +190,11 @@ private fun CollectionMenu(target: CollectionTarget, viewModel: TrackActionsView
             SheetAction(R.drawable.ic_favorite_border, stringResource(R.string.favorite_add), onClick = {
                 close { viewModel.addToFavorites(target.trackIds) }
             })
+            target.folderPath?.let { path ->
+                SheetAction(R.drawable.ic_visibility_off, stringResource(R.string.folder_menu_hide), onClick = {
+                    close { viewModel.hideFolder(path) }
+                })
+            }
             Spacer(Modifier.navigationBarsPadding().height(PlaylyTheme.spacing.md))
         }
     }

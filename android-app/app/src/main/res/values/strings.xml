@@ -502,4 +502,43 @@
     </plurals>
     <string name="duplicates_confirm_message">Это нельзя отменить. Треки пропадут и из плейлистов, и из избранного.</string>
     <string name="duplicates_failed">Не удалось найти дубликаты</string>
+
+    <!-- Stage 9.1: library filter, playback settings -->
+    <string name="settings_min_duration_title">Скрывать треки короче</string>
+    <string name="settings_min_duration_off">Не скрывать</string>
+    <string name="settings_min_duration_value">%1$d с</string>
+    <string name="settings_hidden_folder_title">Скрыта папка «%1$s»</string>
+    <string name="action_show_folder">Показать</string>
+    <string name="folder_menu_hide">Скрыть из медиатеки</string>
+    <string name="message_folder_hidden">Папка «%1$s» скрыта. Вернуть: Настройки → Медиатека</string>
+    <string name="message_folder_shown">Папка «%1$s» снова в медиатеке</string>
+    <string name="settings_forget_unavailable_title">Забыть недоступные файлы</string>
+    <plurals name="settings_forget_unavailable_subtitle">
+        <item quantity="one">%d трек пропал с диска или скрыт</item>
+        <item quantity="few">%d трека пропали с диска или скрыты</item>
+        <item quantity="many">%d треков пропали с диска или скрыты</item>
+        <item quantity="other">%d трека пропали с диска или скрыты</item>
+    </plurals>
+    <string name="dialog_forget_unavailable_title">Забыть недоступные файлы?</string>
+    <plurals name="dialog_forget_unavailable_message">
+        <item quantity="one">%d трек уйдёт из медиатеки, плейлистов, избранного и истории. Файлы на диске не трогаются; если файл вернётся, он появится снова как новый.</item>
+        <item quantity="few">%d трека уйдут из медиатеки, плейлистов, избранного и истории. Файлы на диске не трогаются; если файл вернётся, он появится снова как новый.</item>
+        <item quantity="many">%d треков уйдут из медиатеки, плейлистов, избранного и истории. Файлы на диске не трогаются; если файл вернётся, он появится снова как новый.</item>
+        <item quantity="other">%d трека уйдут из медиатеки, плейлистов, избранного и истории. Файлы на диске не трогаются; если файл вернётся, он появится снова как новый.</item>
+    </plurals>
+    <string name="action_forget">Забыть</string>
+    <plurals name="message_forgot_unavailable">
+        <item quantity="one">Забыт %d трек</item>
+        <item quantity="few">Забыто %d трека</item>
+        <item quantity="many">Забыто %d треков</item>
+        <item quantity="other">Забыто %d трека</item>
+    </plurals>
+    <string name="settings_section_playback">Воспроизведение</string>
+    <string name="settings_resume_title">Продолжать с места остановки</string>
+    <string name="settings_resume_subtitle">После перезапуска трек играет с той же секунды. Если выключено — с начала трека</string>
+    <string name="settings_noisy_title">Пауза при отключении наушников</string>
+    <string name="settings_noisy_subtitle">Провод вынут или Bluetooth отключился — музыка не заиграет из динамика</string>
+    <string name="settings_queue_end_title">Когда очередь закончилась</string>
+    <string name="settings_queue_end_stop">Остановиться на последнем треке</string>
+    <string name="settings_queue_end_rewind">Вернуться к началу очереди</string>
 </resources>

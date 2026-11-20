@@ -13,6 +13,7 @@ import com.playly.player.data.library.LibraryRepository
 import com.playly.player.data.playlists.PlaylistCard
 import com.playly.player.data.playlists.PlaylistRepository
 import com.playly.player.data.library.browse.CollectionKind
+import com.playly.player.data.settings.SettingsRepository
 import com.playly.player.playback.PlaybackController
 import com.playly.player.playback.PlaybackSource
 import kotlin.random.Random
@@ -63,6 +64,8 @@ data class CollectionTarget(
     val artwork: Artwork?,
     val trackIds: List<Long>,
     @DrawableRes val placeholderIcon: Int,
+    /** Stage 9.1: set for folders, which the menu can hide from the library. */
+    val folderPath: String? = null,
 )
 
 /** The one sheet that may be open (spec §12: reopening never stacks duplicates). */
@@ -90,6 +93,7 @@ class TrackActionsViewModel(
     private val favorites: FavoritesRepository,
     private val tags: TagRepository,
     private val files: TrackFiles,
+    private val settings: SettingsRepository,
 ) : ViewModel() {
     private val _sheet = MutableStateFlow<TrackSheet?>(null)
     val sheet: StateFlow<TrackSheet?> = _sheet.asStateFlow()
@@ -313,6 +317,24 @@ class TrackActionsViewModel(
     private fun undoFavorite(change: FavoriteChange) =
         UiAction(R.string.action_undo) { viewModelScope.launch { favorites.undo(change) } }
 
+    /**
+     * Stage 9.1: keeps a folder (and its subfolders) out of the library; the scanner applies it
+     * at once. Settings → Library lists hidden folders to show them again.
+     */
+    fun hideFolder(path: String) {
+        viewModelScope.launch {
+            val name = path.trim('/').substringAfterLast('/')
+            if (!settings.excludeFolder(path)) return@launch
+            _messages.send(
+                UiMessage(
+                    R.string.message_folder_hidden,
+                    listOf(name),
+                    action = UiAction(R.string.action_undo) { viewModelScope.launch { settings.includeFolder(path.trim('/')) } },
+                ),
+            )
+        }
+    }
+
     companion object {
         private const val TAG = "PlaylyActions"
 
@@ -326,7 +348,10 @@ class TrackActionsViewModel(
 
         val Factory = viewModelFactory {
             initializer {
-                TrackActionsViewModel(container.playback, container.library, container.playlists, container.favorites, container.tags, container.trackFiles)
+                TrackActionsViewModel(
+                    container.playback, container.library, container.playlists, container.favorites,
+                    container.tags, container.trackFiles, container.settings,
+                )
             }
         }
     }

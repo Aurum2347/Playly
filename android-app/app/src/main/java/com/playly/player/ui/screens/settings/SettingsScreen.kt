@@ -24,6 +24,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.playly.player.BuildConfig
 import com.playly.player.R
+import com.playly.player.data.library.scan.LibraryFilter
+import com.playly.player.data.settings.QueueEndAction
 import com.playly.player.designsystem.PlaylyTheme
 import com.playly.player.designsystem.components.ConfirmDialog
 import com.playly.player.designsystem.components.LoadingState
@@ -33,6 +35,7 @@ import com.playly.player.designsystem.components.PlaylyIconButton
 import com.playly.player.designsystem.components.PlaylyTopBar
 import com.playly.player.designsystem.components.RowDivider
 import com.playly.player.designsystem.components.SectionHeader
+import com.playly.player.designsystem.components.SettingsChoiceRow
 import com.playly.player.designsystem.components.SettingsGroup
 import com.playly.player.designsystem.components.SettingsRow
 import com.playly.player.designsystem.components.SettingsSwitchRow
@@ -56,6 +59,7 @@ fun SettingsScreen(onBack: () -> Unit, viewModel: SettingsViewModel = viewModel(
     val pickFolder = rememberFolderPicker(viewModel::addSource)
     var pendingRemovalId by rememberSaveable { mutableStateOf<Long?>(null) }
     var equalizerOpen by rememberSaveable { mutableStateOf(false) }
+    var confirmForget by rememberSaveable { mutableStateOf(false) }
 
     Column(Modifier.fillMaxSize()) {
         PlaylyTopBar(title = stringResource(R.string.settings_title), onBack = onBack)
@@ -135,6 +139,59 @@ fun SettingsScreen(onBack: () -> Unit, viewModel: SettingsViewModel = viewModel(
                             tracksLabel
                         },
                         icon = R.drawable.ic_music_note,
+                    )
+                    RowDivider()
+                    SettingsChoiceRow(
+                        title = stringResource(R.string.settings_min_duration_title),
+                        options = LibraryFilter.MIN_DURATION_CHOICES,
+                        selected = current.minTrackSeconds,
+                        label = { minDurationLabel(it) },
+                        onSelect = viewModel::setMinTrackSeconds,
+                    )
+                    current.excludedFolders.forEach { path ->
+                        RowDivider()
+                        HiddenFolderRow(path, onShow = { viewModel.includeFolder(path) })
+                    }
+                    if (current.unavailableCount > 0) {
+                        RowDivider()
+                        SettingsRow(
+                            title = stringResource(R.string.settings_forget_unavailable_title),
+                            subtitle = pluralStringResource(
+                                R.plurals.settings_forget_unavailable_subtitle,
+                                current.unavailableCount,
+                                current.unavailableCount,
+                            ),
+                            icon = R.drawable.ic_delete,
+                            onClick = { confirmForget = true },
+                        )
+                    }
+                }
+            }
+
+            item(key = "playback-header") { SectionHeader(stringResource(R.string.settings_section_playback)) }
+            item(key = "playback") {
+                val playback = current.playback
+                SettingsGroup {
+                    SettingsSwitchRow(
+                        title = stringResource(R.string.settings_resume_title),
+                        subtitle = stringResource(R.string.settings_resume_subtitle),
+                        checked = playback.resumePosition,
+                        onCheckedChange = viewModel::setResumePosition,
+                    )
+                    RowDivider()
+                    SettingsSwitchRow(
+                        title = stringResource(R.string.settings_noisy_title),
+                        subtitle = stringResource(R.string.settings_noisy_subtitle),
+                        checked = playback.pauseOnNoisy,
+                        onCheckedChange = viewModel::setPauseOnNoisy,
+                    )
+                    RowDivider()
+                    SettingsChoiceRow(
+                        title = stringResource(R.string.settings_queue_end_title),
+                        options = QueueEndAction.entries,
+                        selected = playback.queueEnd,
+                        label = { stringResource(it.label) },
+                        onSelect = viewModel::setQueueEnd,
                     )
                 }
             }
@@ -248,6 +305,23 @@ fun SettingsScreen(onBack: () -> Unit, viewModel: SettingsViewModel = viewModel(
         }
 
         val pending = current?.sources?.firstOrNull { it.source.id == pendingRemovalId }?.source
+        if (confirmForget && current != null) {
+            ConfirmDialog(
+                title = stringResource(R.string.dialog_forget_unavailable_title),
+                message = pluralStringResource(
+                    R.plurals.dialog_forget_unavailable_message,
+                    current.unavailableCount,
+                    current.unavailableCount,
+                ),
+                confirmLabel = stringResource(R.string.action_forget),
+                dangerous = true,
+                onConfirm = {
+                    confirmForget = false
+                    viewModel.forgetUnavailable()
+                },
+                onDismiss = { confirmForget = false },
+            )
+        }
         if (pending != null) {
             ConfirmDialog(
                 title = stringResource(R.string.dialog_remove_folder_title),
@@ -264,3 +338,30 @@ fun SettingsScreen(onBack: () -> Unit, viewModel: SettingsViewModel = viewModel(
     }
 }
 
+/** A folder hidden from the library (stage 9.1); the button puts it back. */
+@Composable
+private fun HiddenFolderRow(path: String, onShow: () -> Unit) {
+    val name = path.substringAfterLast('/')
+    SettingsRow(
+        title = stringResource(R.string.settings_hidden_folder_title, name),
+        subtitle = path,
+        icon = R.drawable.ic_folder,
+        trailing = {
+            PlaylyButton(
+                text = stringResource(R.string.action_show_folder),
+                onClick = onShow,
+                style = PlaylyButtonStyle.Text,
+            )
+        },
+    )
+}
+
+@Composable
+private fun minDurationLabel(seconds: Int): String =
+    if (seconds <= 0) stringResource(R.string.settings_min_duration_off) else stringResource(R.string.settings_min_duration_value, seconds)
+
+private val QueueEndAction.label: Int
+    get() = when (this) {
+        QueueEndAction.Stop -> R.string.settings_queue_end_stop
+        QueueEndAction.Rewind -> R.string.settings_queue_end_rewind
+    }

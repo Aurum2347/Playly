@@ -168,6 +168,16 @@ class LibraryRepository(
         ids.chunked(SQLITE_MAX_ARGS).forEach { tracks.deleteAll(it) }
     }
 
+    /**
+     * Stage 9.1 "Forget unavailable files": rows of vanished or hidden files go, out of playlists
+     * and favourites too. Returns their ids (the player's queue drops them).
+     */
+    suspend fun forgetUnavailable(): List<Long> = withContext(io) {
+        val ids = tracks.unavailableIds()
+        forgetTracks(ids)
+        ids
+    }
+
     /** Saves tags written to the file, with the file's new size and time (so a rescan keeps the row). */
     suspend fun updateTrack(track: TrackEntity) = withContext(io) { tracks.updateAll(listOf(track)) }
 

@@ -454,4 +454,37 @@
     </plurals>
     <string name="duplicates_confirm_message">This can’t be undone. The tracks will also disappear from playlists and favorites.</string>
     <string name="duplicates_failed">Couldn’t search for duplicates</string>
+
+    <!-- Stage 9.1: library filter, playback settings -->
+    <string name="settings_min_duration_title">Hide tracks shorter than</string>
+    <string name="settings_min_duration_off">Don’t hide</string>
+    <string name="settings_min_duration_value">%1$d s</string>
+    <string name="settings_hidden_folder_title">Hidden folder “%1$s”</string>
+    <string name="action_show_folder">Show</string>
+    <string name="folder_menu_hide">Hide from library</string>
+    <string name="message_folder_hidden">Folder “%1$s” hidden. To bring it back: Settings → Library</string>
+    <string name="message_folder_shown">Folder “%1$s” is back in the library</string>
+    <string name="settings_forget_unavailable_title">Forget unavailable files</string>
+    <plurals name="settings_forget_unavailable_subtitle">
+        <item quantity="one">%d track is gone from the disk or hidden</item>
+        <item quantity="other">%d tracks are gone from the disk or hidden</item>
+    </plurals>
+    <string name="dialog_forget_unavailable_title">Forget unavailable files?</string>
+    <plurals name="dialog_forget_unavailable_message">
+        <item quantity="one">%d track will leave the library, playlists, favorites and history. Files on the disk are not touched; if a file comes back, it shows up again as a new track.</item>
+        <item quantity="other">%d tracks will leave the library, playlists, favorites and history. Files on the disk are not touched; if a file comes back, it shows up again as a new track.</item>
+    </plurals>
+    <string name="action_forget">Forget</string>
+    <plurals name="message_forgot_unavailable">
+        <item quantity="one">Forgot %d track</item>
+        <item quantity="other">Forgot %d tracks</item>
+    </plurals>
+    <string name="settings_section_playback">Playback</string>
+    <string name="settings_resume_title">Continue where I stopped</string>
+    <string name="settings_resume_subtitle">After a restart the track plays from the same second. When off, from the start of the track</string>
+    <string name="settings_noisy_title">Pause when headphones disconnect</string>
+    <string name="settings_noisy_subtitle">Cable unplugged or Bluetooth gone: the music won’t start playing out loud</string>
+    <string name="settings_queue_end_title">When the queue ends</string>
+    <string name="settings_queue_end_stop">Stop on the last track</string>
+    <string name="settings_queue_end_rewind">Go back to the start of the queue</string>
 </resources>

@@ -6,13 +6,16 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.emptyPreferences
+import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
+import androidx.datastore.preferences.core.stringSetPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import com.playly.player.data.favorites.FavoriteSort
 import com.playly.player.data.library.TrackSort
 import com.playly.player.data.library.browse.AlbumSort
 import com.playly.player.data.library.browse.GroupSort
+import com.playly.player.data.library.scan.LibraryFilter
 import com.playly.player.playback.audio.Equalizer
 import java.io.IOException
 import kotlinx.coroutines.flow.Flow
@@ -47,7 +50,20 @@ data class AppSettings(
     val monoAudio: Boolean = false,
     val normalizeVolume: Boolean = false,
     val skipSilence: Boolean = false,
+    /** Stage 9.1: tracks shorter than this many seconds stay out of the library (0 = keep all). */
+    val minTrackSeconds: Int = 0,
+    /** Stage 9.1: folder paths hidden from the library, with their subfolders. */
+    val excludedFolders: Set<String> = emptySet(),
+    /** Stage 9.1: a restored queue continues where it stopped; off = from the start of the track. */
+    val resumePosition: Boolean = true,
+    /** Stage 9.1: pause when headphones are unplugged or Bluetooth disconnects. */
+    val pauseOnNoisy: Boolean = true,
+    /** Stage 9.1: what happens when the last track of the queue finished. */
+    val queueEnd: QueueEndAction = QueueEndAction.Stop,
 ) {
+    val libraryFilter: LibraryFilter
+        get() = LibraryFilter(minTrackSeconds * 1000L, excludedFolders)
+
     /** The bands the equaliser plays with (and the sliders show), whether it is on or not. */
     val eqGains: List<Float>
         get() = if (eqPreset == Equalizer.CUSTOM) eqCustomGains else Equalizer.preset(eqPreset)?.gains ?: Equalizer.FLAT_GAINS
@@ -73,6 +89,11 @@ class SettingsRepository(private val store: DataStore<Preferences>) {
         val monoAudio = booleanPreferencesKey("mono_audio")
         val normalizeVolume = booleanPreferencesKey("normalize_volume")
         val skipSilence = booleanPreferencesKey("skip_silence")
+        val minTrackSeconds = intPreferencesKey("min_track_seconds")
+        val excludedFolders = stringSetPreferencesKey("excluded_folders")
+        val resumePosition = booleanPreferencesKey("resume_position")
+        val pauseOnNoisy = booleanPreferencesKey("pause_on_noisy")
+        val queueEnd = stringPreferencesKey("queue_end")
     }
 
     val settings: Flow<AppSettings> = store.data
@@ -96,6 +117,11 @@ class SettingsRepository(private val store: DataStore<Preferences>) {
                 monoAudio = prefs[Keys.monoAudio] ?: false,
                 normalizeVolume = prefs[Keys.normalizeVolume] ?: false,
                 skipSilence = prefs[Keys.skipSilence] ?: false,
+                minTrackSeconds = minSecondsOf(prefs[Keys.minTrackSeconds]),
+                excludedFolders = prefs[Keys.excludedFolders].orEmpty(),
+                resumePosition = prefs[Keys.resumePosition] ?: true,
+                pauseOnNoisy = prefs[Keys.pauseOnNoisy] ?: true,
+                queueEnd = QueueEndAction.fromName(prefs[Keys.queueEnd]),
             )
         }
 
@@ -145,8 +171,47 @@ class SettingsRepository(private val store: DataStore<Preferences>) {
     suspend fun setNormalizeVolume(enabled: Boolean) = store.edit { it[Keys.normalizeVolume] = enabled }
 
     suspend fun setSkipSilence(enabled: Boolean) = store.edit { it[Keys.skipSilence] = enabled }
+
+    suspend fun setMinTrackSeconds(seconds: Int) = store.edit { it[Keys.minTrackSeconds] = minSecondsOf(seconds) }
+
+    /** True when [folderPath] was newly hidden. */
+    suspend fun excludeFolder(folderPath: String): Boolean {
+        val path = LibraryFilter.normalize(folderPath) ?: return false
+        var added = false
+        store.edit { prefs ->
+            val current = prefs[Keys.excludedFolders].orEmpty()
+            added = path !in current
+            if (added) prefs[Keys.excludedFolders] = current + path
+        }
+        return added
+    }
+
+    suspend fun includeFolder(folderPath: String) = store.edit { prefs ->
+        prefs[Keys.excludedFolders] = prefs[Keys.excludedFolders].orEmpty() - folderPath
+    }
+
+    suspend fun setResumePosition(enabled: Boolean) = store.edit { it[Keys.resumePosition] = enabled }
+
+    suspend fun setPauseOnNoisy(enabled: Boolean) = store.edit { it[Keys.pauseOnNoisy] = enabled }
+
+    suspend fun setQueueEnd(action: QueueEndAction) = store.edit { it[Keys.queueEnd] = action.name }
 }
 
 /** Unknown or removed preset ids fall back to Flat. */
 private fun eqPresetOf(raw: String?): String =
     if (raw != null && (raw == Equalizer.CUSTOM || Equalizer.preset(raw) != null)) raw else Equalizer.FLAT
+
+/** Only the offered choices are stored; anything else keeps every track. */
+private fun minSecondsOf(raw: Int?): Int = raw?.takeIf { it in LibraryFilter.MIN_DURATION_CHOICES } ?: 0
+
+/** Stage 9.1: after the last track of a queue that does not repeat. */
+enum class QueueEndAction {
+    /** Stay on the finished last track (play starts it again). */
+    Stop,
+    /** Go back to the first track, paused: play starts the whole queue again. */
+    Rewind;
+
+    companion object {
+        fun fromName(name: String?): QueueEndAction = entries.firstOrNull { it.name == name } ?: Stop
+    }
+}
