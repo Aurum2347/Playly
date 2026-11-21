@@ -4,6 +4,7 @@ import android.app.Application
 import coil3.ImageLoader
 import coil3.PlatformContext
 import coil3.SingletonImageLoader
+import com.playly.player.core.ErrorLog
 import com.playly.player.data.artwork.ArtworkImageLoader
 
 class PlaylyApplication : Application(), SingletonImageLoader.Factory {
@@ -12,6 +13,7 @@ class PlaylyApplication : Application(), SingletonImageLoader.Factory {
 
     override fun onCreate() {
         super.onCreate()
+        ErrorLog.init(this)
         container = AppContainer(this)
         // Scans start when the app comes to the foreground and stop observing when it leaves.
         container.scanner.start()

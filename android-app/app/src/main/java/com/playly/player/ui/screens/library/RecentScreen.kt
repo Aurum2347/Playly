@@ -1,6 +1,6 @@
 package com.playly.player.ui.screens.library
 
-import android.util.Log
+import com.playly.player.core.ErrorLog
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
@@ -40,7 +40,7 @@ class RecentViewModel(library: LibraryRepository, private val playback: Playback
     val tracks: StateFlow<List<TrackListItem>?> = library.recentlyPlayed(LIMIT)
         .map<_, List<TrackListItem>?> { it }
         .catch { error ->
-            Log.e("PlaylyLibrary", "Recently played failed", error)
+            ErrorLog.e("PlaylyLibrary", "Recently played failed", error)
             emit(emptyList())
         }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)

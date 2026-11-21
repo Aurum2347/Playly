@@ -100,3 +100,11 @@ data class PlaylyMotion(val reduced: Boolean = false) {
         val EmphasizedAccelerate: Easing = CubicBezierEasing(0.3f, 0f, 0.8f, 0.15f)
     }
 }
+
+/** Stage 9.3: list rows as the user set them (Settings → Appearance). */
+@Immutable
+data class PlaylyListStyle(val compact: Boolean = false, val showArtwork: Boolean = true) {
+    val rowMinHeight: Dp get() = if (compact) 52.dp else 64.dp
+    val artSize: Dp get() = if (compact) 40.dp else 52.dp
+    val verticalPadding: Dp get() = if (compact) 4.dp else 8.dp
+}

@@ -1,5 +1,6 @@
 package com.playly.player.data.library.scan
 
+import com.playly.player.core.ErrorLog
 import android.content.Context
 import android.util.Log
 import androidx.lifecycle.DefaultLifecycleObserver
@@ -154,7 +155,7 @@ class LibraryScanner(
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            Log.e(TAG, "Scan failed", e)
+            ErrorLog.e(TAG, "Scan failed", e)
             _lastFailed.value = true
             ScanReport(failed = true)
         } finally {

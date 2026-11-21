@@ -1,7 +1,7 @@
 package com.playly.player.ui.screens.library
 
+import com.playly.player.core.ErrorLog
 import android.net.Uri
-import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
@@ -62,7 +62,7 @@ class LibraryViewModel(
             library.snapshot
                 .map<_, LibraryUiState> { LibraryUiState.Ready(LibraryContent.from(it), it.sources.size) }
                 .catch { error ->
-                    Log.e(TAG, "Library state failed", error)
+                    ErrorLog.e(TAG, "Library state failed", error)
                     emit(LibraryUiState.Error)
                 }
         }
@@ -73,7 +73,7 @@ class LibraryViewModel(
         .flowOn(Dispatchers.Default)
         .map<_, List<TrackListItem>?> { it }
         .catch { error ->
-            Log.e(TAG, "Track list failed", error)
+            ErrorLog.e(TAG, "Track list failed", error)
             emit(emptyList())
         }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
@@ -87,7 +87,7 @@ class LibraryViewModel(
     val recent: StateFlow<List<TrackListItem>?> = library.recentlyPlayed(RECENT_ON_HOME)
         .map<_, List<TrackListItem>?> { it }
         .catch { error ->
-            Log.e(TAG, "Recently played failed", error)
+            ErrorLog.e(TAG, "Recently played failed", error)
             emit(emptyList())
         }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)

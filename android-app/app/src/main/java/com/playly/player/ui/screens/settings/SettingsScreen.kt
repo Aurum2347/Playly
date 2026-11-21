@@ -20,6 +20,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -62,7 +63,12 @@ private fun backupFileName(): String =
 
 /** Only settings that actually work today; each later stage adds its own section. */
 @Composable
-fun SettingsScreen(onBack: () -> Unit, viewModel: SettingsViewModel = viewModel(factory = SettingsViewModel.Factory)) {
+fun SettingsScreen(
+    onBack: () -> Unit,
+    onOpenErrorLog: () -> Unit = {},
+    onOpenLicenses: () -> Unit = {},
+    viewModel: SettingsViewModel = viewModel(factory = SettingsViewModel.Factory),
+) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val progress by viewModel.scanProgress.collectAsStateWithLifecycle()
     CollectMessages(viewModel.messages)
@@ -78,8 +84,11 @@ fun SettingsScreen(onBack: () -> Unit, viewModel: SettingsViewModel = viewModel(
     var confirmRestore by rememberSaveable { mutableStateOf<String?>(null) }
     val busy by viewModel.busy.collectAsStateWithLifecycle()
     val coverCacheBytes by viewModel.coverCacheBytes.collectAsStateWithLifecycle()
+    val errorCount by viewModel.errorCount.collectAsStateWithLifecycle()
+    var background by remember { mutableStateOf(readBackgroundStatus(context)) }
     LifecycleResumeEffect(Unit) {
         viewModel.refreshCoverCache()
+        background = readBackgroundStatus(context)
         onPauseOrDispose { }
     }
     val createBackup = rememberCreateDocument(BACKUP_MIME, viewModel::exportBackup)
@@ -282,8 +291,12 @@ fun SettingsScreen(onBack: () -> Unit, viewModel: SettingsViewModel = viewModel(
                         checked = current.playerArtworkTint,
                         onCheckedChange = viewModel::setPlayerArtworkTint,
                     )
+                    AppearanceRows(current.appearance, viewModel)
                 }
             }
+
+            item(key = "background-header") { SectionHeader(stringResource(R.string.settings_section_background)) }
+            item(key = "background") { BackgroundGroup(current.playback.keepPlayingOnSwipe, background, viewModel) }
 
             item(key = "data-header") { SectionHeader(stringResource(R.string.settings_section_data)) }
             item(key = "data") {
@@ -332,6 +345,8 @@ fun SettingsScreen(onBack: () -> Unit, viewModel: SettingsViewModel = viewModel(
                         subtitle = stringResource(R.string.settings_version_value, BuildConfig.VERSION_NAME, BuildConfig.VERSION_CODE),
                     )
                     RowDivider()
+                    BuildRow()
+                    RowDivider()
                     SettingsRow(
                         title = stringResource(R.string.settings_offline_title),
                         subtitle = stringResource(R.string.settings_offline_subtitle),
@@ -349,6 +364,7 @@ fun SettingsScreen(onBack: () -> Unit, viewModel: SettingsViewModel = viewModel(
                             }
                         },
                     )
+                    AboutRows(errorCount, onOpenErrorLog, onOpenLicenses)
                 }
             }
             // Respects the inset consumed by the scaffold when the mini-player is under the page.

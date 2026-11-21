@@ -68,6 +68,12 @@ data class AppSettings(
     val pauseOnNoisy: Boolean = true,
     /** Stage 9.1: what happens when the last track of the queue finished. */
     val queueEnd: QueueEndAction = QueueEndAction.Stop,
+    /** Stage 9.3: accent colour, list row height, covers in lists. */
+    val accent: AccentChoice = AccentChoice.Neutral,
+    val listDensity: ListDensity = ListDensity.Comfortable,
+    val listArtwork: Boolean = true,
+    /** Stage 9.3: swiping Playly away from recent apps keeps the music playing (off = stop). */
+    val keepPlayingOnSwipe: Boolean = true,
 ) {
     val libraryFilter: LibraryFilter
         get() = LibraryFilter(minTrackSeconds * 1000L, excludedFolders)
@@ -102,13 +108,17 @@ class SettingsRepository(private val store: DataStore<Preferences>) {
         val resumePosition = booleanPreferencesKey("resume_position")
         val pauseOnNoisy = booleanPreferencesKey("pause_on_noisy")
         val queueEnd = stringPreferencesKey("queue_end")
+        val accent = stringPreferencesKey("accent")
+        val listDensity = stringPreferencesKey("list_density")
+        val listArtwork = booleanPreferencesKey("list_artwork")
+        val keepPlayingOnSwipe = booleanPreferencesKey("keep_playing_on_swipe")
 
         /** Stage 9.2: what a backup carries. Not the scan time or onboarding: those belong to the device. */
         val backupBooleans = listOf(
             reduceMotion, openPlayerOnPlay, playerArtworkTint, eqEnabled, monoAudio, normalizeVolume,
-            skipSilence, resumePosition, pauseOnNoisy,
+            skipSilence, resumePosition, pauseOnNoisy, listArtwork, keepPlayingOnSwipe,
         )
-        val backupStrings = listOf(trackSort, albumSort, artistSort, genreSort, folderSort, favoriteSort, eqPreset, eqCustomGains, queueEnd)
+        val backupStrings = listOf(trackSort, albumSort, artistSort, genreSort, folderSort, favoriteSort, eqPreset, eqCustomGains, queueEnd, accent, listDensity)
         val backupInts = listOf(minTrackSeconds)
         val backupStringSets = listOf(excludedFolders)
     }
@@ -172,6 +182,10 @@ class SettingsRepository(private val store: DataStore<Preferences>) {
                 resumePosition = prefs[Keys.resumePosition] ?: true,
                 pauseOnNoisy = prefs[Keys.pauseOnNoisy] ?: true,
                 queueEnd = QueueEndAction.fromName(prefs[Keys.queueEnd]),
+                accent = AccentChoice.fromName(prefs[Keys.accent]),
+                listDensity = ListDensity.fromName(prefs[Keys.listDensity]),
+                listArtwork = prefs[Keys.listArtwork] ?: true,
+                keepPlayingOnSwipe = prefs[Keys.keepPlayingOnSwipe] ?: true,
             )
         }
 
@@ -245,6 +259,14 @@ class SettingsRepository(private val store: DataStore<Preferences>) {
     suspend fun setPauseOnNoisy(enabled: Boolean) = store.edit { it[Keys.pauseOnNoisy] = enabled }
 
     suspend fun setQueueEnd(action: QueueEndAction) = store.edit { it[Keys.queueEnd] = action.name }
+
+    suspend fun setAccent(accent: AccentChoice) = store.edit { it[Keys.accent] = accent.name }
+
+    suspend fun setListDensity(density: ListDensity) = store.edit { it[Keys.listDensity] = density.name }
+
+    suspend fun setListArtwork(enabled: Boolean) = store.edit { it[Keys.listArtwork] = enabled }
+
+    suspend fun setKeepPlayingOnSwipe(enabled: Boolean) = store.edit { it[Keys.keepPlayingOnSwipe] = enabled }
 }
 
 /** Unknown or removed preset ids fall back to Flat. */

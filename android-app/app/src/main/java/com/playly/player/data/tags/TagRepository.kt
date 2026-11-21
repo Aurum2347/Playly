@@ -1,5 +1,6 @@
 package com.playly.player.data.tags
 
+import com.playly.player.core.ErrorLog
 import android.content.ContentResolver
 import android.content.Context
 import android.net.Uri
@@ -106,7 +107,7 @@ class TagRepository(
             return TagSaveResult.NoWriteAccess
         } catch (e: Exception) {
             Log.w(TAG, "Writing ${track.fileName} failed; restoring the original", e)
-            runCatching { writeOver(uri, original) }.onFailure { Log.e(TAG, "Restoring ${track.fileName} failed", it) }
+            runCatching { writeOver(uri, original) }.onFailure { ErrorLog.e(TAG, "Restoring ${track.fileName} failed", it) }
             return TagSaveResult.Failed
         }
         return TagSaveResult.Saved(updatedRow(track, edit, uri, edited.length()))

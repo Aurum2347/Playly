@@ -1,6 +1,6 @@
 package com.playly.player.ui.screens.search
 
-import android.util.Log
+import com.playly.player.core.ErrorLog
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -85,7 +85,7 @@ class SearchViewModel(
     )
         .mapLatest { (text, content) -> resolve(text, content) }
         .catch { error ->
-            Log.e("PlaylySearch", "Search failed", error)
+            ErrorLog.e("PlaylySearch", "Search failed", error)
             emit(SearchUiState.Error)
         }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), SearchUiState.Idle)

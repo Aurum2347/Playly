@@ -13,9 +13,13 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.playly.player.data.settings.AccentChoice
 import com.playly.player.data.settings.AppSettings
+import com.playly.player.data.settings.ListDensity
+import com.playly.player.designsystem.PlaylyListStyle
 import com.playly.player.designsystem.PlaylyTheme
 import com.playly.player.ui.screens.onboarding.OnboardingScreen
 
@@ -27,7 +31,14 @@ fun PlaylyRoot(appViewModel: AppViewModel = viewModel(factory = AppViewModel.Fac
     val systemAnimationsOff = rememberSystemAnimationsDisabled()
     val current = settings
 
-    PlaylyTheme(reduceMotion = systemAnimationsOff || current?.reduceMotion == true) {
+    PlaylyTheme(
+        reduceMotion = systemAnimationsOff || current?.reduceMotion == true,
+        accent = Color(current?.accent?.argb ?: AccentChoice.Neutral.argb),
+        listStyle = PlaylyListStyle(
+            compact = current?.listDensity == ListDensity.Compact,
+            showArtwork = current?.listArtwork != false,
+        ),
+    ) {
         Box(Modifier.fillMaxSize().background(PlaylyTheme.colors.background)) {
             // Settings load from disk in a few milliseconds; show only the background meanwhile
             // so onboarding never flashes for returning users.

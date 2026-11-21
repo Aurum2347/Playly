@@ -1,5 +1,6 @@
 package com.playly.player.ui.actions
 
+import com.playly.player.core.ErrorLog
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
@@ -19,7 +20,6 @@ import com.playly.player.playback.PlaybackSource
 import kotlin.random.Random
 import androidx.annotation.DrawableRes
 import androidx.annotation.StringRes
-import android.util.Log
 import com.playly.player.data.library.DeleteResult
 import com.playly.player.data.library.TrackFiles
 import com.playly.player.data.tags.TagEdit
@@ -278,7 +278,7 @@ class TrackActionsViewModel(
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
-                Log.e(TAG, "Saving tags failed", e)
+                ErrorLog.e(TAG, "Saving tags failed", e)
                 TagSaveResult.Failed
             }
             val error = when (result) {

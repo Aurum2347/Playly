@@ -1,6 +1,6 @@
 package com.playly.player.ui.screens.duplicates
 
-import android.util.Log
+import com.playly.player.core.ErrorLog
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
@@ -69,7 +69,7 @@ class DuplicatesViewModel(
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
-                Log.e(TAG, "Duplicate search failed", e)
+                ErrorLog.e(TAG, "Duplicate search failed", e)
                 DuplicatesState.Failed
             } finally {
                 scanning = false

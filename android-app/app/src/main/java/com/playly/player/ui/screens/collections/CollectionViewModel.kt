@@ -1,6 +1,6 @@
 package com.playly.player.ui.screens.collections
 
-import android.util.Log
+import com.playly.player.core.ErrorLog
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.createSavedStateHandle
@@ -61,7 +61,7 @@ class CollectionViewModel(
     val state: StateFlow<CollectionPageState> = browser.index
         .map { index -> page(index)?.let { CollectionPageState.Ready(it) } ?: CollectionPageState.Missing }
         .catch { error ->
-            Log.e("PlaylyCollection", "Collection page failed", error)
+            ErrorLog.e("PlaylyCollection", "Collection page failed", error)
             emit(CollectionPageState.Missing)
         }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), CollectionPageState.Loading)

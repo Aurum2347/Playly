@@ -585,4 +585,47 @@
     </plurals>
     <string name="playlist_message_imported_partly">Плейлист «%1$s»: найдено %2$d, нет в медиатеке %3$d</string>
     <string name="playlist_message_import_failed">Не удалось прочитать файл плейлиста</string>
+    <!-- Stage 9.3: appearance, background, about, error log -->
+    <string name="settings_accent_title">Акцентный цвет</string>
+    <string name="accent_neutral">Нейтральный</string>
+    <string name="accent_blue">Синий</string>
+    <string name="accent_green">Зелёный</string>
+    <string name="accent_violet">Фиолетовый</string>
+    <string name="accent_orange">Оранжевый</string>
+    <string name="accent_pink">Розовый</string>
+    <string name="settings_density_title">Плотность списков</string>
+    <string name="density_comfortable">Обычная</string>
+    <string name="density_compact">Компактная</string>
+    <string name="settings_list_artwork_title">Обложки в списках</string>
+    <string name="settings_list_artwork_subtitle">Если выключить, вместо обложек будут значки: большая медиатека листается легче</string>
+    <string name="settings_section_background">Фоновая работа</string>
+    <string name="settings_keep_playing_title">Играть после смахивания из недавних</string>
+    <string name="settings_keep_playing_subtitle">Если выключить, музыка остановится, когда вы смахнёте Playly из списка недавних приложений</string>
+    <string name="settings_battery_title">Экономия батареи</string>
+    <string name="settings_battery_unrestricted">Без ограничений: Android не останавливает Playly в фоне</string>
+    <string name="settings_battery_optimized">Обычный режим. Музыка в фоне играет как медиа и обычно не прерывается. Если всё же останавливается - разрешите Playly работать без ограничений</string>
+    <string name="settings_battery_restricted">Работа в фоне ограничена: музыка может остановиться при выключенном экране. Нажмите и снимите ограничение</string>
+    <string name="settings_notifications_off_title">Уведомления выключены</string>
+    <string name="settings_notifications_off_subtitle">Без них нет управления музыкой в шторке и на экране блокировки. Нажмите, чтобы включить</string>
+    <string name="settings_build_title">Сборка</string>
+    <string name="settings_build_value">%1$s · Android %2$s (API %3$d) · %4$s</string>
+    <string name="settings_licenses_title">Лицензии</string>
+    <string name="settings_licenses_subtitle">Открытые библиотеки, на которых сделан Playly</string>
+    <string name="settings_error_log_title">Журнал ошибок</string>
+    <string name="settings_error_log_empty">Ошибок не было</string>
+    <plurals name="settings_error_log_count">
+        <item quantity="one">%d запись</item>
+        <item quantity="few">%d записи</item>
+        <item quantity="many">%d записей</item>
+        <item quantity="other">%d записи</item>
+    </plurals>
+    <string name="error_log_privacy">Журнал хранится только на этом телефоне и сам никуда не отправляется. Пути к файлам сокращены до имени файла. Поделиться им можно вручную, если хотите сообщить об ошибке.</string>
+    <string name="error_log_empty">Журнал пуст</string>
+    <string name="error_log_empty_subtitle">Сюда попадут сбои приложения и ошибки воспроизведения</string>
+    <string name="action_share">Поделиться</string>
+    <string name="dialog_clear_log_title">Очистить журнал ошибок?</string>
+    <string name="dialog_clear_log_message">Все записи будут удалены.</string>
+    <string name="message_log_cleared">Журнал ошибок очищен</string>
+    <string name="error_log_share_subject">Playly: журнал ошибок</string>
+    <string name="licenses_intro">Все библиотеки ниже распространяются по лицензии Apache 2.0. Её текст: apache.org/licenses/LICENSE-2.0</string>
 </resources>

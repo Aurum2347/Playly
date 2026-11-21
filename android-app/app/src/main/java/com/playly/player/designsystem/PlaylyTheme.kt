@@ -12,12 +12,14 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.staticCompositionLocalOf
+import androidx.compose.ui.graphics.Color
 
 val LocalPlaylyColors = staticCompositionLocalOf { PlaylyColors() }
 val LocalPlaylyTypography = staticCompositionLocalOf { PlaylyTypography() }
 val LocalPlaylySpacing = staticCompositionLocalOf { PlaylySpacing() }
 val LocalPlaylyShapes = staticCompositionLocalOf { PlaylyShapes() }
 val LocalPlaylyMotion = staticCompositionLocalOf { PlaylyMotion() }
+val LocalPlaylyListStyle = staticCompositionLocalOf { PlaylyListStyle() }
 
 object PlaylyTheme {
     val colors: PlaylyColors @Composable @ReadOnlyComposable get() = LocalPlaylyColors.current
@@ -25,6 +27,7 @@ object PlaylyTheme {
     val spacing: PlaylySpacing @Composable @ReadOnlyComposable get() = LocalPlaylySpacing.current
     val shapes: PlaylyShapes @Composable @ReadOnlyComposable get() = LocalPlaylyShapes.current
     val motion: PlaylyMotion @Composable @ReadOnlyComposable get() = LocalPlaylyMotion.current
+    val listStyle: PlaylyListStyle @Composable @ReadOnlyComposable get() = LocalPlaylyListStyle.current
 }
 
 /**
@@ -32,8 +35,13 @@ object PlaylyTheme {
  * (text fields, switches, dialogs, snackbars) pick up the same monochrome palette.
  */
 @Composable
-fun PlaylyTheme(reduceMotion: Boolean = false, content: @Composable () -> Unit) {
-    val colors = remember { PlaylyColors() }
+fun PlaylyTheme(
+    reduceMotion: Boolean = false,
+    accent: Color = PlaylyColors().accent,
+    listStyle: PlaylyListStyle = PlaylyListStyle(),
+    content: @Composable () -> Unit,
+) {
+    val colors = remember(accent) { PlaylyColors(accent = accent) }
     val typography = remember { PlaylyTypography() }
     val motion = remember(reduceMotion) { PlaylyMotion(reduced = reduceMotion) }
     val scheme = remember(colors) {
@@ -83,6 +91,7 @@ fun PlaylyTheme(reduceMotion: Boolean = false, content: @Composable () -> Unit) 
             LocalPlaylySpacing provides PlaylySpacing(),
             LocalPlaylyShapes provides PlaylyShapes(),
             LocalPlaylyMotion provides motion,
+            LocalPlaylyListStyle provides listStyle,
             LocalIndication provides ripple(color = colors.textPrimary),
             LocalTextSelectionColors provides TextSelectionColors(
                 handleColor = colors.accent,

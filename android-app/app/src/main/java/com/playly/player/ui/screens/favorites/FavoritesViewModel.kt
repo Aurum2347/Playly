@@ -1,6 +1,6 @@
 package com.playly.player.ui.screens.favorites
 
-import android.util.Log
+import com.playly.player.core.ErrorLog
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
@@ -40,7 +40,7 @@ class FavoritesViewModel(
         settings.settings.map { it.favoriteSort }.distinctUntilChanged(),
     ) { rows, sort -> FavoritesPage(rows.sortedFor(sort).map { it.track }, sort) }
         .catch { error ->
-            Log.e("PlaylyFavorites", "Favourites failed", error)
+            ErrorLog.e("PlaylyFavorites", "Favourites failed", error)
             emit(FavoritesPage(emptyList(), FavoriteSort.Added))
         }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)

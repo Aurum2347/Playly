@@ -525,4 +525,45 @@
     </plurals>
     <string name="playlist_message_imported_partly">Playlist “%1$s”: found: %2$d, not in the library: %3$d</string>
     <string name="playlist_message_import_failed">Couldn’t read the playlist file</string>
+    <!-- Stage 9.3: appearance, background, about, error log -->
+    <string name="settings_accent_title">Accent color</string>
+    <string name="accent_neutral">Neutral</string>
+    <string name="accent_blue">Blue</string>
+    <string name="accent_green">Green</string>
+    <string name="accent_violet">Violet</string>
+    <string name="accent_orange">Orange</string>
+    <string name="accent_pink">Pink</string>
+    <string name="settings_density_title">List density</string>
+    <string name="density_comfortable">Comfortable</string>
+    <string name="density_compact">Compact</string>
+    <string name="settings_list_artwork_title">Covers in lists</string>
+    <string name="settings_list_artwork_subtitle">When off, lists show icons instead of covers: a big library scrolls lighter</string>
+    <string name="settings_section_background">Background</string>
+    <string name="settings_keep_playing_title">Keep playing when swiped away</string>
+    <string name="settings_keep_playing_subtitle">When off, the music stops if you swipe Playly away from recent apps</string>
+    <string name="settings_battery_title">Battery saving</string>
+    <string name="settings_battery_unrestricted">Unrestricted: Android doesn’t stop Playly in the background</string>
+    <string name="settings_battery_optimized">Standard mode. Background music plays as media and usually isn’t interrupted. If it still stops, allow Playly to run unrestricted</string>
+    <string name="settings_battery_restricted">Background use is restricted: the music may stop when the screen is off. Tap to lift the restriction</string>
+    <string name="settings_notifications_off_title">Notifications are off</string>
+    <string name="settings_notifications_off_subtitle">Without them there are no music controls in the shade and on the lock screen. Tap to turn them on</string>
+    <string name="settings_build_title">Build</string>
+    <string name="settings_build_value">%1$s · Android %2$s (API %3$d) · %4$s</string>
+    <string name="settings_licenses_title">Licenses</string>
+    <string name="settings_licenses_subtitle">Open-source libraries Playly is built on</string>
+    <string name="settings_error_log_title">Error log</string>
+    <string name="settings_error_log_empty">No errors so far</string>
+    <plurals name="settings_error_log_count">
+        <item quantity="one">%d entry</item>
+        <item quantity="other">%d entries</item>
+    </plurals>
+    <string name="error_log_privacy">The log stays on this phone and is never sent anywhere by itself. File paths are cut down to the file name. You can share it by hand if you want to report a problem.</string>
+    <string name="error_log_empty">The log is empty</string>
+    <string name="error_log_empty_subtitle">App crashes and playback errors will show up here</string>
+    <string name="action_share">Share</string>
+    <string name="dialog_clear_log_title">Clear the error log?</string>
+    <string name="dialog_clear_log_message">All entries will be deleted.</string>
+    <string name="message_log_cleared">Error log cleared</string>
+    <string name="error_log_share_subject">Playly: error log</string>
+    <string name="licenses_intro">All libraries below are distributed under the Apache License 2.0. Its text: apache.org/licenses/LICENSE-2.0</string>
 </resources>

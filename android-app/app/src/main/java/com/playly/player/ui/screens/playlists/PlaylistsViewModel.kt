@@ -1,6 +1,6 @@
 package com.playly.player.ui.screens.playlists
 
-import android.util.Log
+import com.playly.player.core.ErrorLog
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
@@ -46,7 +46,7 @@ class PlaylistsViewModel(
             FavoritesCard(rows.size, rows.sumOf { it.track.durationMs }, rows.maxByOrNull { it.addedAt }?.track?.artwork())
         }
         .catch { error ->
-            Log.e("PlaylyPlaylists", "Favourites summary failed", error)
+            ErrorLog.e("PlaylyPlaylists", "Favourites summary failed", error)
             emit(FavoritesCard())
         }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), FavoritesCard())
@@ -59,7 +59,7 @@ class PlaylistsViewModel(
             playlists.cards
                 .map<_, PlaylistsUiState> { PlaylistsUiState.Ready(it) }
                 .catch { error ->
-                    Log.e("PlaylyPlaylists", "Playlists failed", error)
+                    ErrorLog.e("PlaylyPlaylists", "Playlists failed", error)
                     emit(PlaylistsUiState.Error)
                 }
         }

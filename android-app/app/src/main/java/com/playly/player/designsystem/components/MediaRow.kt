@@ -28,7 +28,6 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.dp
 import com.playly.player.R
 import com.playly.player.data.artwork.Artwork
 import com.playly.player.designsystem.PlaylyTheme
@@ -59,6 +58,7 @@ fun MediaRow(
     accessibilityActions: List<CustomAccessibilityAction> = emptyList(),
 ) {
     val colors = PlaylyTheme.colors
+    val listStyle = PlaylyTheme.listStyle
     val background by animateColorAsState(
         targetValue = if (isActive) colors.selected else Color.Transparent,
         animationSpec = PlaylyTheme.motion.press(),
@@ -75,7 +75,7 @@ fun MediaRow(
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .defaultMinSize(minHeight = 64.dp)
+            .defaultMinSize(minHeight = listStyle.rowMinHeight)
             .drawBehind { drawRect(background) }
             .then(clicks)
             .semantics(mergeDescendants = true) {
@@ -86,18 +86,19 @@ fun MediaRow(
             .padding(
                 start = if (leading != null) PlaylyTheme.spacing.xxs else PlaylyTheme.spacing.md,
                 end = if (hasEndControls) PlaylyTheme.spacing.xxs else PlaylyTheme.spacing.md,
-                top = PlaylyTheme.spacing.xs,
-                bottom = PlaylyTheme.spacing.xs,
+                top = listStyle.verticalPadding,
+                bottom = listStyle.verticalPadding,
             ),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(PlaylyTheme.spacing.sm),
     ) {
         leading?.invoke(this)
         val faded = if (dimmed) Modifier.alpha(DIMMED_ALPHA) else Modifier
-        if (artwork != null) {
-            TrackArtwork(artwork, modifier = faded, placeholderIcon = placeholderIcon)
+        // "Covers in lists" off: the icon only, no image is decoded (big libraries scroll lighter).
+        if (artwork != null && listStyle.showArtwork) {
+            TrackArtwork(artwork, modifier = faded, size = listStyle.artSize, placeholderIcon = placeholderIcon)
         } else {
-            ArtworkPlaceholder(modifier = faded, icon = placeholderIcon)
+            ArtworkPlaceholder(modifier = faded, size = listStyle.artSize, icon = placeholderIcon)
         }
         Column(Modifier.weight(1f).then(faded)) {
             Text(

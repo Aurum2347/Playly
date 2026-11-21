@@ -68,6 +68,10 @@ import com.playly.player.ui.navigation.LibraryRoute
 import com.playly.player.ui.navigation.AddTracksRoute
 import com.playly.player.ui.navigation.FavoritesRoute
 import com.playly.player.ui.navigation.DuplicatesRoute
+import com.playly.player.ui.navigation.ErrorLogRoute
+import com.playly.player.ui.navigation.LicensesRoute
+import com.playly.player.ui.screens.about.ErrorLogScreen
+import com.playly.player.ui.screens.about.LicensesScreen
 import com.playly.player.ui.screens.duplicates.DuplicatesScreen
 import com.playly.player.ui.navigation.CollectionRoute
 import com.playly.player.ui.screens.collections.CollectionScreen
@@ -146,6 +150,8 @@ fun MainScaffold(
     val openRecent = dropUnlessResumed { nav.navigate(RecentRoute) { launchSingleTop = true } }
     val openFavorites = dropUnlessResumed { nav.navigate(FavoritesRoute) { launchSingleTop = true } }
     val openDuplicates = dropUnlessResumed { nav.navigate(DuplicatesRoute) { launchSingleTop = true } }
+    val openErrorLog = dropUnlessResumed { nav.navigate(ErrorLogRoute) { launchSingleTop = true } }
+    val openLicenses = dropUnlessResumed { nav.navigate(LicensesRoute) { launchSingleTop = true } }
     val goBack = dropUnlessResumed { nav.popBackStack() }
     val openPlaylist: (Long) -> Unit = { id ->
         // Same guard as dropUnlessResumed: a second tap during the transition does nothing.
@@ -231,7 +237,15 @@ fun MainScaffold(
                     composable<SettingsRoute>(
                         enterTransition = { slideInHorizontally(motion.enter()) { it / 4 } + fadeIn(motion.enter()) },
                         popExitTransition = { slideOutHorizontally(motion.exit()) { it / 4 } + fadeOut(motion.exit()) },
-                    ) { SettingsScreen(onBack = goBack) }
+                    ) { SettingsScreen(onBack = goBack, onOpenErrorLog = openErrorLog, onOpenLicenses = openLicenses) }
+                    composable<ErrorLogRoute>(
+                        enterTransition = { slideInHorizontally(motion.enter()) { it / 4 } + fadeIn(motion.enter()) },
+                        popExitTransition = { slideOutHorizontally(motion.exit()) { it / 4 } + fadeOut(motion.exit()) },
+                    ) { ErrorLogScreen(onBack = goBack) }
+                    composable<LicensesRoute>(
+                        enterTransition = { slideInHorizontally(motion.enter()) { it / 4 } + fadeIn(motion.enter()) },
+                        popExitTransition = { slideOutHorizontally(motion.exit()) { it / 4 } + fadeOut(motion.exit()) },
+                    ) { LicensesScreen(onBack = goBack) }
                 }
                 AnimatedVisibility(
                     visible = miniVisible,

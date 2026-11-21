@@ -17,6 +17,11 @@ import com.playly.player.data.library.AddSourceResult
 import com.playly.player.data.library.LibraryRepository
 import com.playly.player.data.settings.AppSettings
 import com.playly.player.data.settings.QueueEndAction
+import com.playly.player.data.settings.AccentChoice
+import com.playly.player.data.settings.ListDensity
+import com.playly.player.core.ErrorLog
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import com.playly.player.data.settings.SettingsRepository
 import com.playly.player.playback.PlaybackController
 import com.playly.player.playback.audio.Equalizer
@@ -30,6 +35,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -47,6 +53,15 @@ data class SettingsUiState(
     val minTrackSeconds: Int,
     val excludedFolders: List<String>,
     val playback: PlaybackSettingsUi,
+    /** Stage 9.3. */
+    val appearance: AppearanceSettingsUi,
+)
+
+/** Stage 9.3: accent, list rows. */
+data class AppearanceSettingsUi(
+    val accent: AccentChoice,
+    val listDensity: ListDensity,
+    val listArtwork: Boolean,
 )
 
 /** Stage 9.1: the "Playback" section. */
@@ -54,6 +69,8 @@ data class PlaybackSettingsUi(
     val resumePosition: Boolean,
     val pauseOnNoisy: Boolean,
     val queueEnd: QueueEndAction,
+    /** Stage 9.3: the "Background" section. */
+    val keepPlayingOnSwipe: Boolean,
 )
 
 /** Stage 8.3: the "Sound" section and the equaliser sheet. */
@@ -100,7 +117,8 @@ class SettingsViewModel(
             sound = SoundSettingsUi.of(app),
             minTrackSeconds = app.minTrackSeconds,
             excludedFolders = app.excludedFolders.sortedWith(String.CASE_INSENSITIVE_ORDER),
-            playback = PlaybackSettingsUi(app.resumePosition, app.pauseOnNoisy, app.queueEnd),
+            playback = PlaybackSettingsUi(app.resumePosition, app.pauseOnNoisy, app.queueEnd, app.keepPlayingOnSwipe),
+            appearance = AppearanceSettingsUi(app.accent, app.listDensity, app.listArtwork),
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
@@ -156,6 +174,21 @@ class SettingsViewModel(
     fun setPauseOnNoisy(enabled: Boolean) = update { settings.setPauseOnNoisy(enabled) }
 
     fun setQueueEnd(action: QueueEndAction) = update { settings.setQueueEnd(action) }
+
+    // --- Stage 9.3: appearance, background, error log ---
+
+    fun setAccent(accent: AccentChoice) = update { settings.setAccent(accent) }
+
+    fun setListDensity(density: ListDensity) = update { settings.setListDensity(density) }
+
+    fun setListArtwork(enabled: Boolean) = update { settings.setListArtwork(enabled) }
+
+    fun setKeepPlayingOnSwipe(enabled: Boolean) = update { settings.setKeepPlayingOnSwipe(enabled) }
+
+    /** Entries in the local error log, for the row in "About". */
+    val errorCount: StateFlow<Int> = ErrorLog.version
+        .map { withContext(Dispatchers.IO) { ErrorLog.entries().size } }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 0)
 
     /** Unavailable rows go from the library, playlists, favourites and the player's queue. */
     fun forgetUnavailable() = update {

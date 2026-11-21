@@ -7,6 +7,8 @@ import com.playly.player.data.db.TrackEntity
 import com.playly.player.data.library.scan.LibraryFilter
 import com.playly.player.data.library.scan.TrackReconciler
 import com.playly.player.data.library.scan.hiddenRowIds
+import com.playly.player.data.settings.AccentChoice
+import com.playly.player.data.settings.ListDensity
 import com.playly.player.data.settings.QueueEndAction
 import com.playly.player.data.settings.SettingsRepository
 import kotlinx.coroutines.flow.Flow
@@ -129,5 +131,29 @@ class SettingsStageTest {
         assertEquals(setOf("Music/Voice"), repo.settings.first().excludedFolders)
         repo.includeFolder("Music/Voice")
         assertTrue(repo.settings.first().excludedFolders.isEmpty())
+    }
+
+    @Test
+    fun appearanceAndBackgroundSettings() = withRepo { repo ->
+        val defaults = repo.settings.first()
+        assertEquals(AccentChoice.Neutral, defaults.accent)
+        assertEquals(ListDensity.Comfortable, defaults.listDensity)
+        assertTrue(defaults.listArtwork)
+        assertTrue(defaults.keepPlayingOnSwipe)
+        repo.setAccent(AccentChoice.Violet)
+        repo.setListDensity(ListDensity.Compact)
+        repo.setListArtwork(false)
+        repo.setKeepPlayingOnSwipe(false)
+        val saved = repo.exportBackup()
+        withRepo { other ->
+            other.importBackup(saved)
+            val s = other.settings.first()
+            assertEquals(AccentChoice.Violet, s.accent)
+            assertEquals(ListDensity.Compact, s.listDensity)
+            assertFalse(s.listArtwork)
+            assertFalse(s.keepPlayingOnSwipe)
+        }
+        assertEquals(AccentChoice.Neutral, AccentChoice.fromName("Rainbow"))
+        assertEquals(ListDensity.Comfortable, ListDensity.fromName(null))
     }
 }

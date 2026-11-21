@@ -27,6 +27,7 @@ import androidx.media3.session.SessionCommand
 import com.playly.player.MainActivity
 import com.playly.player.PlaylyApplication
 import com.playly.player.R
+import com.playly.player.core.ErrorLog
 import com.playly.player.data.db.PlayHistoryDao
 import com.playly.player.data.library.scan.ScanPlan
 import com.playly.player.data.settings.AppSettings
@@ -145,7 +146,7 @@ class PlaybackService : MediaSessionService() {
         // Stage 9.1: playback behaviour from the "Playback" settings.
         scope.launch {
             settings.settings
-                .map { PlaybackPrefs(it.pauseOnNoisy, it.resumePosition, it.queueEnd) }
+                .map { PlaybackPrefs(it.pauseOnNoisy, it.resumePosition, it.queueEnd, it.keepPlayingOnSwipe) }
                 .distinctUntilChanged()
                 .collect { prefs ->
                     playbackPrefs = prefs
@@ -158,6 +159,11 @@ class PlaybackService : MediaSessionService() {
 
     override fun onTaskRemoved(rootIntent: Intent?) {
         saveNow()
+        if (!playbackPrefs.keepPlayingOnSwipe) {
+            // Stage 9.3 "Stop when swiped away": pause, save, drop the notification and the service.
+            pauseAllPlayersAndStopSelf()
+            return
+        }
         // Default: keep playing if audio is ongoing, otherwise pause and stop the service.
         super.onTaskRemoved(rootIntent)
     }
@@ -475,6 +481,7 @@ class PlaybackService : MediaSessionService() {
         consecutiveErrors++
         val skip = PlaybackPolicy.shouldSkipAfterError(consecutiveErrors, player.mediaItemCount, player.hasNextMediaItem())
         Log.w(TAG, "Cannot play track ${item?.mediaId} (${error.errorCodeName}), skip=$skip", error)
+        ErrorLog.record(TAG, "Cannot play “${item?.mediaMetadata?.title}” (${error.errorCodeName}), skipped: $skip", error)
         session?.broadcastCustomCommand(
             SessionCommand(PlaybackCommands.EVENT_ERROR, Bundle.EMPTY),
             Bundle().apply {
@@ -587,4 +594,6 @@ internal data class PlaybackPrefs(
     val pauseOnNoisy: Boolean = true,
     val resumePosition: Boolean = true,
     val queueEnd: QueueEndAction = QueueEndAction.Stop,
+    /** Stage 9.3. */
+    val keepPlayingOnSwipe: Boolean = true,
 )

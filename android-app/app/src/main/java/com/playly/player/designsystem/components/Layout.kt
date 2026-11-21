@@ -31,6 +31,7 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.playly.player.R
 import com.playly.player.designsystem.PlaylyTheme
@@ -181,10 +182,14 @@ fun RowDivider(modifier: Modifier = Modifier) {
 
 /** Square placeholder used wherever artwork is missing. */
 @Composable
-fun ArtworkPlaceholder(modifier: Modifier = Modifier, @DrawableRes icon: Int = R.drawable.ic_music_note) {
+fun ArtworkPlaceholder(
+    modifier: Modifier = Modifier,
+    size: Dp = PlaylyTheme.spacing.listArt,
+    @DrawableRes icon: Int = R.drawable.ic_music_note,
+) {
     Box(
         modifier = modifier
-            .size(PlaylyTheme.spacing.listArt)
+            .size(size)
             .clip(PlaylyTheme.shapes.small)
             .background(PlaylyTheme.colors.surfaceRaised),
         contentAlignment = Alignment.Center,
